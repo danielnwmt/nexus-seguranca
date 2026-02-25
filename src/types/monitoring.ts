@@ -1,9 +1,12 @@
 export interface Client {
   id: string;
   name: string;
+  cpf: string;
   email: string;
   phone: string;
   address: string;
+  storagePath: string;
+  retentionDays: 5 | 10 | 15 | 20 | 25 | 30;
   camerasCount: number;
   status: 'active' | 'inactive';
   createdAt: string;

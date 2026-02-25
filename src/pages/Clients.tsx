@@ -1,31 +1,36 @@
 import { useState } from 'react';
-import { Plus, Search, Users, Pencil, Trash2, Camera } from 'lucide-react';
+import { Plus, Search, Users, Pencil, Trash2, Camera, HardDrive, Calendar } from 'lucide-react';
 import { mockClients } from '@/data/mockData';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Client } from '@/types/monitoring';
+
+const RETENTION_OPTIONS = [5, 10, 15, 20, 25, 30] as const;
 
 const Clients = () => {
   const [clients, setClients] = useState(mockClients);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [form, setForm] = useState({ name: '', email: '', phone: '', address: '' });
+  const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '', storagePath: '', retentionDays: '30' });
 
   const filtered = clients.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.email.toLowerCase().includes(search.toLowerCase())
+    c.email.toLowerCase().includes(search.toLowerCase()) ||
+    c.cpf.includes(search)
   );
 
   const handleSave = () => {
     if (editingClient) {
-      setClients(prev => prev.map(c => c.id === editingClient.id ? { ...c, ...form } : c));
+      setClients(prev => prev.map(c => c.id === editingClient.id ? { ...c, ...form, retentionDays: Number(form.retentionDays) as Client['retentionDays'] } : c));
     } else {
       const newClient: Client = {
         id: String(clients.length + 1),
         ...form,
+        retentionDays: Number(form.retentionDays) as Client['retentionDays'],
         camerasCount: 0,
         status: 'active',
         createdAt: new Date().toISOString().split('T')[0],
@@ -37,7 +42,7 @@ const Clients = () => {
 
   const handleEdit = (client: Client) => {
     setEditingClient(client);
-    setForm({ name: client.name, email: client.email, phone: client.phone, address: client.address });
+    setForm({ name: client.name, cpf: client.cpf, email: client.email, phone: client.phone, address: client.address, storagePath: client.storagePath, retentionDays: String(client.retentionDays) });
     setDialogOpen(true);
   };
 
@@ -46,7 +51,7 @@ const Clients = () => {
   };
 
   const resetForm = () => {
-    setForm({ name: '', email: '', phone: '', address: '' });
+    setForm({ name: '', cpf: '', email: '', phone: '', address: '', storagePath: '', retentionDays: '30' });
     setEditingClient(null);
     setDialogOpen(false);
   };
@@ -60,30 +65,53 @@ const Clients = () => {
         </div>
         <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) resetForm(); else setDialogOpen(true); }}>
           <DialogTrigger asChild>
-            <Button className="gap-2" onClick={() => { setEditingClient(null); setForm({ name: '', email: '', phone: '', address: '' }); }}>
+            <Button className="gap-2" onClick={() => { setEditingClient(null); setForm({ name: '', cpf: '', email: '', phone: '', address: '', storagePath: '', retentionDays: '30' }); }}>
               <Plus className="w-4 h-4" /> Novo Cliente
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-card border-border">
+          <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-foreground">{editingClient ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <div>
-                <Label className="text-xs text-muted-foreground">Nome</Label>
-                <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Nome do cliente" className="bg-muted border-border" />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Nome</Label>
+                  <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Nome do cliente" className="bg-muted border-border" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">CPF / CNPJ</Label>
+                  <Input value={form.cpf} onChange={e => setForm(p => ({ ...p, cpf: e.target.value }))} placeholder="000.000.000-00" className="bg-muted border-border font-mono" />
+                </div>
               </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Email</Label>
-                <Input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="email@exemplo.com" className="bg-muted border-border" />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Telefone</Label>
-                <Input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="(11) 9999-9999" className="bg-muted border-border" />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Email</Label>
+                  <Input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="email@exemplo.com" className="bg-muted border-border" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Telefone</Label>
+                  <Input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="(11) 9999-9999" className="bg-muted border-border" />
+                </div>
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Endereço</Label>
                 <Input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} placeholder="Rua, número - Cidade" className="bg-muted border-border" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground flex items-center gap-1"><HardDrive className="w-3 h-3" /> Caminho de Gravação</Label>
+                <Input value={form.storagePath} onChange={e => setForm(p => ({ ...p, storagePath: e.target.value }))} placeholder="D:\Gravacoes\Cliente" className="bg-muted border-border font-mono text-xs" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="w-3 h-3" /> Dias de Retenção</Label>
+                <Select value={form.retentionDays} onValueChange={v => setForm(p => ({ ...p, retentionDays: v }))}>
+                  <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    {RETENTION_OPTIONS.map(d => (
+                      <SelectItem key={d} value={String(d)}>{d} dias</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <Button onClick={handleSave} className="w-full">{editingClient ? 'Salvar Alterações' : 'Adicionar Cliente'}</Button>
             </div>
@@ -103,8 +131,9 @@ const Clients = () => {
           <thead>
             <tr className="bg-muted/50 border-b border-border">
               <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Cliente</th>
+              <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">CPF/CNPJ</th>
               <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Contato</th>
-              <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Endereço</th>
+              <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Gravação</th>
               <th className="text-center text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Câmeras</th>
               <th className="text-center text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Status</th>
               <th className="text-right text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Ações</th>
@@ -118,10 +147,16 @@ const Clients = () => {
                   <p className="text-[10px] text-muted-foreground font-mono">ID: {client.id}</p>
                 </td>
                 <td className="px-4 py-3">
+                  <p className="text-xs font-mono text-foreground">{client.cpf}</p>
+                </td>
+                <td className="px-4 py-3">
                   <p className="text-xs text-foreground">{client.email}</p>
                   <p className="text-[10px] text-muted-foreground">{client.phone}</p>
                 </td>
-                <td className="px-4 py-3 text-xs text-muted-foreground max-w-[200px] truncate">{client.address}</td>
+                <td className="px-4 py-3">
+                  <p className="text-[10px] font-mono text-foreground truncate max-w-[180px]" title={client.storagePath}>{client.storagePath}</p>
+                  <p className="text-[10px] text-muted-foreground">{client.retentionDays} dias de retenção</p>
+                </td>
                 <td className="px-4 py-3 text-center">
                   <span className="inline-flex items-center gap-1 text-xs font-mono text-foreground">
                     <Camera className="w-3 h-3 text-primary" />
