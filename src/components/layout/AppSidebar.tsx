@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Camera, Users, Bell, Shield } from 'lucide-react';
+import { LayoutDashboard, Camera, Users, Bell } from 'lucide-react';
+import bravoLogo from '@/assets/bravo-logo.webp';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -15,12 +16,10 @@ const AppSidebar = () => {
     <aside className="w-64 h-screen bg-sidebar border-r border-sidebar-border flex flex-col fixed left-0 top-0 z-30">
       <div className="p-5 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
-            <Shield className="w-5 h-5 text-primary" />
-          </div>
+          <img src={bravoLogo} alt="Bravo Monitoramento" className="w-9 h-9 object-contain" />
           <div>
-            <h1 className="text-sm font-bold text-foreground tracking-wide">SENTINEL</h1>
-            <p className="text-[10px] font-mono text-muted-foreground tracking-widest">MONITORING</p>
+            <h1 className="text-sm font-bold text-foreground tracking-wide">BRAVO</h1>
+            <p className="text-[10px] font-mono text-muted-foreground tracking-widest">MONITORAMENTO</p>
           </div>
         </div>
       </div>
