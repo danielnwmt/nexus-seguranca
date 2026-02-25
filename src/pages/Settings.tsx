@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit } from 'lucide-react';
+import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,7 @@ interface SystemUser {
   id: string;
   name: string;
   email: string;
+  password: string;
   level: 'N1' | 'N2' | 'admin';
   active: boolean;
 }
@@ -55,14 +56,15 @@ const Settings = () => {
   ]);
 
   const [users, setUsers] = useState<SystemUser[]>([
-    { id: '1', name: 'Administrador', email: 'admin@bravo.com', level: 'admin', active: true },
-    { id: '2', name: 'Operador 01', email: 'operador01@bravo.com', level: 'N2', active: true },
-    { id: '3', name: 'Visualizador', email: 'viewer@bravo.com', level: 'N1', active: true },
+    { id: '1', name: 'Administrador', email: 'admin@bravo.com', password: '1234', level: 'admin', active: true },
   ]);
+
+  const [pwaEnabled, setPwaEnabled] = useState(true);
+  const systemUrl = window.location.origin;
 
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
-  const [userForm, setUserForm] = useState<Omit<SystemUser, 'id'>>({ name: '', email: '', level: 'N1', active: true });
+  const [userForm, setUserForm] = useState<Omit<SystemUser, 'id'>>({ name: '', email: '', password: '', level: 'N1', active: true });
 
   const handleBankChange = (bankId: string, field: keyof BankConfig, value: string | boolean) => {
     setBanks(prev => prev.map(b => b.id === bankId ? { ...b, [field]: value } : b));
@@ -74,13 +76,13 @@ const Settings = () => {
 
   const openAddUser = () => {
     setEditingUser(null);
-    setUserForm({ name: '', email: '', level: 'N1', active: true });
+    setUserForm({ name: '', email: '', password: '', level: 'N1', active: true });
     setUserDialogOpen(true);
   };
 
   const openEditUser = (user: SystemUser) => {
     setEditingUser(user);
-    setUserForm({ name: user.name, email: user.email, level: user.level, active: user.active });
+    setUserForm({ name: user.name, email: user.email, password: user.password, level: user.level, active: user.active });
     setUserDialogOpen(true);
   };
 
@@ -119,6 +121,7 @@ const Settings = () => {
           <TabsTrigger value="banks" className="gap-2"><Building2 className="w-4 h-4" />Bancos</TabsTrigger>
           <TabsTrigger value="permissions" className="gap-2"><ShieldCheck className="w-4 h-4" />Permissões</TabsTrigger>
           <TabsTrigger value="system" className="gap-2"><RefreshCw className="w-4 h-4" />Sistema</TabsTrigger>
+          <TabsTrigger value="mobile" className="gap-2"><Smartphone className="w-4 h-4" />App Mobile</TabsTrigger>
         </TabsList>
 
         {/* ===== BANCOS ===== */}
@@ -295,6 +298,72 @@ const Settings = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ===== APP MOBILE ===== */}
+        <TabsContent value="mobile" className="space-y-4">
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="text-base">Acesso Mobile</CardTitle>
+              <CardDescription className="text-xs">Configure o acesso ao sistema via dispositivos móveis</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm">Modo PWA (Progressive Web App)</Label>
+                  <p className="text-xs text-muted-foreground">Permite instalar o app direto pelo navegador</p>
+                </div>
+                <Switch checked={pwaEnabled} onCheckedChange={setPwaEnabled} />
+              </div>
+
+              <div className="border-t border-border pt-4 space-y-2">
+                <Label className="text-xs text-muted-foreground">URL do Sistema</Label>
+                <div className="flex gap-2">
+                  <Input value={systemUrl} readOnly className="bg-muted border-border font-mono text-sm" />
+                  <Button variant="outline" size="icon" onClick={() => { navigator.clipboard.writeText(systemUrl); toast({ title: 'URL copiada!' }); }}>
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="border-t border-border pt-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <QrCode className="w-10 h-10 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">QR Code</p>
+                    <p className="text-xs text-muted-foreground">Escaneie com seu celular para acessar o sistema</p>
+                  </div>
+                </div>
+                <div className="w-40 h-40 bg-muted border border-border rounded-lg flex items-center justify-center">
+                  <QrCode className="w-20 h-20 text-muted-foreground/50" />
+                </div>
+              </div>
+
+              <div className="border-t border-border pt-4 space-y-3">
+                <Label className="text-sm font-medium">Instruções de Instalação</Label>
+                <div className="space-y-2">
+                  <Card className="bg-muted border-border">
+                    <CardContent className="p-3">
+                      <p className="text-sm font-medium text-foreground">📱 Android</p>
+                      <p className="text-xs text-muted-foreground">Abra o Chrome → Menu (⋮) → "Adicionar à tela inicial" → Instalar</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-muted border-border">
+                    <CardContent className="p-3">
+                      <p className="text-sm font-medium text-foreground">🍎 iOS (iPhone/iPad)</p>
+                      <p className="text-xs text-muted-foreground">Abra o Safari → Compartilhar (↑) → "Adicionar à Tela de Início"</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-muted border-border">
+                    <CardContent className="p-3">
+                      <p className="text-sm font-medium text-foreground">💻 Windows</p>
+                      <p className="text-xs text-muted-foreground">Abra o Edge/Chrome → Ícone de instalar na barra de endereço → Instalar</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Dialog de usuário */}
@@ -307,6 +376,10 @@ const Settings = () => {
             <div className="space-y-1">
               <Label className="text-xs">Nome</Label>
               <Input value={userForm.name} onChange={e => setUserForm(p => ({ ...p, name: e.target.value }))} className="bg-muted border-border" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Senha</Label>
+              <Input type="password" value={userForm.password} onChange={e => setUserForm(p => ({ ...p, password: e.target.value }))} className="bg-muted border-border" placeholder="••••" />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Email</Label>
