@@ -1,80 +1,126 @@
 
 
-## Plan: Configure PWA Completo com `vite-plugin-pwa`
+## Plano: Banco de Dados + Autenticacao + Manual de Instalacao
 
-### Situacao atual
+### Situacao Atual
+- O sistema usa apenas **dados mock** (arrays vazios em `mockData.ts`) — nada e salvo no banco
+- Existe apenas 1 tabela no banco: `company_settings`
+- Nao ha autenticacao — qualquer pessoa pode acessar
+- 5 entidades precisam de tabelas: **clients**, **cameras**, **guards**, **alarms**, **invoices**
 
-O projeto tem um `manifest.json` manual e meta tags basicas, mas nao possui um service worker, o que significa que o app nao funciona offline e nao dispara o prompt de instalacao automaticamente.
+### Etapa 1 — Criar tabelas no banco de dados
 
-### O que sera feito
+Criar as seguintes tabelas com RLS (Row-Level Security):
 
-1. **Instalar `vite-plugin-pwa`** — Adicionar a dependencia que gera automaticamente o service worker e gerencia o manifest.
+```text
+clients
+├── id (uuid, PK)
+├── name (text)
+├── cpf (text)
+├── email (text)
+├── phone (text)
+├── address (text)
+├── cameras_count (integer, default 0)
+├── status (text, default 'active')
+├── monthly_fee (numeric)
+├── payment_due_day (integer)
+├── created_at (timestamptz)
+└── updated_at (timestamptz)
 
-2. **Configurar `vite.config.ts`** — Integrar o plugin VitePWA com:
-   - Manifest completo (nome, icones, cores, display standalone)
-   - Workbox com `navigateFallbackDenylist: [/^\/~oauth/]` (requisito de seguranca)
-   - Estrategia `generateSW` para cache automatico de assets
-   - `registerType: 'autoUpdate'` para atualizacoes transparentes
+cameras
+├── id (uuid, PK)
+├── name (text)
+├── client_id (uuid, FK → clients)
+├── stream_url (text)
+├── protocol (text) — RTSP | RTMP
+├── status (text, default 'online')
+├── location (text)
+├── resolution (text)
+├── storage_path (text)
+├── retention_days (integer, default 30)
+├── analytics (text[]) — array de tipos
+├── created_at (timestamptz)
+└── updated_at (timestamptz)
 
-3. **Atualizar `index.html`** — Adicionar meta tags para Apple (apple-mobile-web-app-capable, apple-touch-icon) e atualizar og:title/description para Bravo Monitoramento.
+guards
+├── id (uuid, PK)
+├── name (text)
+├── cpf (text)
+├── phone (text)
+├── email (text)
+├── shift (text) — day | night | 12x36
+├── status (text, default 'active')
+├── client_ids (text[])
+├── hire_date (date)
+├── created_at (timestamptz)
+└── updated_at (timestamptz)
 
-4. **Criar icones PWA** — Gerar icones placeholder nos tamanhos 192x192 e 512x512 em `public/` (SVG convertido).
+alarms
+├── id (uuid, PK)
+├── camera_id (uuid, FK → cameras)
+├── camera_name (text)
+├── client_name (text)
+├── type (text)
+├── severity (text)
+├── message (text)
+├── acknowledged (boolean, default false)
+├── created_at (timestamptz)
+└── updated_at (timestamptz)
 
-5. **Registrar o Service Worker em `src/main.tsx`** — Importar `registerSW` do vite-plugin-pwa para ativar o auto-update.
-
-6. **Remover `public/manifest.json`** — O plugin VitePWA gera o manifest automaticamente, evitando conflito.
-
-### Detalhes tecnicos
-
-**vite.config.ts** — Adicao do plugin:
-```typescript
-import { VitePWA } from 'vite-plugin-pwa';
-
-// No array de plugins:
-VitePWA({
-  registerType: 'autoUpdate',
-  workbox: {
-    navigateFallbackDenylist: [/^\/~oauth/],
-    globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}'],
-  },
-  manifest: {
-    name: 'Bravo Monitoramento',
-    short_name: 'Bravo',
-    description: 'Sistema de monitoramento de câmeras',
-    theme_color: '#0a0f14',
-    background_color: '#0a0f14',
-    display: 'standalone',
-    orientation: 'any',
-    icons: [
-      { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
-      { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
-      { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-    ],
-  },
-})
+invoices
+├── id (uuid, PK)
+├── client_id (uuid, FK → clients)
+├── client_name (text)
+├── amount (numeric)
+├── due_date (date)
+├── status (text, default 'pending')
+├── payment_method (text)
+├── bank (text)
+├── paid_at (date)
+├── boleto_url (text)
+├── created_at (timestamptz)
+└── updated_at (timestamptz)
 ```
 
-**src/main.tsx** — Registro do SW:
-```typescript
-import { registerSW } from 'virtual:pwa-register';
-registerSW({ immediate: true });
-```
+Todas as tabelas terao RLS habilitado, permitindo acesso apenas para usuarios autenticados.
 
-**index.html** — Meta tags adicionais:
-```html
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<link rel="apple-touch-icon" href="/pwa-192x192.png" />
-```
+### Etapa 2 — Autenticacao (apenas admin)
 
-**Icones** — Criar `public/pwa-192x192.png` e `public/pwa-512x512.png` como SVGs simples com o logo/inicial "B" em fundo escuro.
+- Criar pagina de **Login** com email e senha
+- Criar rota `/login` publica e proteger todas as demais rotas
+- Apenas usuarios registrados no sistema poderao acessar
+- Nao haverá tela de cadastro publico — o admin sera criado manualmente
+- Politicas RLS: somente `auth.uid() IS NOT NULL` pode ler/escrever
 
-### Arquivos modificados
-- `package.json` — adicionar `vite-plugin-pwa`
-- `vite.config.ts` — configurar plugin
-- `src/main.tsx` — registrar service worker
-- `src/vite-env.d.ts` — adicionar types do virtual:pwa-register
-- `index.html` — meta tags Apple + limpeza og tags
-- `public/manifest.json` — remover (substituido pelo plugin)
-- `public/pwa-192x192.png` e `public/pwa-512x512.png` — criar icones
+### Etapa 3 — Conectar paginas ao banco
+
+Substituir todos os `useState(mockData)` por queries reais usando `@tanstack/react-query` + Supabase client:
+
+- **Clients.tsx** — CRUD de clientes no banco
+- **Cameras.tsx** — CRUD de cameras no banco
+- **Guards.tsx** — CRUD de vigilantes no banco
+- **Alarms.tsx** — CRUD de alarmes no banco
+- **Financial.tsx** — CRUD de faturas no banco
+- **Index.tsx** — Dashboard com dados reais do banco
+
+### Etapa 4 — Manual de instalacao em maquina propria
+
+Criar arquivo `INSTALL.md` na raiz do projeto com instrucoes para:
+
+1. Requisitos do servidor (Node.js, npm/bun)
+2. Clone do repositorio
+3. Configuracao das variaveis de ambiente (.env)
+4. Build do projeto (`npm run build`)
+5. Servir com Nginx ou outro servidor web
+6. Configuracao do dominio/SSL
+7. Criacao do usuario admin no banco
+8. Acesso inicial ao sistema
+
+### Detalhes Tecnicos
+
+- As queries usarao `useQuery` e `useMutation` do TanStack React Query
+- Os tipos do Supabase serao regenerados automaticamente apos criar as tabelas
+- RLS garantira que somente usuarios logados acessem os dados
+- O `mockData.ts` sera mantido como fallback mas nao sera mais usado nas paginas
+- Trigger no banco para atualizar `cameras_count` em clients quando cameras forem adicionadas/removidas
 
