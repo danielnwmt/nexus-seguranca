@@ -1,22 +1,63 @@
 # Manual de Instalação — Bravo Monitoramento
 
-## Requisitos
+---
 
-- **Node.js** 18+ (ou Bun)
-- **npm** ou **bun**
-- **Nginx** (ou outro servidor web para produção)
-- **Supabase** (projeto próprio ou self-hosted)
+## 🖥️ Instalação no Windows (Recomendado)
+
+### Instalação Automática
+
+1. Baixe/clone o projeto no servidor
+2. Clique com botão direito em `install-windows.ps1` → **Executar com PowerShell como Administrador**
+
+Ou via terminal (Administrador):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File install-windows.ps1
+```
+
+Com parâmetros personalizados:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File install-windows.ps1 `
+  -InstallDir "D:\BravoMonitoramento" `
+  -Port 8080 `
+  -SupabaseUrl "https://SEU_PROJETO.supabase.co" `
+  -SupabaseKey "sua_anon_key" `
+  -SupabaseProjectId "seu_project_id"
+```
+
+O instalador faz tudo automaticamente:
+- ✅ Verifica/instala Node.js
+- ✅ Instala dependências
+- ✅ Gera build de produção
+- ✅ Configura servidor web
+- ✅ Cria serviço Windows (com NSSM)
+- ✅ Cria atalho na Área de Trabalho
+
+### Desinstalar
+
+```powershell
+powershell -ExecutionPolicy Bypass -File desinstalar-bravo.ps1
+```
 
 ---
 
-## 1. Clone o Repositório
+## 🐧 Instalação no Linux/Ubuntu
+
+### Requisitos
+
+- **Node.js** 18+ (ou Bun)
+- **npm** ou **bun**
+- **Nginx** (ou outro servidor web)
+
+### 1. Clone o Repositório
 
 ```bash
 git clone https://github.com/seu-usuario/bravo-monitoramento.git
 cd bravo-monitoramento
 ```
 
-## 2. Instale as Dependências
+### 2. Instale as Dependências
 
 ```bash
 npm install
@@ -24,7 +65,7 @@ npm install
 bun install
 ```
 
-## 3. Configure as Variáveis de Ambiente
+### 3. Configure as Variáveis de Ambiente
 
 Crie um arquivo `.env` na raiz do projeto:
 
@@ -34,38 +75,17 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sua_anon_key_aqui
 VITE_SUPABASE_PROJECT_ID=seu_project_id
 ```
 
-> As credenciais estão no painel do Supabase → Settings → API.
+> As credenciais estão no painel do backend → Settings → API.
 
-## 4. Configure o Banco de Dados
-
-Execute as migrations SQL no Supabase (SQL Editor) para criar as tabelas:
-- `clients`, `cameras`, `guards`, `alarms`, `invoices`, `user_roles`, `company_settings`
-
-Todas as tabelas possuem RLS (Row-Level Security) habilitado — somente usuários autenticados têm acesso.
-
-## 5. Crie o Usuário Admin
-
-No Supabase Dashboard → Authentication → Users → **Add User**:
-
-- **Email:** `admin@bravo.com`
-- **Senha:** `sua-senha-segura`
-- **Auto Confirm:** Sim
-
-O trigger `on_auth_user_created` atribuirá automaticamente a role `admin` ao novo usuário.
-
-## 6. Build do Projeto
+### 4. Build do Projeto
 
 ```bash
 npm run build
-# ou
-bun run build
 ```
 
 Os arquivos serão gerados na pasta `dist/`.
 
-## 7. Configuração do Nginx
-
-Exemplo de configuração para servir o app:
+### 5. Configuração do Nginx
 
 ```nginx
 server {
@@ -79,7 +99,6 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    # Otimizações
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
         expires 1y;
         add_header Cache-Control "public, immutable";
@@ -87,20 +106,47 @@ server {
 }
 ```
 
-## 8. SSL com Certbot (Opcional, Recomendado)
+### 6. SSL com Certbot (Recomendado)
 
 ```bash
 sudo apt install certbot python3-certbot-nginx
 sudo certbot --nginx -d seu-dominio.com.br
 ```
 
-## 9. Acesse o Sistema
+---
 
-Abra o navegador em `https://seu-dominio.com.br` e faça login com as credenciais do admin criado no passo 5.
+## 🔐 Configuração do Banco de Dados
+
+Execute as migrations SQL no banco para criar as tabelas:
+- `clients`, `cameras`, `guards`, `alarms`, `invoices`, `user_roles`, `company_settings`
+
+Todas as tabelas possuem RLS (Row-Level Security) — somente usuários autenticados têm acesso.
+
+## 👤 Criar o Usuário Admin
+
+No painel de autenticação do backend → Users → **Add User**:
+
+- **Email:** `admin@bravo.com`
+- **Senha:** `sua-senha-segura`
+- **Auto Confirm:** Sim
+
+O trigger `on_auth_user_created` atribuirá automaticamente a role `admin`.
 
 ---
 
-## Estrutura de Permissões
+## 📱 Instalar como Aplicativo (PWA)
+
+O sistema funciona como **Progressive Web App**. Para instalar:
+
+1. Abra o sistema no **Chrome** ou **Edge**
+2. Clique no ícone ⊕ na barra de endereço
+3. Clique em **"Instalar"**
+
+O app fica no Menu Iniciar com ícone próprio e sem barra do navegador.
+
+---
+
+## 🔑 Estrutura de Permissões
 
 | Nível | Acesso |
 |-------|--------|
@@ -110,9 +156,13 @@ Abra o navegador em `https://seu-dominio.com.br` e faça login com as credenciai
 
 ---
 
-## Troubleshooting
+## ❓ Troubleshooting
 
-- **Tela branca:** Verifique se o `.env` está correto e o build foi feito após configurar
-- **Erro 401:** Verifique as credenciais do Supabase e se o usuário foi confirmado
-- **RLS bloqueando:** Certifique-se de que o usuário está logado antes de acessar dados
-- **Nginx 404:** Verifique se `try_files` está configurado para SPA (`/index.html`)
+| Problema | Solução |
+|----------|---------|
+| Tela branca | Verifique o `.env` e refaça o build |
+| Erro 401 | Verifique credenciais e se o usuário foi confirmado |
+| RLS bloqueando | Confirme que o usuário está logado |
+| Nginx 404 | Configure `try_files` para SPA (`/index.html`) |
+| PowerShell bloqueado | Execute `Set-ExecutionPolicy Bypass -Scope Process` |
+| Porta em uso | Use `-Port 8080` no instalador |
