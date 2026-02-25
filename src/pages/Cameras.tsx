@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Camera, Plus, Search, Wifi, WifiOff } from 'lucide-react';
-import { mockCameras } from '@/data/mockData';
+import { Camera, Plus, Search, Pencil } from 'lucide-react';
+import { mockCameras, mockClients } from '@/data/mockData';
 import CameraFeed from '@/components/dashboard/CameraFeed';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,8 @@ const Cameras = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterProtocol, setFilterProtocol] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [newCamera, setNewCamera] = useState({ name: '', streamUrl: '', protocol: 'RTSP' as 'RTSP' | 'RTMP', location: '', resolution: '1920x1080' });
+  const [editingCamera, setEditingCamera] = useState<CameraType | null>(null);
+  const [newCamera, setNewCamera] = useState({ name: '', streamUrl: '', protocol: 'RTSP' as 'RTSP' | 'RTMP', location: '', resolution: '1920x1080', clientId: '' });
 
   const filtered = cameras.filter(c => {
     const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.clientName.toLowerCase().includes(search.toLowerCase());
@@ -24,17 +25,57 @@ const Cameras = () => {
     return matchSearch && matchStatus && matchProtocol;
   });
 
-  const handleAdd = () => {
-    const cam: CameraType = {
-      id: String(cameras.length + 1),
-      ...newCamera,
-      clientId: '1',
-      clientName: 'Novo Cliente',
-      status: 'online',
-    };
-    setCameras(prev => [...prev, cam]);
-    setNewCamera({ name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080' });
+  const resetForm = () => {
+    setNewCamera({ name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '' });
+    setEditingCamera(null);
     setDialogOpen(false);
+  };
+
+  const handleSave = () => {
+    const client = mockClients.find(c => c.id === newCamera.clientId);
+    if (editingCamera) {
+      setCameras(prev => prev.map(c => c.id === editingCamera.id ? {
+        ...c,
+        name: newCamera.name,
+        protocol: newCamera.protocol,
+        streamUrl: newCamera.streamUrl,
+        location: newCamera.location,
+        resolution: newCamera.resolution,
+        clientId: newCamera.clientId,
+        clientName: client?.name || c.clientName,
+      } : c));
+    } else {
+      const cam: CameraType = {
+        id: String(cameras.length + 1),
+        name: newCamera.name,
+        streamUrl: newCamera.streamUrl,
+        protocol: newCamera.protocol,
+        location: newCamera.location,
+        resolution: newCamera.resolution,
+        clientId: newCamera.clientId,
+        clientName: client?.name || 'Sem Cliente',
+        status: 'online',
+      };
+      setCameras(prev => [...prev, cam]);
+    }
+    resetForm();
+  };
+
+  const handleEdit = (camera: CameraType) => {
+    setEditingCamera(camera);
+    setNewCamera({
+      name: camera.name,
+      streamUrl: camera.streamUrl,
+      protocol: camera.protocol,
+      location: camera.location,
+      resolution: camera.resolution,
+      clientId: camera.clientId,
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    setCameras(prev => prev.filter(c => c.id !== id));
   };
 
   return (
@@ -44,17 +85,28 @@ const Cameras = () => {
           <h1 className="text-2xl font-bold text-foreground">Câmeras</h1>
           <p className="text-sm text-muted-foreground font-mono">Gerenciamento de câmeras RTMP/RTSP</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) resetForm(); else setDialogOpen(true); }}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button className="gap-2" onClick={() => { setEditingCamera(null); setNewCamera({ name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '' }); }}>
               <Plus className="w-4 h-4" /> Nova Câmera
             </Button>
           </DialogTrigger>
           <DialogContent className="bg-card border-border">
             <DialogHeader>
-              <DialogTitle className="text-foreground">Adicionar Câmera</DialogTitle>
+              <DialogTitle className="text-foreground">{editingCamera ? 'Editar Câmera' : 'Adicionar Câmera'}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              <div>
+                <Label className="text-xs text-muted-foreground">Cliente</Label>
+                <Select value={newCamera.clientId} onValueChange={v => setNewCamera(p => ({ ...p, clientId: v }))}>
+                  <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
+                  <SelectContent>
+                    {mockClients.map(client => (
+                      <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Nome</Label>
                 <Input value={newCamera.name} onChange={e => setNewCamera(p => ({ ...p, name: e.target.value }))} placeholder="CAM-10 Recepção" className="bg-muted border-border" />
@@ -83,7 +135,7 @@ const Cameras = () => {
                 <Label className="text-xs text-muted-foreground">Localização</Label>
                 <Input value={newCamera.location} onChange={e => setNewCamera(p => ({ ...p, location: e.target.value }))} placeholder="Portaria" className="bg-muted border-border" />
               </div>
-              <Button onClick={handleAdd} className="w-full">Adicionar Câmera</Button>
+              <Button onClick={handleSave} className="w-full">{editingCamera ? 'Salvar Alterações' : 'Adicionar Câmera'}</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -117,7 +169,7 @@ const Cameras = () => {
       {/* Camera Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filtered.map(camera => (
-          <CameraFeed key={camera.id} camera={camera} />
+          <CameraFeed key={camera.id} camera={camera} onEdit={() => handleEdit(camera)} onDelete={() => handleDelete(camera.id)} />
         ))}
       </div>
 
