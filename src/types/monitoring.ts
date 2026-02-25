@@ -12,6 +12,29 @@ export interface Client {
   paymentDueDay?: number;
 }
 
+export type AnalyticType =
+  | 'lpr'
+  | 'weapon_detection'
+  | 'line_crossing'
+  | 'area_intrusion'
+  | 'loitering'
+  | 'human_car_classification'
+  | 'fallen_person'
+  | 'people_counting'
+  | 'tampering';
+
+export const ANALYTIC_LABELS: Record<AnalyticType, string> = {
+  lpr: 'LPR (Leitura de Placas)',
+  weapon_detection: 'Detecção de Armas',
+  line_crossing: 'Cruzamento de Linha',
+  area_intrusion: 'Intrusão de Área',
+  loitering: 'Vadiagem (Loitering)',
+  human_car_classification: 'Classificação Humano/Carro',
+  fallen_person: 'Pessoa Caída',
+  people_counting: 'Contagem de Pessoas',
+  tampering: 'Tampering (Sabotagem)',
+};
+
 export interface Camera {
   id: string;
   name: string;
@@ -24,6 +47,7 @@ export interface Camera {
   resolution: string;
   storagePath: string;
   retentionDays: 5 | 10 | 15 | 20 | 25 | 30;
+  analytics: AnalyticType[];
 }
 
 export interface Alarm {
