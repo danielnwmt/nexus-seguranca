@@ -74,6 +74,7 @@ if ($nodeVersion) {
 # 2. Instalar banco de dados (Supabase Self-Hosted)
 # ----------------------------------------------------------
 if (!$SkipDatabase) {
+    # ---- Docker Desktop ----
     Write-Step "Verificando Docker..."
 
     $dockerOk = $false
@@ -86,12 +87,84 @@ if (!$SkipDatabase) {
     } catch {}
 
     if (!$dockerOk) {
-        Write-Err "Docker nao encontrado!"
-        Write-Host "  Instale Docker Desktop em: https://www.docker.com/products/docker-desktop/" -ForegroundColor Gray
-        Write-Host "  Apos instalar, reinicie o computador e execute este script novamente." -ForegroundColor Gray
-        exit 1
+        Write-Warn "Docker nao encontrado. Instalando automaticamente..."
+
+        # Tentar via winget primeiro
+        $wingetOk = $false
+        try {
+            $wingetVer = winget --version 2>$null
+            if ($wingetVer) { $wingetOk = $true }
+        } catch {}
+
+        if ($wingetOk) {
+            Write-Host "  Instalando Docker Desktop via winget..." -ForegroundColor Gray
+            winget install Docker.DockerDesktop --accept-source-agreements --accept-package-agreements --silent
+        } else {
+            # Download direto do instalador
+            Write-Host "  Baixando Docker Desktop..." -ForegroundColor Gray
+            $dockerInstaller = "$env:TEMP\DockerDesktopInstaller.exe"
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            Invoke-WebRequest -Uri "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe" -OutFile $dockerInstaller -UseBasicParsing
+            Write-Host "  Instalando Docker Desktop (isso pode levar alguns minutos)..." -ForegroundColor Gray
+            Start-Process -FilePath $dockerInstaller -ArgumentList "install", "--quiet", "--accept-license" -Wait -NoNewWindow
+            Remove-Item $dockerInstaller -Force -ErrorAction SilentlyContinue
+        }
+
+        # Atualizar PATH
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        # Adicionar caminho padrao do Docker se necessario
+        $dockerDefaultPath = "$env:ProgramFiles\Docker\Docker\resources\bin"
+        if (Test-Path $dockerDefaultPath) {
+            $env:Path = "$dockerDefaultPath;$env:Path"
+        }
+
+        # Verificar novamente
+        $dockerOk = $false
+        try {
+            $dockerVer = docker --version 2>$null
+            if ($dockerVer) {
+                Write-Ok "Docker Desktop instalado: $dockerVer"
+                $dockerOk = $true
+            }
+        } catch {}
+
+        if (!$dockerOk) {
+            Write-Warn "Docker instalado mas requer reinicializacao do computador."
+            Write-Host ""
+            Write-Host "  ACAO NECESSARIA:" -ForegroundColor Yellow
+            Write-Host "  1. Reinicie o computador" -ForegroundColor Gray
+            Write-Host "  2. Abra o Docker Desktop e aguarde iniciar" -ForegroundColor Gray
+            Write-Host "  3. Execute este script novamente" -ForegroundColor Gray
+            Write-Host ""
+            $restart = Read-Host "  Deseja reiniciar agora? (s/n)"
+            if ($restart -eq "s") {
+                Restart-Computer -Force
+            }
+            exit 0
+        }
+
+        # Iniciar Docker Desktop se nao estiver rodando
+        $dockerProcess = Get-Process "Docker Desktop" -ErrorAction SilentlyContinue
+        if (!$dockerProcess) {
+            Write-Host "  Iniciando Docker Desktop..." -ForegroundColor Gray
+            Start-Process "$env:ProgramFiles\Docker\Docker\Docker Desktop.exe"
+            Write-Host "  Aguardando Docker inicializar (pode levar 1-2 minutos)..." -ForegroundColor Gray
+            $attempts = 0
+            do {
+                Start-Sleep -Seconds 10
+                $attempts++
+                try { $dockerVer = docker info 2>$null } catch { $dockerVer = $null }
+            } while (!$dockerVer -and $attempts -lt 18)
+
+            if (!$dockerVer) {
+                Write-Err "Docker nao inicializou a tempo. Abra manualmente e execute o script novamente."
+                exit 1
+            }
+            Write-Ok "Docker Desktop iniciado"
+        }
     }
 
+    # ---- Git ----
     Write-Step "Verificando Git..."
     $gitOk = $false
     try {
@@ -103,9 +176,27 @@ if (!$SkipDatabase) {
     } catch {}
 
     if (!$gitOk) {
-        Write-Warn "Git nao encontrado. Instalando via winget..."
-        winget install Git.Git --accept-source-agreements --accept-package-agreements --silent
+        Write-Warn "Git nao encontrado. Instalando automaticamente..."
+
+        $wingetOk = $false
+        try {
+            $wingetVer = winget --version 2>$null
+            if ($wingetVer) { $wingetOk = $true }
+        } catch {}
+
+        if ($wingetOk) {
+            winget install Git.Git --accept-source-agreements --accept-package-agreements --silent
+        } else {
+            Write-Host "  Baixando Git..." -ForegroundColor Gray
+            $gitInstaller = "$env:TEMP\Git-Installer.exe"
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            Invoke-WebRequest -Uri "https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.2/Git-2.47.1.2-64-bit.exe" -OutFile $gitInstaller -UseBasicParsing
+            Start-Process -FilePath $gitInstaller -ArgumentList "/VERYSILENT", "/NORESTART" -Wait -NoNewWindow
+            Remove-Item $gitInstaller -Force -ErrorAction SilentlyContinue
+        }
+
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        Write-Ok "Git instalado"
     }
 
     Write-Step "Instalando Supabase Self-Hosted..."
