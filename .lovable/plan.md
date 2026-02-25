@@ -1,44 +1,80 @@
 
 
-## Plan: Clean Mock Data, Default Admin User, and Mobile App Integration Section
+## Plan: Configure PWA Completo com `vite-plugin-pwa`
 
-### What will change
+### Situacao atual
 
-1. **Mock Data (`src/data/mockData.ts`)** — Remove all mock clients, cameras, alarms, guards, and invoices. Leave empty arrays so the app starts clean.
+O projeto tem um `manifest.json` manual e meta tags basicas, mas nao possui um service worker, o que significa que o app nao funciona offline e nao dispara o prompt de instalacao automaticamente.
 
-2. **Settings — Users (`src/pages/Settings.tsx`)** — Remove the two extra operators (Operador 01, Visualizador), keeping only the Administrador (admin@bravo.com, Admin level). Add a password field to the user form dialog for when creating/editing users (default admin password: 1234).
+### O que sera feito
 
-3. **Settings — New "Mobile" Tab (`src/pages/Settings.tsx`)** — Add a new tab called "App Mobile" in the Settings page with:
-   - Instructions for integrating the mobile app (PWA install or Capacitor)
-   - A toggle to enable/disable PWA mode
-   - QR Code placeholder or URL display for mobile access
-   - Download/install instructions for Android and iOS
+1. **Instalar `vite-plugin-pwa`** — Adicionar a dependencia que gera automaticamente o service worker e gerencia o manifest.
 
-4. **Dashboard (`src/pages/Index.tsx`)** — Will naturally show zeros/empty state since mock data is cleared.
+2. **Configurar `vite.config.ts`** — Integrar o plugin VitePWA com:
+   - Manifest completo (nome, icones, cores, display standalone)
+   - Workbox com `navigateFallbackDenylist: [/^\/~oauth/]` (requisito de seguranca)
+   - Estrategia `generateSW` para cache automatico de assets
+   - `registerType: 'autoUpdate'` para atualizacoes transparentes
 
-### Technical details
+3. **Atualizar `index.html`** — Adicionar meta tags para Apple (apple-mobile-web-app-capable, apple-touch-icon) e atualizar og:title/description para Bravo Monitoramento.
 
-**mockData.ts changes:**
+4. **Criar icones PWA** — Gerar icones placeholder nos tamanhos 192x192 e 512x512 em `public/` (SVG convertido).
+
+5. **Registrar o Service Worker em `src/main.tsx`** — Importar `registerSW` do vite-plugin-pwa para ativar o auto-update.
+
+6. **Remover `public/manifest.json`** — O plugin VitePWA gera o manifest automaticamente, evitando conflito.
+
+### Detalhes tecnicos
+
+**vite.config.ts** — Adicao do plugin:
 ```typescript
-export const mockClients: Client[] = [];
-export const mockCameras: Camera[] = [];
-export const mockAlarms: Alarm[] = [];
-export const mockGuards: Guard[] = [];
-export const mockInvoices: Invoice[] = [];
+import { VitePWA } from 'vite-plugin-pwa';
+
+// No array de plugins:
+VitePWA({
+  registerType: 'autoUpdate',
+  workbox: {
+    navigateFallbackDenylist: [/^\/~oauth/],
+    globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}'],
+  },
+  manifest: {
+    name: 'Bravo Monitoramento',
+    short_name: 'Bravo',
+    description: 'Sistema de monitoramento de câmeras',
+    theme_color: '#0a0f14',
+    background_color: '#0a0f14',
+    display: 'standalone',
+    orientation: 'any',
+    icons: [
+      { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+      { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+      { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ],
+  },
+})
 ```
 
-**Settings.tsx — Users default state:**
-- Only keep `{ id: '1', name: 'Administrador', email: 'admin@bravo.com', level: 'admin', active: true }`
-- Add password field to `SystemUser` interface and user form dialog
+**src/main.tsx** — Registro do SW:
+```typescript
+import { registerSW } from 'virtual:pwa-register';
+registerSW({ immediate: true });
+```
 
-**Settings.tsx — New "App Mobile" tab:**
-- New tab with `Smartphone` icon from lucide-react
-- Card showing the system URL for mobile access
-- Toggle for PWA installation mode
-- Copy-to-clipboard button for the app URL
-- Instructions section for Android and iOS installation
+**index.html** — Meta tags adicionais:
+```html
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="apple-touch-icon" href="/pwa-192x192.png" />
+```
 
-### Files to modify
-- `src/data/mockData.ts` — clear all arrays
-- `src/pages/Settings.tsx` — remove extra users, add password field, add Mobile tab
+**Icones** — Criar `public/pwa-192x192.png` e `public/pwa-512x512.png` como SVGs simples com o logo/inicial "B" em fundo escuro.
+
+### Arquivos modificados
+- `package.json` — adicionar `vite-plugin-pwa`
+- `vite.config.ts` — configurar plugin
+- `src/main.tsx` — registrar service worker
+- `src/vite-env.d.ts` — adicionar types do virtual:pwa-register
+- `index.html` — meta tags Apple + limpeza og tags
+- `public/manifest.json` — remover (substituido pelo plugin)
+- `public/pwa-192x192.png` e `public/pwa-512x512.png` — criar icones
 
