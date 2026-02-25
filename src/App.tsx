@@ -10,6 +10,7 @@ import Clients from "./pages/Clients";
 import Guards from "./pages/Guards";
 import Financial from "./pages/Financial";
 import Alarms from "./pages/Alarms";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/guards" element={<Guards />} />
             <Route path="/financial" element={<Financial />} />
             <Route path="/alarms" element={<Alarms />} />
+            <Route path="/settings" element={<Settings />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
