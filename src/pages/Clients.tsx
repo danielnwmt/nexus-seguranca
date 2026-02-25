@@ -9,6 +9,33 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import type { Client } from '@/types/monitoring';
 
+const maskCpfCnpj = (value: string) => {
+  const digits = value.replace(/\D/g, '').slice(0, 14);
+  if (digits.length <= 11) {
+    return digits
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  }
+  return digits
+    .replace(/(\d{2})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1/$2')
+    .replace(/(\d{4})(\d)/, '$1-$2');
+};
+
+const maskPhone = (value: string) => {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 10) {
+    return digits
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{4})(\d)/, '$1-$2');
+  }
+  return digits
+    .replace(/(\d{2})(\d)/, '($1) $2')
+    .replace(/(\d{5})(\d)/, '$1-$2');
+};
+
 const Clients = () => {
   const { toast } = useToast();
   const [clients, setClients] = useState(mockClients);
@@ -110,7 +137,7 @@ const Clients = () => {
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">CPF / CNPJ</Label>
-                  <Input value={form.cpf} onChange={e => setForm(p => ({ ...p, cpf: e.target.value }))} placeholder="000.000.000-00" className="bg-muted border-border font-mono" />
+                  <Input value={form.cpf} onChange={e => setForm(p => ({ ...p, cpf: maskCpfCnpj(e.target.value) }))} placeholder="000.000.000-00" className="bg-muted border-border font-mono" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -120,7 +147,7 @@ const Clients = () => {
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Telefone</Label>
-                  <Input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="(11) 9999-9999" className="bg-muted border-border" />
+                  <Input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: maskPhone(e.target.value) }))} placeholder="(11) 99999-9999" className="bg-muted border-border font-mono" />
                 </div>
               </div>
               <div>
