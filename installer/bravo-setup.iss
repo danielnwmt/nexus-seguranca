@@ -1,6 +1,6 @@
 ; ============================================================
 ;  Bravo Monitoramento - Inno Setup Installer Script
-;  Compativel com Inno Setup 3.x+
+;  Inno Setup 6.x
 ; ============================================================
 
 [Setup]
@@ -28,11 +28,11 @@ Name: "{commondesktop}\Bravo Monitoramento"; Filename: "http://localhost:80"; Ta
 Name: "{commondesktop}\Iniciar Bravo"; Filename: "{app}\iniciar-bravo.bat"; Tasks: desktopicon
 
 [Tasks]
-Name: "desktopicon"; Description: "Criar atalho na Area de Trabalho"; GroupDescription: "Atalhos:"; Flags: checked
+Name: "desktopicon"; Description: "Criar atalho na Area de Trabalho"; Flags: unchecked
 
 [Run]
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\install-windows.ps1"""; Description: "Configurar sistema"; Flags: postinstall waituntilterminated
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\install-windows.ps1"""; Description: "Configurar sistema"; Flags: postinstall runascurrentuser waituntilterminated
 Filename: "http://localhost:80"; Description: "Abrir Bravo Monitoramento"; Flags: postinstall nowait shellexec skipifsilent
 
 [UninstallRun]
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\desinstalar-bravo.ps1"""; Flags: waituntilterminated
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\desinstalar-bravo.ps1"""; Flags: runascurrentuser waituntilterminated
