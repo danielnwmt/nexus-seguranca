@@ -4,12 +4,15 @@ import StatsCard from '@/components/dashboard/StatsCard';
 import CameraFeed from '@/components/dashboard/CameraFeed';
 import AlarmItem from '@/components/dashboard/AlarmItem';
 import { mockCameras, mockClients, mockAlarms } from '@/data/mockData';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const Index = () => {
   const [alarms, setAlarms] = useState(mockAlarms);
+  const [selectedClient, setSelectedClient] = useState<string>('all');
 
-  const onlineCameras = mockCameras.filter(c => c.status !== 'offline').length;
-  const offlineCameras = mockCameras.filter(c => c.status === 'offline').length;
+  const filteredCameras = selectedClient === 'all' ? mockCameras : mockCameras.filter(c => c.clientId === selectedClient);
+  const onlineCameras = filteredCameras.filter(c => c.status !== 'offline').length;
+  const offlineCameras = filteredCameras.filter(c => c.status === 'offline').length;
   const activeAlarms = alarms.filter(a => !a.acknowledged).length;
 
   const handleAcknowledge = (id: string) => {
@@ -26,7 +29,7 @@ const Index = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard title="Câmeras Online" value={onlineCameras} icon={Video} variant="success" trend={`${mockCameras.length} total`} />
+        <StatsCard title="Câmeras Online" value={onlineCameras} icon={Video} variant="success" trend={`${filteredCameras.length} total`} />
         <StatsCard title="Câmeras Offline" value={offlineCameras} icon={Camera} variant="danger" />
         <StatsCard title="Clientes Ativos" value={mockClients.filter(c => c.status === 'active').length} icon={Users} />
         <StatsCard title="Alarmes Ativos" value={activeAlarms} icon={Bell} variant={activeAlarms > 0 ? 'warning' : 'default'} />
@@ -40,10 +43,23 @@ const Index = () => {
               <Video className="w-4 h-4 text-primary" />
               Câmeras ao Vivo
             </h2>
-            <span className="text-[10px] font-mono text-muted-foreground">{mockCameras.length} câmeras</span>
+            <div className="flex items-center gap-2">
+              <Select value={selectedClient} onValueChange={setSelectedClient}>
+                <SelectTrigger className="w-44 h-8 text-xs bg-muted border-border">
+                  <SelectValue placeholder="Filtrar por cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Clientes</SelectItem>
+                  {mockClients.map(client => (
+                    <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-[10px] font-mono text-muted-foreground">{filteredCameras.length} câmeras</span>
+            </div>
           </div>
           <div className="camera-grid camera-grid-3x3">
-            {mockCameras.map(camera => (
+            {filteredCameras.map(camera => (
               <CameraFeed key={camera.id} camera={camera} compact />
             ))}
           </div>
