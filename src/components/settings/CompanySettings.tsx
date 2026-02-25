@@ -7,6 +7,28 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
+const maskCNPJ = (value: string) => {
+  return value
+    .replace(/\D/g, '')
+    .slice(0, 14)
+    .replace(/(\d{2})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1/$2')
+    .replace(/(\d{4})(\d)/, '$1-$2');
+};
+
+const maskPhone = (value: string) => {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 10) {
+    return digits
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{4})(\d)/, '$1-$2');
+  }
+  return digits
+    .replace(/(\d{2})(\d)/, '($1) $2')
+    .replace(/(\d{5})(\d)/, '$1-$2');
+};
+
 const CompanySettings = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -140,7 +162,7 @@ const CompanySettings = () => {
             <Label className="text-xs text-muted-foreground">CNPJ</Label>
             <Input
               value={form.cnpj}
-              onChange={e => setForm(p => ({ ...p, cnpj: e.target.value }))}
+              onChange={e => setForm(p => ({ ...p, cnpj: maskCNPJ(e.target.value) }))}
               className="bg-muted border-border font-mono"
               placeholder="00.000.000/0000-00"
             />
@@ -162,9 +184,9 @@ const CompanySettings = () => {
             <Label className="text-xs text-muted-foreground">Telefone</Label>
             <Input
               value={form.phone}
-              onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
-              className="bg-muted border-border"
-              placeholder="(00) 0000-0000"
+              onChange={e => setForm(p => ({ ...p, phone: maskPhone(e.target.value) }))}
+              className="bg-muted border-border font-mono"
+              placeholder="(00) 00000-0000"
             />
           </div>
           <div className="space-y-1">
