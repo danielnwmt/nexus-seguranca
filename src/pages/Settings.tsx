@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode } from 'lucide-react';
+import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store } from 'lucide-react';
+import CompanySettings from '@/components/settings/CompanySettings';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -116,13 +117,19 @@ const Settings = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="banks" className="space-y-4">
+      <Tabs defaultValue="company" className="space-y-4">
         <TabsList className="bg-card border border-border">
+          <TabsTrigger value="company" className="gap-2"><Store className="w-4 h-4" />Empresa</TabsTrigger>
           <TabsTrigger value="banks" className="gap-2"><Building2 className="w-4 h-4" />Bancos</TabsTrigger>
           <TabsTrigger value="permissions" className="gap-2"><ShieldCheck className="w-4 h-4" />Permissões</TabsTrigger>
           <TabsTrigger value="system" className="gap-2"><RefreshCw className="w-4 h-4" />Sistema</TabsTrigger>
           <TabsTrigger value="mobile" className="gap-2"><Smartphone className="w-4 h-4" />App Mobile</TabsTrigger>
         </TabsList>
+
+        {/* ===== EMPRESA ===== */}
+        <TabsContent value="company" className="space-y-4">
+          <CompanySettings />
+        </TabsContent>
 
         {/* ===== BANCOS ===== */}
         <TabsContent value="banks" className="space-y-4">

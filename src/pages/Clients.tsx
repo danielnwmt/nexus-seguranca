@@ -5,9 +5,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import type { Client } from '@/types/monitoring';
 
 const Clients = () => {
+  const { toast } = useToast();
   const [clients, setClients] = useState(mockClients);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -20,7 +23,19 @@ const Clients = () => {
     c.cpf.includes(search)
   );
 
-  const handleSave = () => {
+  const createClientFolder = async (clientName: string, clientId: string) => {
+    try {
+      const folderName = clientName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      const placeholder = new Blob([''], { type: 'text/plain' });
+      await supabase.storage
+        .from('client-cameras')
+        .upload(`${folderName}-${clientId}/.keep`, placeholder);
+    } catch (err) {
+      console.error('Erro ao criar pasta do cliente:', err);
+    }
+  };
+
+  const handleSave = async () => {
     if (editingClient) {
       setClients(prev => prev.map(c => c.id === editingClient.id ? {
         ...c,
@@ -29,8 +44,9 @@ const Clients = () => {
         paymentDueDay: form.paymentDueDay ? Number(form.paymentDueDay) : undefined,
       } : c));
     } else {
+      const newId = Date.now().toString();
       const newClient: Client = {
-        id: String(clients.length + 1),
+        id: newId,
         ...form,
         monthlyFee: form.monthlyFee ? Number(form.monthlyFee) : undefined,
         paymentDueDay: form.paymentDueDay ? Number(form.paymentDueDay) : undefined,
@@ -39,6 +55,8 @@ const Clients = () => {
         createdAt: new Date().toISOString().split('T')[0],
       };
       setClients(prev => [...prev, newClient]);
+      await createClientFolder(form.name, newId);
+      toast({ title: 'Cliente adicionado', description: 'Pasta de imagens criada automaticamente.' });
     }
     resetForm();
   };
