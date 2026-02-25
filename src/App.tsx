@@ -3,6 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import ProtectedRoute from "./components/layout/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
 import Index from "./pages/Index";
 import Cameras from "./pages/Cameras";
@@ -11,32 +13,34 @@ import Guards from "./pages/Guards";
 import Financial from "./pages/Financial";
 import Alarms from "./pages/Alarms";
 import Settings from "./pages/Settings";
-
+import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route path="/" element={<Index />} />
-            <Route path="/cameras" element={<Cameras />} />
-            <Route path="/clients" element={<Clients />} />
-            <Route path="/guards" element={<Guards />} />
-            <Route path="/financial" element={<Financial />} />
-            <Route path="/alarms" element={<Alarms />} />
-            <Route path="/settings" element={<Settings />} />
-            
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+              <Route path="/" element={<Index />} />
+              <Route path="/cameras" element={<Cameras />} />
+              <Route path="/clients" element={<Clients />} />
+              <Route path="/guards" element={<Guards />} />
+              <Route path="/financial" element={<Financial />} />
+              <Route path="/alarms" element={<Alarms />} />
+              <Route path="/settings" element={<Settings />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 

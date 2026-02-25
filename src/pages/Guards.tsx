@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { Shield, Plus, Search, Pencil, Trash2, Moon, Sun, Clock } from 'lucide-react';
-import { mockGuards, mockClients } from '@/data/mockData';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import type { Guard } from '@/types/monitoring';
+import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
 
 const maskCpf = (value: string) => {
   const digits = value.replace(/\D/g, '').slice(0, 11);
@@ -38,56 +37,55 @@ const statusLabels: Record<string, { label: string; className: string }> = {
 };
 
 const Guards = () => {
-  const [guards, setGuards] = useState(mockGuards);
+  const { data: guards = [], isLoading } = useTableQuery('guards');
+  const { data: clients = [] } = useTableQuery('clients');
+  const insertMutation = useInsertMutation('guards');
+  const updateMutation = useUpdateMutation('guards');
+  const deleteMutation = useDeleteMutation('guards');
+
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingGuard, setEditingGuard] = useState<Guard | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', cpf: '', phone: '', email: '', shift: 'day', status: 'active', clientIds: [] as string[] });
 
-  const filtered = guards.filter(g =>
+  const filtered = guards.filter((g: any) =>
     g.name.toLowerCase().includes(search.toLowerCase()) ||
-    g.cpf.includes(search)
+    (g.cpf || '').includes(search)
   );
 
   const handleSave = () => {
-    if (editingGuard) {
-      setGuards(prev => prev.map(g => g.id === editingGuard.id ? {
-        ...g,
-        ...form,
-        shift: form.shift as Guard['shift'],
-        status: form.status as Guard['status'],
-      } : g));
+    const payload = {
+      name: form.name,
+      cpf: form.cpf,
+      phone: form.phone,
+      email: form.email,
+      shift: form.shift,
+      status: form.status,
+      client_ids: form.clientIds,
+    };
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, ...payload } as any);
     } else {
-      const newGuard: Guard = {
-        id: String(guards.length + 1),
-        ...form,
-        shift: form.shift as Guard['shift'],
-        status: form.status as Guard['status'],
-        hireDate: new Date().toISOString().split('T')[0],
-        schedule: [],
-      };
-      setGuards(prev => [...prev, newGuard]);
+      insertMutation.mutate(payload as any);
     }
     resetForm();
   };
 
-  const handleEdit = (guard: Guard) => {
-    setEditingGuard(guard);
+  const handleEdit = (guard: any) => {
+    setEditingId(guard.id);
     setForm({
       name: guard.name,
-      cpf: guard.cpf,
-      phone: guard.phone,
-      email: guard.email,
+      cpf: guard.cpf || '',
+      phone: guard.phone || '',
+      email: guard.email || '',
       shift: guard.shift,
       status: guard.status,
-      clientIds: guard.clientIds,
+      clientIds: guard.client_ids || [],
     });
     setDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setGuards(prev => prev.filter(g => g.id !== id));
-  };
+  const handleDelete = (id: string) => deleteMutation.mutate(id);
 
   const toggleClient = (clientId: string) => {
     setForm(prev => ({
@@ -100,7 +98,7 @@ const Guards = () => {
 
   const resetForm = () => {
     setForm({ name: '', cpf: '', phone: '', email: '', shift: 'day', status: 'active', clientIds: [] });
-    setEditingGuard(null);
+    setEditingId(null);
     setDialogOpen(false);
   };
 
@@ -113,13 +111,13 @@ const Guards = () => {
         </div>
         <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) resetForm(); else setDialogOpen(true); }}>
           <DialogTrigger asChild>
-            <Button className="gap-2" onClick={() => { setEditingGuard(null); resetForm(); }}>
+            <Button className="gap-2" onClick={() => { setEditingId(null); resetForm(); }}>
               <Plus className="w-4 h-4" /> Novo Vigilante
             </Button>
           </DialogTrigger>
           <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-foreground">{editingGuard ? 'Editar Vigilante' : 'Novo Vigilante'}</DialogTitle>
+              <DialogTitle className="text-foreground">{editingId ? 'Editar Vigilante' : 'Novo Vigilante'}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -169,7 +167,7 @@ const Guards = () => {
               <div>
                 <Label className="text-xs text-muted-foreground mb-2 block">Clientes Vinculados</Label>
                 <div className="space-y-2 rounded-lg border border-border p-3 bg-muted/30">
-                  {mockClients.map(client => (
+                  {clients.map((client: any) => (
                     <div key={client.id} className="flex items-center gap-2">
                       <Checkbox
                         checked={form.clientIds.includes(client.id)}
@@ -179,21 +177,20 @@ const Guards = () => {
                       <label htmlFor={`client-${client.id}`} className="text-xs text-foreground cursor-pointer">{client.name}</label>
                     </div>
                   ))}
+                  {clients.length === 0 && <p className="text-xs text-muted-foreground">Nenhum cliente cadastrado</p>}
                 </div>
               </div>
-              <Button onClick={handleSave} className="w-full">{editingGuard ? 'Salvar Alterações' : 'Adicionar Vigilante'}</Button>
+              <Button onClick={handleSave} className="w-full">{editingId ? 'Salvar Alterações' : 'Adicionar Vigilante'}</Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Search */}
       <div className="relative max-w-xs">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar vigilante..." className="pl-9 bg-muted border-border" />
       </div>
 
-      {/* Table */}
       <div className="rounded-lg border border-border overflow-hidden">
         <table className="w-full">
           <thead>
@@ -208,20 +205,18 @@ const Guards = () => {
             </tr>
           </thead>
           <tbody>
-            {filtered.map(guard => {
-              const shift = shiftConfig[guard.shift];
+            {filtered.map((guard: any) => {
+              const shift = shiftConfig[guard.shift] || shiftConfig.day;
               const ShiftIcon = shift.icon;
-              const st = statusLabels[guard.status];
-              const linkedClients = mockClients.filter(c => guard.clientIds.includes(c.id));
+              const st = statusLabels[guard.status] || statusLabels.active;
+              const linkedClients = clients.filter((c: any) => (guard.client_ids || []).includes(c.id));
               return (
                 <tr key={guard.id} className="border-b border-border hover:bg-muted/30 transition-colors">
                   <td className="px-4 py-3">
                     <p className="text-sm font-medium text-foreground">{guard.name}</p>
-                    <p className="text-[10px] text-muted-foreground font-mono">Desde {new Date(guard.hireDate).toLocaleDateString('pt-BR')}</p>
+                    <p className="text-[10px] text-muted-foreground font-mono">Desde {guard.hire_date ? new Date(guard.hire_date).toLocaleDateString('pt-BR') : '-'}</p>
                   </td>
-                  <td className="px-4 py-3">
-                    <p className="text-xs font-mono text-foreground">{guard.cpf}</p>
-                  </td>
+                  <td className="px-4 py-3"><p className="text-xs font-mono text-foreground">{guard.cpf}</p></td>
                   <td className="px-4 py-3">
                     <p className="text-xs text-foreground">{guard.phone}</p>
                     <p className="text-[10px] text-muted-foreground">{guard.email}</p>
@@ -234,7 +229,7 @@ const Guards = () => {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
-                      {linkedClients.map(c => (
+                      {linkedClients.map((c: any) => (
                         <span key={c.id} className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded text-foreground">{c.name.split(' ')[0]}</span>
                       ))}
                       {linkedClients.length === 0 && <span className="text-[10px] text-muted-foreground">Nenhum</span>}
@@ -262,7 +257,7 @@ const Guards = () => {
         </table>
       </div>
 
-      {filtered.length === 0 && (
+      {!isLoading && filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
           <Shield className="w-12 h-12 mb-3" />
           <p className="text-sm">Nenhum vigilante encontrado</p>
