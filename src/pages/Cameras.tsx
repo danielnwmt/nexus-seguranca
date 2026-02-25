@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Camera, Plus, Search, HardDrive, Calendar } from 'lucide-react';
+import { Camera, Plus, Search, HardDrive, Calendar, Brain } from 'lucide-react';
 import { mockCameras, mockClients } from '@/data/mockData';
 import CameraFeed from '@/components/dashboard/CameraFeed';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -7,9 +7,26 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import type { Camera as CameraType } from '@/types/monitoring';
+import { Checkbox } from '@/components/ui/checkbox';
+import type { Camera as CameraType, AnalyticType } from '@/types/monitoring';
+import { ANALYTIC_LABELS } from '@/types/monitoring';
 
 const RETENTION_OPTIONS = [5, 10, 15, 20, 25, 30] as const;
+const ALL_ANALYTICS: AnalyticType[] = ['lpr', 'weapon_detection', 'line_crossing', 'area_intrusion', 'loitering', 'human_car_classification', 'fallen_person', 'people_counting', 'tampering'];
+
+interface CameraForm {
+  name: string;
+  streamUrl: string;
+  protocol: 'RTSP' | 'RTMP';
+  location: string;
+  resolution: string;
+  clientId: string;
+  storagePath: string;
+  retentionDays: string;
+  analytics: AnalyticType[];
+}
+
+const emptyForm: CameraForm = { name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30', analytics: [] };
 
 const Cameras = () => {
   const [cameras, setCameras] = useState(mockCameras);
@@ -18,7 +35,7 @@ const Cameras = () => {
   const [filterProtocol, setFilterProtocol] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCamera, setEditingCamera] = useState<CameraType | null>(null);
-  const [newCamera, setNewCamera] = useState({ name: '', streamUrl: '', protocol: 'RTSP' as 'RTSP' | 'RTMP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30' });
+  const [newCamera, setNewCamera] = useState<CameraForm>({ ...emptyForm });
 
   const filtered = cameras.filter(c => {
     const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.clientName.toLowerCase().includes(search.toLowerCase());
@@ -28,9 +45,18 @@ const Cameras = () => {
   });
 
   const resetForm = () => {
-    setNewCamera({ name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30' });
+    setNewCamera({ ...emptyForm });
     setEditingCamera(null);
     setDialogOpen(false);
+  };
+
+  const toggleAnalytic = (analytic: AnalyticType) => {
+    setNewCamera(p => ({
+      ...p,
+      analytics: p.analytics.includes(analytic)
+        ? p.analytics.filter(a => a !== analytic)
+        : [...p.analytics, analytic],
+    }));
   };
 
   const handleSave = () => {
@@ -47,6 +73,7 @@ const Cameras = () => {
         clientName: client?.name || c.clientName,
         storagePath: newCamera.storagePath,
         retentionDays: Number(newCamera.retentionDays) as CameraType['retentionDays'],
+        analytics: newCamera.analytics,
       } : c));
     } else {
       const cam: CameraType = {
@@ -61,6 +88,7 @@ const Cameras = () => {
         status: 'online',
         storagePath: newCamera.storagePath,
         retentionDays: Number(newCamera.retentionDays) as CameraType['retentionDays'],
+        analytics: newCamera.analytics,
       };
       setCameras(prev => [...prev, cam]);
     }
@@ -78,6 +106,7 @@ const Cameras = () => {
       clientId: camera.clientId,
       storagePath: camera.storagePath,
       retentionDays: String(camera.retentionDays),
+      analytics: camera.analytics || [],
     });
     setDialogOpen(true);
   };
@@ -95,7 +124,7 @@ const Cameras = () => {
         </div>
         <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) resetForm(); else setDialogOpen(true); }}>
           <DialogTrigger asChild>
-            <Button className="gap-2" onClick={() => { setEditingCamera(null); setNewCamera({ name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30' }); }}>
+            <Button className="gap-2" onClick={() => { setEditingCamera(null); setNewCamera({ ...emptyForm }); }}>
               <Plus className="w-4 h-4" /> Nova Câmera
             </Button>
           </DialogTrigger>
@@ -158,6 +187,23 @@ const Cameras = () => {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Analytics IA */}
+              <div>
+                <Label className="text-xs text-muted-foreground flex items-center gap-1 mb-2"><Brain className="w-3 h-3" /> Analíticos via IA</Label>
+                <div className="grid grid-cols-1 gap-2 bg-muted/50 rounded-lg p-3 border border-border">
+                  {ALL_ANALYTICS.map(analytic => (
+                    <label key={analytic} className="flex items-center gap-2 cursor-pointer hover:bg-muted rounded px-2 py-1.5 transition-colors">
+                      <Checkbox
+                        checked={newCamera.analytics.includes(analytic)}
+                        onCheckedChange={() => toggleAnalytic(analytic)}
+                      />
+                      <span className="text-xs text-foreground">{ANALYTIC_LABELS[analytic]}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               <Button onClick={handleSave} className="w-full">{editingCamera ? 'Salvar Alterações' : 'Adicionar Câmera'}</Button>
             </div>
           </DialogContent>
