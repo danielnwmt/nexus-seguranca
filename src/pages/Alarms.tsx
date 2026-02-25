@@ -1,26 +1,31 @@
 import { useState } from 'react';
 import { Bell, CheckCheck, Plus } from 'lucide-react';
-import { mockAlarms, mockCameras, mockClients } from '@/data/mockData';
 import AlarmItem from '@/components/dashboard/AlarmItem';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { Alarm } from '@/types/monitoring';
+import { useTableQuery, useInsertMutation, useUpdateMutation } from '@/hooks/useSupabaseQuery';
+import { supabase } from '@/integrations/supabase/client';
 
 const Alarms = () => {
-  const [alarms, setAlarms] = useState(mockAlarms);
+  const { data: alarms = [], isLoading } = useTableQuery('alarms');
+  const { data: cameras = [] } = useTableQuery('cameras');
+  const { data: clients = [] } = useTableQuery('clients');
+  const insertMutation = useInsertMutation('alarms');
+  const updateMutation = useUpdateMutation('alarms');
+
   const [filterSeverity, setFilterSeverity] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedCameraId, setSelectedCameraId] = useState('');
-  const [newAlarm, setNewAlarm] = useState({ type: 'motion' as Alarm['type'], severity: 'warning' as Alarm['severity'], message: '' });
+  const [newAlarm, setNewAlarm] = useState({ type: 'motion', severity: 'warning', message: '' });
 
-  const clientCameras = mockCameras.filter(c => c.clientId === selectedClientId);
+  const clientCameras = cameras.filter((c: any) => c.client_id === selectedClientId);
 
-  const filtered = alarms.filter(a => {
+  const filtered = alarms.filter((a: any) => {
     const matchSeverity = filterSeverity === 'all' || a.severity === filterSeverity;
     const matchStatus = filterStatus === 'all' ||
       (filterStatus === 'active' && !a.acknowledged) ||
@@ -29,36 +34,50 @@ const Alarms = () => {
   });
 
   const handleAcknowledge = (id: string) => {
-    setAlarms(prev => prev.map(a => a.id === id ? { ...a, acknowledged: true } : a));
+    updateMutation.mutate({ id, acknowledged: true } as any);
   };
 
-  const handleAcknowledgeAll = () => {
-    setAlarms(prev => prev.map(a => ({ ...a, acknowledged: true })));
+  const handleAcknowledgeAll = async () => {
+    const activeAlarms = alarms.filter((a: any) => !a.acknowledged);
+    for (const alarm of activeAlarms) {
+      await supabase.from('alarms').update({ acknowledged: true }).eq('id', (alarm as any).id);
+    }
+    // Refetch
+    window.location.reload();
   };
 
   const handleAddAlarm = () => {
-    const camera = mockCameras.find(c => c.id === selectedCameraId);
-    const client = mockClients.find(c => c.id === selectedClientId);
+    const camera = cameras.find((c: any) => c.id === selectedCameraId);
+    const client = clients.find((c: any) => c.id === selectedClientId);
     if (!camera || !client) return;
-    const alarm: Alarm = {
-      id: String(alarms.length + 1),
-      cameraId: camera.id,
-      cameraName: camera.name,
-      clientName: client.name,
+    insertMutation.mutate({
+      camera_id: (camera as any).id,
+      camera_name: (camera as any).name,
+      client_name: (client as any).name,
       type: newAlarm.type,
       severity: newAlarm.severity,
       message: newAlarm.message,
-      timestamp: new Date().toISOString(),
-      acknowledged: false,
-    };
-    setAlarms(prev => [alarm, ...prev]);
+    } as any);
     setNewAlarm({ type: 'motion', severity: 'warning', message: '' });
     setSelectedClientId('');
     setSelectedCameraId('');
     setDialogOpen(false);
   };
 
-  const activeCount = alarms.filter(a => !a.acknowledged).length;
+  const activeCount = alarms.filter((a: any) => !a.acknowledged).length;
+
+  // Map to AlarmItem format
+  const mapAlarm = (a: any) => ({
+    id: a.id,
+    cameraId: a.camera_id || '',
+    cameraName: a.camera_name || '',
+    clientName: a.client_name || '',
+    type: a.type,
+    severity: a.severity,
+    message: a.message || '',
+    timestamp: a.created_at,
+    acknowledged: a.acknowledged,
+  });
 
   return (
     <div className="space-y-6">
@@ -81,9 +100,7 @@ const Alarms = () => {
           )}
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="w-4 h-4" /> Novo Alarme
-              </Button>
+              <Button className="gap-2"><Plus className="w-4 h-4" /> Novo Alarme</Button>
             </DialogTrigger>
             <DialogContent className="bg-card border-border">
               <DialogHeader>
@@ -95,7 +112,7 @@ const Alarms = () => {
                   <Select value={selectedClientId} onValueChange={v => { setSelectedClientId(v); setSelectedCameraId(''); }}>
                     <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
                     <SelectContent>
-                      {mockClients.map(client => (
+                      {clients.map((client: any) => (
                         <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -106,7 +123,7 @@ const Alarms = () => {
                   <Select value={selectedCameraId} onValueChange={setSelectedCameraId} disabled={!selectedClientId}>
                     <SelectTrigger className="bg-muted border-border"><SelectValue placeholder={selectedClientId ? 'Selecione a câmera' : 'Selecione um cliente primeiro'} /></SelectTrigger>
                     <SelectContent>
-                      {clientCameras.map(cam => (
+                      {clientCameras.map((cam: any) => (
                         <SelectItem key={cam.id} value={cam.id}>{cam.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -115,7 +132,7 @@ const Alarms = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs text-muted-foreground">Tipo</Label>
-                    <Select value={newAlarm.type} onValueChange={v => setNewAlarm(p => ({ ...p, type: v as Alarm['type'] }))}>
+                    <Select value={newAlarm.type} onValueChange={v => setNewAlarm(p => ({ ...p, type: v }))}>
                       <SelectTrigger className="bg-muted border-border"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="motion">Movimento</SelectItem>
@@ -127,7 +144,7 @@ const Alarms = () => {
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground">Severidade</Label>
-                    <Select value={newAlarm.severity} onValueChange={v => setNewAlarm(p => ({ ...p, severity: v as Alarm['severity'] }))}>
+                    <Select value={newAlarm.severity} onValueChange={v => setNewAlarm(p => ({ ...p, severity: v }))}>
                       <SelectTrigger className="bg-muted border-border"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="critical">Crítico</SelectItem>
@@ -150,7 +167,6 @@ const Alarms = () => {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex items-center gap-3">
         <Select value={filterSeverity} onValueChange={setFilterSeverity}>
           <SelectTrigger className="w-36 bg-muted border-border"><SelectValue placeholder="Severidade" /></SelectTrigger>
@@ -171,14 +187,13 @@ const Alarms = () => {
         </Select>
       </div>
 
-      {/* Alarm List */}
       <div className="space-y-2 max-w-2xl">
-        {filtered.map(alarm => (
-          <AlarmItem key={alarm.id} alarm={alarm} onAcknowledge={handleAcknowledge} />
+        {filtered.map((alarm: any) => (
+          <AlarmItem key={alarm.id} alarm={mapAlarm(alarm) as any} onAcknowledge={handleAcknowledge} />
         ))}
       </div>
 
-      {filtered.length === 0 && (
+      {!isLoading && filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
           <Bell className="w-12 h-12 mb-3" />
           <p className="text-sm">Nenhum alarme encontrado</p>

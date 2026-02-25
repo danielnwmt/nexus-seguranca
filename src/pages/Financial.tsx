@@ -1,13 +1,11 @@
 import { useState } from 'react';
 import { DollarSign, Search, Plus, FileText, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban } from 'lucide-react';
-import { mockInvoices, mockClients } from '@/data/mockData';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { Invoice } from '@/types/monitoring';
+import { useTableQuery, useInsertMutation, useUpdateMutation } from '@/hooks/useSupabaseQuery';
 
 const bankLabels: Record<string, string> = {
   sicredi: 'Sicredi',
@@ -24,40 +22,41 @@ const statusConfig: Record<string, { label: string; icon: React.ElementType; cla
 };
 
 const Financial = () => {
-  const [invoices, setInvoices] = useState(mockInvoices);
+  const { data: invoices = [], isLoading } = useTableQuery('invoices');
+  const { data: clients = [] } = useTableQuery('clients');
+  const insertMutation = useInsertMutation('invoices');
+  const updateMutation = useUpdateMutation('invoices');
+
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ clientId: '', amount: '', dueDate: '', bank: '' });
 
-  const filtered = invoices.filter(inv => {
-    const matchSearch = inv.clientName.toLowerCase().includes(search.toLowerCase());
+  const filtered = invoices.filter((inv: any) => {
+    const matchSearch = (inv.client_name || '').toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === 'all' || inv.status === filterStatus;
     return matchSearch && matchStatus;
   });
 
-  const totalReceita = invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.amount, 0);
-  const totalPendente = invoices.filter(i => i.status === 'pending').reduce((sum, i) => sum + i.amount, 0);
-  const totalAtrasado = invoices.filter(i => i.status === 'overdue').reduce((sum, i) => sum + i.amount, 0);
+  const totalReceita = invoices.filter((i: any) => i.status === 'paid').reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+  const totalPendente = invoices.filter((i: any) => i.status === 'pending').reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+  const totalAtrasado = invoices.filter((i: any) => i.status === 'overdue').reduce((sum: number, i: any) => sum + Number(i.amount), 0);
 
   const handleSave = () => {
-    const client = mockClients.find(c => c.id === form.clientId);
-    const newInvoice: Invoice = {
-      id: String(invoices.length + 1),
-      clientId: form.clientId,
-      clientName: client?.name || 'Desconhecido',
+    const client = clients.find((c: any) => c.id === form.clientId);
+    insertMutation.mutate({
+      client_id: form.clientId,
+      client_name: (client as any)?.name || 'Desconhecido',
       amount: Number(form.amount),
-      dueDate: form.dueDate,
-      status: 'pending',
-      bank: form.bank as Invoice['bank'],
-    };
-    setInvoices(prev => [...prev, newInvoice]);
+      due_date: form.dueDate,
+      bank: form.bank || null,
+    } as any);
     setForm({ clientId: '', amount: '', dueDate: '', bank: '' });
     setDialogOpen(false);
   };
 
   const markAsPaid = (id: string) => {
-    setInvoices(prev => prev.map(i => i.id === id ? { ...i, status: 'paid' as const, paidAt: new Date().toISOString().split('T')[0], paymentMethod: 'Manual' } : i));
+    updateMutation.mutate({ id, status: 'paid', paid_at: new Date().toISOString().split('T')[0], payment_method: 'Manual' } as any);
   };
 
   const formatCurrency = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -83,7 +82,7 @@ const Financial = () => {
                 <Select value={form.clientId} onValueChange={v => setForm(p => ({ ...p, clientId: v }))}>
                   <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
                   <SelectContent>
-                    {mockClients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    {clients.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -115,7 +114,6 @@ const Financial = () => {
         </Dialog>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="rounded-lg border border-border bg-card p-4">
           <div className="flex items-center justify-between mb-2">
@@ -140,7 +138,6 @@ const Financial = () => {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -157,7 +154,6 @@ const Financial = () => {
         </Select>
       </div>
 
-      {/* Invoices Table */}
       <div className="rounded-lg border border-border overflow-hidden">
         <table className="w-full">
           <thead>
@@ -171,24 +167,18 @@ const Financial = () => {
             </tr>
           </thead>
           <tbody>
-            {filtered.map(inv => {
-              const st = statusConfig[inv.status];
+            {filtered.map((inv: any) => {
+              const st = statusConfig[inv.status] || statusConfig.pending;
               const StatusIcon = st.icon;
               return (
                 <tr key={inv.id} className="border-b border-border hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3"><p className="text-sm font-medium text-foreground">{inv.client_name}</p></td>
+                  <td className="px-4 py-3"><p className="text-sm font-mono text-foreground">{formatCurrency(Number(inv.amount))}</p></td>
                   <td className="px-4 py-3">
-                    <p className="text-sm font-medium text-foreground">{inv.clientName}</p>
+                    <p className="text-xs font-mono text-foreground">{inv.due_date ? new Date(inv.due_date).toLocaleDateString('pt-BR') : '-'}</p>
+                    {inv.paid_at && <p className="text-[10px] text-muted-foreground">Pago em {new Date(inv.paid_at).toLocaleDateString('pt-BR')}</p>}
                   </td>
-                  <td className="px-4 py-3">
-                    <p className="text-sm font-mono text-foreground">{formatCurrency(inv.amount)}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="text-xs font-mono text-foreground">{new Date(inv.dueDate).toLocaleDateString('pt-BR')}</p>
-                    {inv.paidAt && <p className="text-[10px] text-muted-foreground">Pago em {new Date(inv.paidAt).toLocaleDateString('pt-BR')}</p>}
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="text-xs text-foreground">{inv.bank ? bankLabels[inv.bank] : '-'}</p>
-                  </td>
+                  <td className="px-4 py-3"><p className="text-xs text-foreground">{inv.bank ? bankLabels[inv.bank] || inv.bank : '-'}</p></td>
                   <td className="px-4 py-3 text-center">
                     <span className={`inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full ${st.className}`}>
                       <StatusIcon className="w-3 h-3" />
@@ -214,7 +204,7 @@ const Financial = () => {
         </table>
       </div>
 
-      {filtered.length === 0 && (
+      {!isLoading && filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
           <DollarSign className="w-12 h-12 mb-3" />
           <p className="text-sm">Nenhuma cobrança encontrada</p>

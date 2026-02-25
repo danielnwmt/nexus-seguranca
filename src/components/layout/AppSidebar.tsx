@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Camera, Users, Bell, DollarSign, Shield, Settings } from 'lucide-react';
+import { LayoutDashboard, Camera, Users, Bell, DollarSign, Shield, Settings, LogOut } from 'lucide-react';
 import bravoLogo from '@/assets/bravo-logo.webp';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -10,11 +11,11 @@ const navItems = [
   { to: '/financial', icon: DollarSign, label: 'Financeiro' },
   { to: '/alarms', icon: Bell, label: 'Alarmes' },
   { to: '/settings', icon: Settings, label: 'Configurações' },
-  
 ];
 
 const AppSidebar = () => {
   const location = useLocation();
+  const { signOut, user } = useAuth();
 
   return (
     <aside className="w-64 h-screen bg-sidebar border-r border-sidebar-border flex flex-col fixed left-0 top-0 z-30">
@@ -48,11 +49,20 @@ const AppSidebar = () => {
         })}
       </nav>
 
-      <div className="p-4 border-t border-sidebar-border">
+      <div className="p-4 border-t border-sidebar-border space-y-3">
         <div className="flex items-center gap-2">
           <div className="status-dot status-online" />
           <span className="text-xs font-mono text-muted-foreground">Sistema Online</span>
         </div>
+        {user && (
+          <button
+            onClick={signOut}
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-destructive transition-colors w-full"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Sair
+          </button>
+        )}
       </div>
     </aside>
   );

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Camera, Plus, Search, HardDrive, Calendar, Brain } from 'lucide-react';
-import { mockCameras, mockClients } from '@/data/mockData';
 import CameraFeed from '@/components/dashboard/CameraFeed';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -8,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import type { Camera as CameraType, AnalyticType } from '@/types/monitoring';
+import type { AnalyticType } from '@/types/monitoring';
 import { ANALYTIC_LABELS } from '@/types/monitoring';
+import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
 
 const RETENTION_OPTIONS = [5, 10, 15, 20, 25, 30] as const;
 const ALL_ANALYTICS: AnalyticType[] = ['lpr', 'weapon_detection', 'line_crossing', 'area_intrusion', 'loitering', 'human_car_classification', 'fallen_person', 'people_counting', 'tampering'];
@@ -29,16 +29,21 @@ interface CameraForm {
 const emptyForm: CameraForm = { name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30', analytics: [] };
 
 const Cameras = () => {
-  const [cameras, setCameras] = useState(mockCameras);
+  const { data: cameras = [], isLoading } = useTableQuery('cameras');
+  const { data: clients = [] } = useTableQuery('clients');
+  const insertMutation = useInsertMutation('cameras');
+  const updateMutation = useUpdateMutation('cameras');
+  const deleteMutation = useDeleteMutation('cameras');
+
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterProtocol, setFilterProtocol] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingCamera, setEditingCamera] = useState<CameraType | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [newCamera, setNewCamera] = useState<CameraForm>({ ...emptyForm });
 
-  const filtered = cameras.filter(c => {
-    const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.clientName.toLowerCase().includes(search.toLowerCase());
+  const filtered = cameras.filter((c: any) => {
+    const matchSearch = c.name.toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === 'all' || c.status === filterStatus;
     const matchProtocol = filterProtocol === 'all' || c.protocol === filterProtocol;
     return matchSearch && matchStatus && matchProtocol;
@@ -46,7 +51,7 @@ const Cameras = () => {
 
   const resetForm = () => {
     setNewCamera({ ...emptyForm });
-    setEditingCamera(null);
+    setEditingId(null);
     setDialogOpen(false);
   };
 
@@ -60,59 +65,60 @@ const Cameras = () => {
   };
 
   const handleSave = () => {
-    const client = mockClients.find(c => c.id === newCamera.clientId);
-    if (editingCamera) {
-      setCameras(prev => prev.map(c => c.id === editingCamera.id ? {
-        ...c,
-        name: newCamera.name,
-        protocol: newCamera.protocol,
-        streamUrl: newCamera.streamUrl,
-        location: newCamera.location,
-        resolution: newCamera.resolution,
-        clientId: newCamera.clientId,
-        clientName: client?.name || c.clientName,
-        storagePath: newCamera.storagePath,
-        retentionDays: Number(newCamera.retentionDays) as CameraType['retentionDays'],
-        analytics: newCamera.analytics,
-      } : c));
+    const payload = {
+      name: newCamera.name,
+      client_id: newCamera.clientId || null,
+      stream_url: newCamera.streamUrl,
+      protocol: newCamera.protocol,
+      location: newCamera.location,
+      resolution: newCamera.resolution,
+      storage_path: newCamera.storagePath,
+      retention_days: Number(newCamera.retentionDays),
+      analytics: newCamera.analytics,
+    };
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, ...payload } as any);
     } else {
-      const cam: CameraType = {
-        id: String(cameras.length + 1),
-        name: newCamera.name,
-        streamUrl: newCamera.streamUrl,
-        protocol: newCamera.protocol,
-        location: newCamera.location,
-        resolution: newCamera.resolution,
-        clientId: newCamera.clientId,
-        clientName: client?.name || 'Sem Cliente',
-        status: 'online',
-        storagePath: newCamera.storagePath,
-        retentionDays: Number(newCamera.retentionDays) as CameraType['retentionDays'],
-        analytics: newCamera.analytics,
-      };
-      setCameras(prev => [...prev, cam]);
+      insertMutation.mutate(payload as any);
     }
     resetForm();
   };
 
-  const handleEdit = (camera: CameraType) => {
-    setEditingCamera(camera);
+  const handleEdit = (camera: any) => {
+    setEditingId(camera.id);
     setNewCamera({
       name: camera.name,
-      streamUrl: camera.streamUrl,
-      protocol: camera.protocol,
-      location: camera.location,
-      resolution: camera.resolution,
-      clientId: camera.clientId,
-      storagePath: camera.storagePath,
-      retentionDays: String(camera.retentionDays),
+      streamUrl: camera.stream_url || '',
+      protocol: camera.protocol || 'RTSP',
+      location: camera.location || '',
+      resolution: camera.resolution || '1920x1080',
+      clientId: camera.client_id || '',
+      storagePath: camera.storage_path || '',
+      retentionDays: String(camera.retention_days || 30),
       analytics: camera.analytics || [],
     });
     setDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setCameras(prev => prev.filter(c => c.id !== id));
+  const handleDelete = (id: string) => deleteMutation.mutate(id);
+
+  // Map DB rows to CameraFeed expected format
+  const mapCamera = (c: any) => {
+    const client = clients.find((cl: any) => cl.id === c.client_id);
+    return {
+      id: c.id,
+      name: c.name,
+      clientId: c.client_id || '',
+      clientName: client?.name || 'Sem Cliente',
+      streamUrl: c.stream_url || '',
+      protocol: c.protocol || 'RTSP',
+      status: c.status || 'online',
+      location: c.location || '',
+      resolution: c.resolution || '',
+      storagePath: c.storage_path || '',
+      retentionDays: c.retention_days || 30,
+      analytics: c.analytics || [],
+    };
   };
 
   return (
@@ -124,13 +130,13 @@ const Cameras = () => {
         </div>
         <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) resetForm(); else setDialogOpen(true); }}>
           <DialogTrigger asChild>
-            <Button className="gap-2" onClick={() => { setEditingCamera(null); setNewCamera({ ...emptyForm }); }}>
+            <Button className="gap-2" onClick={() => { setEditingId(null); setNewCamera({ ...emptyForm }); }}>
               <Plus className="w-4 h-4" /> Nova Câmera
             </Button>
           </DialogTrigger>
           <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-foreground">{editingCamera ? 'Editar Câmera' : 'Adicionar Câmera'}</DialogTitle>
+              <DialogTitle className="text-foreground">{editingId ? 'Editar Câmera' : 'Adicionar Câmera'}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -138,7 +144,7 @@ const Cameras = () => {
                 <Select value={newCamera.clientId} onValueChange={v => setNewCamera(p => ({ ...p, clientId: v }))}>
                   <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
                   <SelectContent>
-                    {mockClients.map(client => (
+                    {clients.map((client: any) => (
                       <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -187,8 +193,6 @@ const Cameras = () => {
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Analytics IA */}
               <div>
                 <Label className="text-xs text-muted-foreground flex items-center gap-1 mb-2"><Brain className="w-3 h-3" /> Analíticos via IA</Label>
                 <div className="grid grid-cols-1 gap-2 bg-muted/50 rounded-lg p-3 border border-border">
@@ -203,14 +207,12 @@ const Cameras = () => {
                   ))}
                 </div>
               </div>
-
-              <Button onClick={handleSave} className="w-full">{editingCamera ? 'Salvar Alterações' : 'Adicionar Câmera'}</Button>
+              <Button onClick={handleSave} className="w-full">{editingId ? 'Salvar Alterações' : 'Adicionar Câmera'}</Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Filters */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -235,14 +237,14 @@ const Cameras = () => {
         </Select>
       </div>
 
-      {/* Camera Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filtered.map(camera => (
-          <CameraFeed key={camera.id} camera={camera} onEdit={() => handleEdit(camera)} onDelete={() => handleDelete(camera.id)} />
-        ))}
+        {filtered.map((camera: any) => {
+          const mapped = mapCamera(camera);
+          return <CameraFeed key={camera.id} camera={mapped as any} onEdit={() => handleEdit(camera)} onDelete={() => handleDelete(camera.id)} />;
+        })}
       </div>
 
-      {filtered.length === 0 && (
+      {!isLoading && filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
           <Camera className="w-12 h-12 mb-3" />
           <p className="text-sm">Nenhuma câmera encontrada</p>
