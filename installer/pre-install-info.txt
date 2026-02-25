@@ -1,0 +1,25 @@
+BRAVO MONITORAMENTO - Informacoes de Instalacao
+================================================
+
+Este instalador ira configurar o sistema completo:
+
+  1. Copiar arquivos do sistema para C:\BravoMonitoramento
+  2. Executar o script de configuracao automatica que:
+     - Instala Node.js (se necessario)
+     - Configura o banco de dados (Docker + Supabase)
+     - Faz o build do frontend
+     - Cria servico Windows para inicio automatico
+
+REQUISITOS:
+  - Windows 10/11 ou Windows Server 2016+
+  - 4 GB de RAM (minimo)
+  - 10 GB de espaco em disco
+  - Conexao com internet (para download de dependencias)
+  - Docker Desktop (para banco de dados local)
+
+PORTAS UTILIZADAS:
+  - 80    : Interface web (frontend)
+  - 8000  : Banco de dados (Supabase)
+  - 5432  : PostgreSQL
+
+Apos a instalacao, acesse: http://localhost
