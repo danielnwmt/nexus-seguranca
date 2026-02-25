@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Camera, Plus, Search, Pencil } from 'lucide-react';
+import { Camera, Plus, Search, HardDrive, Calendar } from 'lucide-react';
 import { mockCameras, mockClients } from '@/data/mockData';
 import CameraFeed from '@/components/dashboard/CameraFeed';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import type { Camera as CameraType } from '@/types/monitoring';
 
+const RETENTION_OPTIONS = [5, 10, 15, 20, 25, 30] as const;
+
 const Cameras = () => {
   const [cameras, setCameras] = useState(mockCameras);
   const [search, setSearch] = useState('');
@@ -16,7 +18,7 @@ const Cameras = () => {
   const [filterProtocol, setFilterProtocol] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCamera, setEditingCamera] = useState<CameraType | null>(null);
-  const [newCamera, setNewCamera] = useState({ name: '', streamUrl: '', protocol: 'RTSP' as 'RTSP' | 'RTMP', location: '', resolution: '1920x1080', clientId: '' });
+  const [newCamera, setNewCamera] = useState({ name: '', streamUrl: '', protocol: 'RTSP' as 'RTSP' | 'RTMP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30' });
 
   const filtered = cameras.filter(c => {
     const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.clientName.toLowerCase().includes(search.toLowerCase());
@@ -26,7 +28,7 @@ const Cameras = () => {
   });
 
   const resetForm = () => {
-    setNewCamera({ name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '' });
+    setNewCamera({ name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30' });
     setEditingCamera(null);
     setDialogOpen(false);
   };
@@ -43,6 +45,8 @@ const Cameras = () => {
         resolution: newCamera.resolution,
         clientId: newCamera.clientId,
         clientName: client?.name || c.clientName,
+        storagePath: newCamera.storagePath,
+        retentionDays: Number(newCamera.retentionDays) as CameraType['retentionDays'],
       } : c));
     } else {
       const cam: CameraType = {
@@ -55,6 +59,8 @@ const Cameras = () => {
         clientId: newCamera.clientId,
         clientName: client?.name || 'Sem Cliente',
         status: 'online',
+        storagePath: newCamera.storagePath,
+        retentionDays: Number(newCamera.retentionDays) as CameraType['retentionDays'],
       };
       setCameras(prev => [...prev, cam]);
     }
@@ -70,6 +76,8 @@ const Cameras = () => {
       location: camera.location,
       resolution: camera.resolution,
       clientId: camera.clientId,
+      storagePath: camera.storagePath,
+      retentionDays: String(camera.retentionDays),
     });
     setDialogOpen(true);
   };
@@ -87,11 +95,11 @@ const Cameras = () => {
         </div>
         <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) resetForm(); else setDialogOpen(true); }}>
           <DialogTrigger asChild>
-            <Button className="gap-2" onClick={() => { setEditingCamera(null); setNewCamera({ name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '' }); }}>
+            <Button className="gap-2" onClick={() => { setEditingCamera(null); setNewCamera({ name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30' }); }}>
               <Plus className="w-4 h-4" /> Nova Câmera
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-card border-border">
+          <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-foreground">{editingCamera ? 'Editar Câmera' : 'Adicionar Câmera'}</DialogTitle>
             </DialogHeader>
@@ -134,6 +142,21 @@ const Cameras = () => {
               <div>
                 <Label className="text-xs text-muted-foreground">Localização</Label>
                 <Input value={newCamera.location} onChange={e => setNewCamera(p => ({ ...p, location: e.target.value }))} placeholder="Portaria" className="bg-muted border-border" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground flex items-center gap-1"><HardDrive className="w-3 h-3" /> Caminho de Gravação</Label>
+                <Input value={newCamera.storagePath} onChange={e => setNewCamera(p => ({ ...p, storagePath: e.target.value }))} placeholder="D:\Gravacoes\Cliente\CAM01" className="bg-muted border-border font-mono text-xs" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="w-3 h-3" /> Dias de Retenção</Label>
+                <Select value={newCamera.retentionDays} onValueChange={v => setNewCamera(p => ({ ...p, retentionDays: v }))}>
+                  <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    {RETENTION_OPTIONS.map(d => (
+                      <SelectItem key={d} value={String(d)}>{d} dias</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <Button onClick={handleSave} className="w-full">{editingCamera ? 'Salvar Alterações' : 'Adicionar Câmera'}</Button>
             </div>

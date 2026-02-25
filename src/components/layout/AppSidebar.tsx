@@ -1,11 +1,13 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Camera, Users, Bell } from 'lucide-react';
+import { LayoutDashboard, Camera, Users, Bell, DollarSign, Shield } from 'lucide-react';
 import bravoLogo from '@/assets/bravo-logo.webp';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/cameras', icon: Camera, label: 'Câmeras' },
   { to: '/clients', icon: Users, label: 'Clientes' },
+  { to: '/guards', icon: Shield, label: 'Vigilantes' },
+  { to: '/financial', icon: DollarSign, label: 'Financeiro' },
   { to: '/alarms', icon: Bell, label: 'Alarmes' },
 ];
 

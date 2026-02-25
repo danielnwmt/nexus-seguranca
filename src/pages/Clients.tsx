@@ -1,21 +1,18 @@
 import { useState } from 'react';
-import { Plus, Search, Users, Pencil, Trash2, Camera, HardDrive, Calendar } from 'lucide-react';
+import { Plus, Search, Users, Pencil, Trash2, Camera } from 'lucide-react';
 import { mockClients } from '@/data/mockData';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Client } from '@/types/monitoring';
-
-const RETENTION_OPTIONS = [5, 10, 15, 20, 25, 30] as const;
 
 const Clients = () => {
   const [clients, setClients] = useState(mockClients);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '', storagePath: '', retentionDays: '30' });
+  const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '' });
 
   const filtered = clients.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -25,12 +22,18 @@ const Clients = () => {
 
   const handleSave = () => {
     if (editingClient) {
-      setClients(prev => prev.map(c => c.id === editingClient.id ? { ...c, ...form, retentionDays: Number(form.retentionDays) as Client['retentionDays'] } : c));
+      setClients(prev => prev.map(c => c.id === editingClient.id ? {
+        ...c,
+        ...form,
+        monthlyFee: form.monthlyFee ? Number(form.monthlyFee) : undefined,
+        paymentDueDay: form.paymentDueDay ? Number(form.paymentDueDay) : undefined,
+      } : c));
     } else {
       const newClient: Client = {
         id: String(clients.length + 1),
         ...form,
-        retentionDays: Number(form.retentionDays) as Client['retentionDays'],
+        monthlyFee: form.monthlyFee ? Number(form.monthlyFee) : undefined,
+        paymentDueDay: form.paymentDueDay ? Number(form.paymentDueDay) : undefined,
         camerasCount: 0,
         status: 'active',
         createdAt: new Date().toISOString().split('T')[0],
@@ -42,7 +45,15 @@ const Clients = () => {
 
   const handleEdit = (client: Client) => {
     setEditingClient(client);
-    setForm({ name: client.name, cpf: client.cpf, email: client.email, phone: client.phone, address: client.address, storagePath: client.storagePath, retentionDays: String(client.retentionDays) });
+    setForm({
+      name: client.name,
+      cpf: client.cpf,
+      email: client.email,
+      phone: client.phone,
+      address: client.address,
+      monthlyFee: client.monthlyFee ? String(client.monthlyFee) : '',
+      paymentDueDay: client.paymentDueDay ? String(client.paymentDueDay) : '',
+    });
     setDialogOpen(true);
   };
 
@@ -51,7 +62,7 @@ const Clients = () => {
   };
 
   const resetForm = () => {
-    setForm({ name: '', cpf: '', email: '', phone: '', address: '', storagePath: '', retentionDays: '30' });
+    setForm({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '' });
     setEditingClient(null);
     setDialogOpen(false);
   };
@@ -65,7 +76,7 @@ const Clients = () => {
         </div>
         <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) resetForm(); else setDialogOpen(true); }}>
           <DialogTrigger asChild>
-            <Button className="gap-2" onClick={() => { setEditingClient(null); setForm({ name: '', cpf: '', email: '', phone: '', address: '', storagePath: '', retentionDays: '30' }); }}>
+            <Button className="gap-2" onClick={() => { setEditingClient(null); setForm({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '' }); }}>
               <Plus className="w-4 h-4" /> Novo Cliente
             </Button>
           </DialogTrigger>
@@ -98,20 +109,15 @@ const Clients = () => {
                 <Label className="text-xs text-muted-foreground">Endereço</Label>
                 <Input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} placeholder="Rua, número - Cidade" className="bg-muted border-border" />
               </div>
-              <div>
-                <Label className="text-xs text-muted-foreground flex items-center gap-1"><HardDrive className="w-3 h-3" /> Caminho de Gravação</Label>
-                <Input value={form.storagePath} onChange={e => setForm(p => ({ ...p, storagePath: e.target.value }))} placeholder="D:\Gravacoes\Cliente" className="bg-muted border-border font-mono text-xs" />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground flex items-center gap-1"><Calendar className="w-3 h-3" /> Dias de Retenção</Label>
-                <Select value={form.retentionDays} onValueChange={v => setForm(p => ({ ...p, retentionDays: v }))}>
-                  <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    {RETENTION_OPTIONS.map(d => (
-                      <SelectItem key={d} value={String(d)}>{d} dias</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Mensalidade (R$)</Label>
+                  <Input type="number" value={form.monthlyFee} onChange={e => setForm(p => ({ ...p, monthlyFee: e.target.value }))} placeholder="1500" className="bg-muted border-border font-mono" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Dia Vencimento</Label>
+                  <Input type="number" min="1" max="31" value={form.paymentDueDay} onChange={e => setForm(p => ({ ...p, paymentDueDay: e.target.value }))} placeholder="10" className="bg-muted border-border font-mono" />
+                </div>
               </div>
               <Button onClick={handleSave} className="w-full">{editingClient ? 'Salvar Alterações' : 'Adicionar Cliente'}</Button>
             </div>
@@ -133,7 +139,7 @@ const Clients = () => {
               <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Cliente</th>
               <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">CPF/CNPJ</th>
               <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Contato</th>
-              <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Gravação</th>
+              <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Mensalidade</th>
               <th className="text-center text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Câmeras</th>
               <th className="text-center text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Status</th>
               <th className="text-right text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Ações</th>
@@ -154,8 +160,12 @@ const Clients = () => {
                   <p className="text-[10px] text-muted-foreground">{client.phone}</p>
                 </td>
                 <td className="px-4 py-3">
-                  <p className="text-[10px] font-mono text-foreground truncate max-w-[180px]" title={client.storagePath}>{client.storagePath}</p>
-                  <p className="text-[10px] text-muted-foreground">{client.retentionDays} dias de retenção</p>
+                  <p className="text-xs font-mono text-foreground">
+                    {client.monthlyFee ? `R$ ${client.monthlyFee.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {client.paymentDueDay ? `Venc. dia ${client.paymentDueDay}` : ''}
+                  </p>
                 </td>
                 <td className="px-4 py-3 text-center">
                   <span className="inline-flex items-center gap-1 text-xs font-mono text-foreground">
