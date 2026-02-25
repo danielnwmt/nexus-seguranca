@@ -1,10 +1,10 @@
 import { Client, Camera, Alarm } from '@/types/monitoring';
 
 export const mockClients: Client[] = [
-  { id: '1', name: 'Condomínio Aurora', email: 'admin@aurora.com', phone: '(11) 3456-7890', address: 'Rua das Flores, 123 - SP', camerasCount: 8, status: 'active', createdAt: '2024-01-15' },
-  { id: '2', name: 'Shopping Centro', email: 'seg@shopcentro.com', phone: '(11) 2345-6789', address: 'Av. Brasil, 456 - SP', camerasCount: 24, status: 'active', createdAt: '2024-02-20' },
-  { id: '3', name: 'Indústria MetalTech', email: 'ti@metaltech.com', phone: '(11) 4567-8901', address: 'Rod. Anchieta, 789 - SP', camerasCount: 16, status: 'active', createdAt: '2024-03-10' },
-  { id: '4', name: 'Escola Futuro', email: 'dir@futuro.edu.br', phone: '(11) 5678-9012', address: 'Rua do Saber, 321 - SP', camerasCount: 12, status: 'inactive', createdAt: '2024-04-05' },
+  { id: '1', name: 'Condomínio Aurora', cpf: '12.345.678/0001-90', email: 'admin@aurora.com', phone: '(11) 3456-7890', address: 'Rua das Flores, 123 - SP', storagePath: 'D:\\Gravacoes\\Aurora', retentionDays: 30, camerasCount: 8, status: 'active', createdAt: '2024-01-15' },
+  { id: '2', name: 'Shopping Centro', cpf: '23.456.789/0001-01', email: 'seg@shopcentro.com', phone: '(11) 2345-6789', address: 'Av. Brasil, 456 - SP', storagePath: 'E:\\Gravacoes\\Shopping', retentionDays: 15, camerasCount: 24, status: 'active', createdAt: '2024-02-20' },
+  { id: '3', name: 'Indústria MetalTech', cpf: '34.567.890/0001-12', email: 'ti@metaltech.com', phone: '(11) 4567-8901', address: 'Rod. Anchieta, 789 - SP', storagePath: 'D:\\Gravacoes\\MetalTech', retentionDays: 20, camerasCount: 16, status: 'active', createdAt: '2024-03-10' },
+  { id: '4', name: 'Escola Futuro', cpf: '45.678.901/0001-23', email: 'dir@futuro.edu.br', phone: '(11) 5678-9012', address: 'Rua do Saber, 321 - SP', storagePath: 'D:\\Gravacoes\\Escola', retentionDays: 10, camerasCount: 12, status: 'inactive', createdAt: '2024-04-05' },
 ];
 
 export const mockCameras: Camera[] = [
