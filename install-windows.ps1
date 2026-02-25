@@ -1,31 +1,51 @@
 #Requires -RunAsAdministrator
 # ============================================================
-#  Bravo Monitoramento — Instalador Windows Server
+#  Bravo Monitoramento — Instalador Completo Windows
+#  Instala: Docker + Supabase + Frontend
 #  Execute como Administrador:
 #    powershell -ExecutionPolicy Bypass -File install-windows.ps1
 # ============================================================
 
 param(
     [string]$InstallDir = "C:\BravoMonitoramento",
+    [string]$SupabaseDir = "C:\Supabase",
     [int]$Port = 80,
+    [int]$SupabasePort = 8000,
     [string]$SupabaseUrl = "",
     [string]$SupabaseKey = "",
-    [string]$SupabaseProjectId = ""
+    [string]$SupabaseProjectId = "",
+    [switch]$SkipDatabase
 )
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
-function Write-Step($msg) { Write-Host "`n🔹 $msg" -ForegroundColor Cyan }
-function Write-Ok($msg)   { Write-Host "  ✅ $msg" -ForegroundColor Green }
-function Write-Warn($msg) { Write-Host "  ⚠️  $msg" -ForegroundColor Yellow }
-function Write-Err($msg)  { Write-Host "  ❌ $msg" -ForegroundColor Red }
+function Write-Step($msg) { Write-Host "`n>> $msg" -ForegroundColor Cyan }
+function Write-Ok($msg)   { Write-Host "  [OK] $msg" -ForegroundColor Green }
+function Write-Warn($msg) { Write-Host "  [!] $msg" -ForegroundColor Yellow }
+function Write-Err($msg)  { Write-Host "  [X] $msg" -ForegroundColor Red }
 
 Write-Host ""
 Write-Host "=============================================" -ForegroundColor DarkCyan
 Write-Host "   BRAVO MONITORAMENTO — Instalador Windows" -ForegroundColor White
+Write-Host "   Frontend + Banco de Dados" -ForegroundColor Gray
 Write-Host "=============================================" -ForegroundColor DarkCyan
 Write-Host ""
+
+# ----------------------------------------------------------
+# 0. Perguntar modo de instalação
+# ----------------------------------------------------------
+if (!$SkipDatabase -and !$SupabaseUrl) {
+    Write-Host "  Escolha o modo de instalacao:" -ForegroundColor White
+    Write-Host "  [1] Completo (Banco de dados + Frontend nesta maquina)" -ForegroundColor Gray
+    Write-Host "  [2] Apenas Frontend (Banco de dados em outro servidor)" -ForegroundColor Gray
+    Write-Host ""
+    $mode = Read-Host "  Opcao (1 ou 2)"
+
+    if ($mode -eq "2") {
+        $SkipDatabase = $true
+    }
+}
 
 # ----------------------------------------------------------
 # 1. Verificar/Instalar Node.js
@@ -51,47 +71,137 @@ if ($nodeVersion) {
 }
 
 # ----------------------------------------------------------
-# 2. Criar diretorio de instalacao
+# 2. Instalar banco de dados (Supabase Self-Hosted)
 # ----------------------------------------------------------
-Write-Step "Preparando diretorio de instalacao: $InstallDir"
+if (!$SkipDatabase) {
+    Write-Step "Verificando Docker..."
 
-if (!(Test-Path $InstallDir)) {
-    New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-    Write-Ok "Diretorio criado"
-} else {
-    Write-Ok "Diretorio ja existe"
+    $dockerOk = $false
+    try {
+        $dockerVer = docker --version 2>$null
+        if ($dockerVer) {
+            Write-Ok "Docker encontrado: $dockerVer"
+            $dockerOk = $true
+        }
+    } catch {}
+
+    if (!$dockerOk) {
+        Write-Err "Docker nao encontrado!"
+        Write-Host "  Instale Docker Desktop em: https://www.docker.com/products/docker-desktop/" -ForegroundColor Gray
+        Write-Host "  Apos instalar, reinicie o computador e execute este script novamente." -ForegroundColor Gray
+        exit 1
+    }
+
+    Write-Step "Verificando Git..."
+    $gitOk = $false
+    try {
+        $gitVer = git --version 2>$null
+        if ($gitVer) {
+            Write-Ok "Git encontrado: $gitVer"
+            $gitOk = $true
+        }
+    } catch {}
+
+    if (!$gitOk) {
+        Write-Warn "Git nao encontrado. Instalando via winget..."
+        winget install Git.Git --accept-source-agreements --accept-package-agreements --silent
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+    }
+
+    Write-Step "Instalando Supabase Self-Hosted..."
+
+    if (!(Test-Path "$SupabaseDir\docker")) {
+        git clone --depth 1 https://github.com/supabase/supabase.git $SupabaseDir
+        Write-Ok "Repositorio Supabase clonado"
+    } else {
+        Write-Ok "Supabase ja existe em $SupabaseDir"
+    }
+
+    Set-Location "$SupabaseDir\docker"
+
+    if (!(Test-Path ".env")) {
+        Copy-Item ".env.example" ".env"
+        Write-Ok "Arquivo .env criado a partir do exemplo"
+    }
+
+    Write-Host ""
+    Write-Host "  IMPORTANTE: Configure as chaves de seguranca!" -ForegroundColor Yellow
+    Write-Host "  Edite o arquivo: $SupabaseDir\docker\.env" -ForegroundColor Gray
+    Write-Host "  Altere: POSTGRES_PASSWORD, JWT_SECRET, ANON_KEY, SERVICE_ROLE_KEY" -ForegroundColor Gray
+    Write-Host "  Guia: https://supabase.com/docs/guides/self-hosting/docker#generate-api-keys" -ForegroundColor Gray
+    Write-Host ""
+
+    $configDone = Read-Host "  Ja configurou o .env? (s/n)"
+
+    if ($configDone -eq "s") {
+        Write-Step "Iniciando containers do banco de dados..."
+        docker compose up -d
+
+        Write-Host "  Aguardando containers inicializarem..." -ForegroundColor Gray
+        Start-Sleep -Seconds 30
+
+        $running = docker compose ps --format "{{.State}}" 2>$null
+        Write-Ok "Containers iniciados"
+        Write-Host "  Painel do banco: http://localhost:$SupabasePort" -ForegroundColor White
+
+        # Ler ANON_KEY do .env
+        $envContent = Get-Content ".env" -Raw
+        if ($envContent -match 'ANON_KEY=(.+)') {
+            $SupabaseKey = $Matches[1].Trim()
+        }
+        $SupabaseUrl = "http://localhost:$SupabasePort"
+        $SupabaseProjectId = "default"
+
+        Write-Host ""
+        Write-Warn "PROXIMO PASSO: Acesse http://localhost:$SupabasePort"
+        Write-Host "  1. Va em SQL Editor" -ForegroundColor Gray
+        Write-Host "  2. Execute o SQL do arquivo INSTALL.md (Etapa 3)" -ForegroundColor Gray
+        Write-Host "  3. Crie o usuario admin em Authentication > Users" -ForegroundColor Gray
+        Write-Host ""
+        Read-Host "  Pressione ENTER quando terminar para continuar a instalacao"
+    } else {
+        Write-Warn "Configure o .env e execute o script novamente."
+        exit 0
+    }
 }
 
 # ----------------------------------------------------------
-# 3. Copiar arquivos do projeto
+# 3. Pedir credenciais se necessário
 # ----------------------------------------------------------
-Write-Step "Copiando arquivos do projeto..."
+if (!$SupabaseUrl -or !$SupabaseKey) {
+    Write-Step "Configurando conexao com o banco de dados..."
+    Write-Host ""
+    if (!$SupabaseUrl)       { $SupabaseUrl       = Read-Host "  URL do Supabase (ex: http://localhost:8000)" }
+    if (!$SupabaseKey)       { $SupabaseKey       = Read-Host "  ANON_KEY do Supabase" }
+    if (!$SupabaseProjectId) { $SupabaseProjectId = Read-Host "  Project ID (ex: default)" }
+}
+
+if (!$SupabaseProjectId) { $SupabaseProjectId = "default" }
+
+# ----------------------------------------------------------
+# 4. Preparar diretorio do frontend
+# ----------------------------------------------------------
+Write-Step "Preparando diretorio: $InstallDir"
+
+if (!(Test-Path $InstallDir)) {
+    New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+}
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 if ($scriptDir -ne $InstallDir) {
-    $excludes = @("node_modules", ".git", "dist")
+    $excludes = @("node_modules", ".git", "dist", "C:\Supabase")
     Get-ChildItem -Path $scriptDir -Exclude $excludes | ForEach-Object {
         Copy-Item -Path $_.FullName -Destination $InstallDir -Recurse -Force
     }
-    Write-Ok "Arquivos copiados para $InstallDir"
-} else {
-    Write-Ok "Ja no diretorio de instalacao"
+    Write-Ok "Arquivos copiados"
 }
 
 Set-Location $InstallDir
 
 # ----------------------------------------------------------
-# 4. Configurar variaveis de ambiente (.env)
+# 5. Criar .env
 # ----------------------------------------------------------
 Write-Step "Configurando variaveis de ambiente..."
-
-if (!$SupabaseUrl -or !$SupabaseKey -or !$SupabaseProjectId) {
-    Write-Host ""
-    Write-Host "  Configure as credenciais do banco de dados:" -ForegroundColor White
-    if (!$SupabaseUrl)       { $SupabaseUrl       = Read-Host "  SUPABASE_URL" }
-    if (!$SupabaseKey)       { $SupabaseKey       = Read-Host "  SUPABASE_ANON_KEY" }
-    if (!$SupabaseProjectId) { $SupabaseProjectId = Read-Host "  SUPABASE_PROJECT_ID" }
-}
 
 $envContent = @"
 VITE_SUPABASE_URL="$SupabaseUrl"
@@ -103,60 +213,71 @@ Set-Content -Path ".env" -Value $envContent -Encoding UTF8
 Write-Ok "Arquivo .env criado"
 
 # ----------------------------------------------------------
-# 5. Instalar dependencias
+# 6. Instalar dependencias e build
 # ----------------------------------------------------------
-Write-Step "Instalando dependencias (npm install)..."
-
+Write-Step "Instalando dependencias..."
 npm install --legacy-peer-deps 2>&1 | Out-Null
 Write-Ok "Dependencias instaladas"
 
-# ----------------------------------------------------------
-# 6. Build do projeto
-# ----------------------------------------------------------
 Write-Step "Gerando build de producao..."
-
 npm run build 2>&1 | Out-Null
 
 if (Test-Path "dist\index.html") {
-    Write-Ok "Build concluido com sucesso"
+    Write-Ok "Build concluido"
 } else {
-    Write-Err "Build falhou. Execute 'npm run build' manualmente para ver os erros."
+    Write-Err "Build falhou. Execute 'npm run build' manualmente."
     exit 1
 }
 
 # ----------------------------------------------------------
-# 7. Instalar 'serve' para servir os arquivos
+# 7. Servidor web
 # ----------------------------------------------------------
-Write-Step "Instalando servidor web (serve)..."
-
+Write-Step "Instalando servidor web..."
 npm install -g serve 2>&1 | Out-Null
-Write-Ok "Servidor 'serve' instalado globalmente"
+Write-Ok "Servidor 'serve' instalado"
 
 # ----------------------------------------------------------
-# 8. Criar script de inicializacao
+# 8. Scripts de inicialização
 # ----------------------------------------------------------
-Write-Step "Criando script de inicializacao..."
+Write-Step "Criando scripts de inicializacao..."
 
-$startScript = @"
+# Script que inicia TUDO (banco + frontend)
+$startAll = @"
 @echo off
 title Bravo Monitoramento
 echo.
 echo =============================================
-echo   BRAVO MONITORAMENTO - Servidor Web
+echo   BRAVO MONITORAMENTO - Iniciando...
 echo =============================================
 echo.
-echo Servidor rodando em: http://localhost:$Port
+
+echo Iniciando banco de dados...
+cd /d "$SupabaseDir\docker"
+docker compose up -d
+
+echo.
+echo Iniciando servidor web...
+echo Acesse: http://localhost:$Port
 echo Pressione Ctrl+C para parar.
 echo.
 cd /d "$InstallDir"
 serve -s dist -l $Port
 "@
 
-Set-Content -Path "$InstallDir\iniciar-bravo.bat" -Value $startScript -Encoding ASCII
-Write-Ok "Script criado: iniciar-bravo.bat"
+$startFrontendOnly = @"
+@echo off
+title Bravo Monitoramento
+echo Servidor rodando em: http://localhost:$Port
+cd /d "$InstallDir"
+serve -s dist -l $Port
+"@
+
+Set-Content -Path "$InstallDir\iniciar-bravo.bat" -Value $startAll -Encoding ASCII
+Set-Content -Path "$InstallDir\iniciar-frontend.bat" -Value $startFrontendOnly -Encoding ASCII
+Write-Ok "Scripts criados: iniciar-bravo.bat / iniciar-frontend.bat"
 
 # ----------------------------------------------------------
-# 9. Criar servico Windows (NSSM) - opcional
+# 9. Servico Windows (NSSM)
 # ----------------------------------------------------------
 Write-Step "Configurando servico Windows..."
 
@@ -175,21 +296,17 @@ if ($nssmPath) {
     nssm set BravoMonitoramento Start SERVICE_AUTO_START
     nssm start BravoMonitoramento
 
-    Write-Ok "Servico Windows 'BravoMonitoramento' criado e iniciado"
-    Write-Ok "O servico inicia automaticamente com o Windows"
+    Write-Ok "Servico Windows criado (inicia automaticamente)"
 } else {
-    Write-Warn "NSSM nao encontrado. Para criar um servico Windows automatico:"
-    Write-Host "  1. Baixe NSSM: https://nssm.cc/download" -ForegroundColor Gray
-    Write-Host "  2. Extraia e coloque nssm.exe no PATH" -ForegroundColor Gray
-    Write-Host "  3. Execute este instalador novamente" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "  Enquanto isso, use 'iniciar-bravo.bat' para iniciar manualmente." -ForegroundColor Gray
+    Write-Warn "NSSM nao encontrado — instale para criar servico automatico"
+    Write-Host "  Baixe: https://nssm.cc/download" -ForegroundColor Gray
+    Write-Host "  Use 'iniciar-bravo.bat' para iniciar manualmente" -ForegroundColor Gray
 }
 
 # ----------------------------------------------------------
-# 10. Criar atalho na Area de Trabalho
+# 10. Atalho na Area de Trabalho
 # ----------------------------------------------------------
-Write-Step "Criando atalho na Area de Trabalho..."
+Write-Step "Criando atalho..."
 
 $desktopPath = [Environment]::GetFolderPath("Desktop")
 $shortcutPath = Join-Path $desktopPath "Bravo Monitoramento.lnk"
@@ -197,28 +314,29 @@ $shortcutPath = Join-Path $desktopPath "Bravo Monitoramento.lnk"
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = "http://localhost:$Port"
-$shortcut.IconLocation = "$InstallDir\dist\favicon.ico,0"
 $shortcut.Description = "Abrir Bravo Monitoramento"
 $shortcut.Save()
 
 Write-Ok "Atalho criado na Area de Trabalho"
 
 # ----------------------------------------------------------
-# Resumo Final
+# Resumo
 # ----------------------------------------------------------
 Write-Host ""
 Write-Host "=============================================" -ForegroundColor Green
-Write-Host "   INSTALACAO CONCLUIDA COM SUCESSO!" -ForegroundColor White
+Write-Host "   INSTALACAO CONCLUIDA!" -ForegroundColor White
 Write-Host "=============================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "  📁 Diretorio: $InstallDir" -ForegroundColor White
-Write-Host "  🌐 Acesso:    http://localhost:$Port" -ForegroundColor White
-Write-Host "  🔑 Login:     admin@bravo.com" -ForegroundColor White
+Write-Host "  Frontend:  $InstallDir" -ForegroundColor White
+if (!$SkipDatabase) {
+    Write-Host "  Banco:     $SupabaseDir" -ForegroundColor White
+    Write-Host "  Painel DB: http://localhost:$SupabasePort" -ForegroundColor White
+}
+Write-Host "  Sistema:   http://localhost:$Port" -ForegroundColor White
+Write-Host "  Login:     admin@bravo.com" -ForegroundColor White
 Write-Host ""
-Write-Host "  Comandos uteis:" -ForegroundColor Gray
-Write-Host "    Iniciar:  iniciar-bravo.bat" -ForegroundColor Gray
-Write-Host "    Rebuild:  npm run build" -ForegroundColor Gray
+Write-Host "  Iniciar:   iniciar-bravo.bat" -ForegroundColor Gray
+Write-Host "  Parar DB:  cd $SupabaseDir\docker && docker compose stop" -ForegroundColor Gray
 Write-Host ""
 
-# Abrir no navegador
 Start-Process "http://localhost:$Port"
