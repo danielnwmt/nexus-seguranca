@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
@@ -45,7 +46,8 @@ const Clients = () => {
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '' });
+  const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '' });
+  const { data: storageServers = [] } = useTableQuery('storage_servers');
 
   const filtered = clients.filter((c: any) =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -70,6 +72,9 @@ const Clients = () => {
       email: form.email,
       phone: form.phone,
       address: form.address,
+      monthly_fee: form.monthlyFee ? Number(form.monthlyFee) : null,
+      payment_due_day: form.paymentDueDay ? Number(form.paymentDueDay) : null,
+      storage_server_id: form.storageServerId || null,
     };
 
     if (editingId) {
@@ -93,6 +98,9 @@ const Clients = () => {
       email: client.email || '',
       phone: client.phone || '',
       address: client.address || '',
+      monthlyFee: client.monthly_fee ? String(client.monthly_fee) : '',
+      paymentDueDay: client.payment_due_day ? String(client.payment_due_day) : '',
+      storageServerId: client.storage_server_id || '',
     });
     setDialogOpen(true);
   };
@@ -101,8 +109,9 @@ const Clients = () => {
     deleteMutation.mutate(id);
   };
 
+  const defaultForm = { name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '' };
   const resetForm = () => {
-    setForm({ name: '', cpf: '', email: '', phone: '', address: '' });
+    setForm(defaultForm);
     setEditingId(null);
     setDialogOpen(false);
   };
@@ -116,7 +125,7 @@ const Clients = () => {
         </div>
         <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) resetForm(); else setDialogOpen(true); }}>
           <DialogTrigger asChild>
-            <Button className="gap-2" onClick={() => { setEditingId(null); setForm({ name: '', cpf: '', email: '', phone: '', address: '' }); }}>
+            <Button className="gap-2" onClick={() => { setEditingId(null); setForm(defaultForm); }}>
               <Plus className="w-4 h-4" /> Novo Cliente
             </Button>
           </DialogTrigger>
@@ -148,6 +157,25 @@ const Clients = () => {
               <div>
                 <Label className="text-xs text-muted-foreground">Endereço</Label>
                 <Input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} placeholder="Rua, número - Cidade" className="bg-muted border-border" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Mensalidade (R$)</Label>
+                  <Input type="number" value={form.monthlyFee} onChange={e => setForm(p => ({ ...p, monthlyFee: e.target.value }))} placeholder="1500.00" className="bg-muted border-border font-mono" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Dia Vencimento</Label>
+                  <Input type="number" min="1" max="31" value={form.paymentDueDay} onChange={e => setForm(p => ({ ...p, paymentDueDay: e.target.value }))} placeholder="10" className="bg-muted border-border font-mono" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Servidor de Gravação</Label>
+                <Select value={form.storageServerId} onValueChange={v => setForm(p => ({ ...p, storageServerId: v }))}>
+                  <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o servidor" /></SelectTrigger>
+                  <SelectContent>
+                    {storageServers.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name} ({s.ip_address})</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <Button onClick={handleSave} className="w-full">{editingId ? 'Salvar Alterações' : 'Adicionar Cliente'}</Button>
             </div>
