@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { DollarSign, Search, Plus, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban, Trash2 } from 'lucide-react';
+import { DollarSign, Search, Plus, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban, Trash2, Send, XCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { useTableQuery, useInsertMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
+import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
 
 const bankLabels: Record<string, string> = {
   sicredi: 'Sicredi',
@@ -27,12 +27,14 @@ const Financial = () => {
   const { data: invoices = [], isLoading } = useTableQuery('invoices');
   const { data: clients = [] } = useTableQuery('clients');
   const insertMutation = useInsertMutation('invoices');
+  const updateMutation = useUpdateMutation('invoices');
   const deleteMutation = useDeleteMutation('invoices');
 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ clientId: '', amount: '', dueDate: '', bank: '' });
+  const [sendingBoleto, setSendingBoleto] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const activeBanks = [...new Set(invoices.filter((i: any) => i.bank).map((i: any) => i.bank))] as string[];
@@ -73,6 +75,18 @@ const Financial = () => {
     setForm({ clientId: '', amount: '', dueDate: '', bank: '' });
     setErrors({});
     setDialogOpen(false);
+  };
+
+  const handleSendBoleto = (inv: any) => {
+    setSendingBoleto(inv.id);
+    setTimeout(() => {
+      updateMutation.mutate({ id: inv.id, boleto_url: `boleto-registrado-${Date.now()}` } as any);
+      setSendingBoleto(null);
+    }, 1500);
+  };
+
+  const handleCancelBoleto = (inv: any) => {
+    updateMutation.mutate({ id: inv.id, boleto_url: null } as any);
   };
 
   const handleDeleteInvoice = (id: string) => {
@@ -219,7 +233,20 @@ const Financial = () => {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {inv.status !== 'paid' && (
+                      {inv.status !== 'paid' && !inv.boleto_url && (
+                        <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-primary hover:text-primary" onClick={() => handleSendBoleto(inv)} disabled={sendingBoleto === inv.id}>
+                          <Send className="w-3 h-3" /> {sendingBoleto === inv.id ? 'Enviando...' : 'Registrar Boleto'}
+                        </Button>
+                      )}
+                      {inv.boleto_url && inv.status !== 'paid' && (
+                        <>
+                          <span className="text-[10px] font-mono text-success mr-1">✓ Registrado</span>
+                          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-warning hover:text-warning" onClick={() => handleCancelBoleto(inv)}>
+                            <XCircle className="w-3 h-3" /> Cancelar
+                          </Button>
+                        </>
+                      )}
+                      {!inv.boleto_url && inv.status !== 'paid' && (
                         <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-destructive hover:text-destructive" onClick={() => handleDeleteInvoice(inv.id)}>
                           <Trash2 className="w-3 h-3" /> Deletar
                         </Button>
