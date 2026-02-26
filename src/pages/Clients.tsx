@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Plus, Search, Users, Pencil, Trash2, Camera } from 'lucide-react';
+import { Plus, Search, Users, Pencil, Trash2, Camera, Server } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
@@ -38,6 +39,7 @@ const maskPhone = (value: string) => {
 const Clients = () => {
   const { toast } = useToast();
   const { data: clients = [], isLoading } = useTableQuery('clients');
+  const { data: storageServers = [] } = useTableQuery('storage_servers');
   const insertMutation = useInsertMutation('clients');
   const updateMutation = useUpdateMutation('clients');
   const deleteMutation = useDeleteMutation('clients');
@@ -45,7 +47,9 @@ const Clients = () => {
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '' });
+  const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '' });
+
+  const activeServers = (storageServers as any[]).filter((s: any) => s.status === 'active');
 
   const filtered = clients.filter((c: any) =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -72,6 +76,7 @@ const Clients = () => {
       address: form.address,
       monthly_fee: form.monthlyFee ? Number(form.monthlyFee) : null,
       payment_due_day: form.paymentDueDay ? Number(form.paymentDueDay) : null,
+      storage_server_id: form.storageServerId || null,
     };
 
     if (editingId) {
@@ -97,6 +102,7 @@ const Clients = () => {
       address: client.address || '',
       monthlyFee: client.monthly_fee ? String(client.monthly_fee) : '',
       paymentDueDay: client.payment_due_day ? String(client.payment_due_day) : '',
+      storageServerId: client.storage_server_id || '',
     });
     setDialogOpen(true);
   };
@@ -106,7 +112,7 @@ const Clients = () => {
   };
 
   const resetForm = () => {
-    setForm({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '' });
+    setForm({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '' });
     setEditingId(null);
     setDialogOpen(false);
   };
@@ -120,7 +126,7 @@ const Clients = () => {
         </div>
         <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) resetForm(); else setDialogOpen(true); }}>
           <DialogTrigger asChild>
-            <Button className="gap-2" onClick={() => { setEditingId(null); setForm({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '' }); }}>
+            <Button className="gap-2" onClick={() => { setEditingId(null); setForm({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '' }); }}>
               <Plus className="w-4 h-4" /> Novo Cliente
             </Button>
           </DialogTrigger>
@@ -163,6 +169,22 @@ const Clients = () => {
                   <Input type="number" min="1" max="31" value={form.paymentDueDay} onChange={e => setForm(p => ({ ...p, paymentDueDay: e.target.value }))} placeholder="10" className="bg-muted border-border font-mono" />
                 </div>
               </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground flex items-center gap-1"><Server className="w-3 h-3" /> Servidor de Gravação</Label>
+                <Select value={form.storageServerId} onValueChange={v => setForm(p => ({ ...p, storageServerId: v }))}>
+                  <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o servidor" /></SelectTrigger>
+                  <SelectContent>
+                    {activeServers.map((server: any) => (
+                      <SelectItem key={server.id} value={server.id}>
+                        {server.name} — {server.ip_address}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {activeServers.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground">Nenhum servidor cadastrado. Cadastre em Configurações → Servidores.</p>
+                )}
+              </div>
               <Button onClick={handleSave} className="w-full">{editingId ? 'Salvar Alterações' : 'Adicionar Cliente'}</Button>
             </div>
           </DialogContent>
@@ -182,6 +204,7 @@ const Clients = () => {
               <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">CPF/CNPJ</th>
               <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Contato</th>
               <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Mensalidade</th>
+              <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Servidor</th>
               <th className="text-center text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Câmeras</th>
               <th className="text-center text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Status</th>
               <th className="text-right text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Ações</th>
@@ -207,6 +230,19 @@ const Clients = () => {
                   <p className="text-[10px] text-muted-foreground">
                     {client.payment_due_day ? `Venc. dia ${client.payment_due_day}` : ''}
                   </p>
+                </td>
+                <td className="px-4 py-3">
+                  {(() => {
+                    const server = (storageServers as any[]).find((s: any) => s.id === client.storage_server_id);
+                    return server ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-foreground">
+                        <Server className="w-3 h-3 text-primary" />
+                        {server.name}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    );
+                  })()}
                 </td>
                 <td className="px-4 py-3 text-center">
                   <span className="inline-flex items-center gap-1 text-xs font-mono text-foreground">
