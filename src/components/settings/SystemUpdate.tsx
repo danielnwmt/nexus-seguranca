@@ -207,11 +207,12 @@ const SystemUpdate = () => {
       </Card>
 
       {/* Comando de instalação */}
+      {/* Instalação Rápida Ubuntu */}
       <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle className="text-base">Instalação Rápida (Ubuntu)</CardTitle>
+          <CardTitle className="text-base">🐧 Instalação Rápida — Ubuntu</CardTitle>
           <CardDescription className="text-xs">
-            Copie e cole este comando no terminal do servidor para instalar tudo automaticamente
+            Cole no terminal do servidor Ubuntu 24.04 LTS
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -221,7 +222,27 @@ const SystemUpdate = () => {
             </code>
           </div>
           <p className="text-xs text-muted-foreground mt-2">
-            Substitua <strong>SEU_USUARIO</strong> pelo seu usuário do GitHub. O script instala PostgreSQL, PostgREST, MediaMTX, Nginx e o frontend automaticamente.
+            Instala PostgreSQL, PostgREST, MediaMTX, Nginx e o frontend automaticamente.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Instalação Rápida Windows */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="text-base">🪟 Instalação Rápida — Windows</CardTitle>
+          <CardDescription className="text-xs">
+            Abra o PowerShell como Administrador e cole o comando abaixo
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="bg-muted p-3 rounded-lg border border-border">
+            <code className="text-xs font-mono text-foreground break-all">
+              Set-ExecutionPolicy Bypass -Scope Process -Force; iwr -useb https://raw.githubusercontent.com/danielnwmt/bravo-seguran-a/main/installer/install-online.ps1 | iex
+            </code>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Instala PostgreSQL, PostgREST, MediaMTX e o frontend como serviços do Windows automaticamente.
           </p>
         </CardContent>
       </Card>
