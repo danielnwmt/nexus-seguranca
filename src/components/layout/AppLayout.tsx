@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import AppSidebar from './AppSidebar';
+import ChatWidget from '@/components/chat/ChatWidget';
 
 const AppLayout = () => {
   return (
@@ -8,6 +9,7 @@ const AppLayout = () => {
       <main className="flex-1 ml-64 p-6 overflow-auto">
         <Outlet />
       </main>
+      <ChatWidget />
     </div>
   );
 };

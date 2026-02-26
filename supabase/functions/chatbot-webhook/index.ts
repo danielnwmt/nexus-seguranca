@@ -1,0 +1,64 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const body = await req.json();
+    const { message, source, phone } = body;
+
+    if (!message) {
+      return new Response(
+        JSON.stringify({ error: 'Mensagem é obrigatória' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Process message based on source
+    let reply = '';
+    const lowerMsg = message.toLowerCase();
+
+    if (lowerMsg.includes('câmera') || lowerMsg.includes('camera')) {
+      reply = 'Para verificar o status das câmeras, acesse o menu Câmeras no painel principal. Se uma câmera estiver offline, verifique a conexão de rede e o equipamento.';
+    } else if (lowerMsg.includes('alarme') || lowerMsg.includes('alerta')) {
+      reply = 'Os alarmes são exibidos em tempo real no Dashboard. Alarmes críticos geram notificações automáticas. Acesse o menu Alarmes para ver o histórico completo.';
+    } else if (lowerMsg.includes('boleto') || lowerMsg.includes('pagamento') || lowerMsg.includes('financeiro')) {
+      reply = 'Para questões financeiras, acesse o menu Financeiro. Lá você pode gerar cobranças, registrar boletos e acompanhar pagamentos.';
+    } else if (lowerMsg.includes('vigilante') || lowerMsg.includes('guarda')) {
+      reply = 'A gestão de vigilantes está no menu Vigilantes. Você pode cadastrar, editar turnos e vincular a clientes específicos.';
+    } else if (lowerMsg.includes('cliente')) {
+      reply = 'O cadastro de clientes está no menu Clientes. Cada cliente pode ter câmeras, mensalidade e servidor de gravação vinculados.';
+    } else if (lowerMsg.includes('backup')) {
+      reply = 'Para fazer backup, acesse Configurações → aba Backup. Você pode exportar todos os dados do sistema em formato JSON.';
+    } else if (lowerMsg.includes('ajuda') || lowerMsg.includes('help')) {
+      reply = 'Posso ajudar com: 📹 Câmeras, 🚨 Alarmes, 💰 Financeiro, 👮 Vigilantes, 👥 Clientes, 💾 Backup. Sobre o que deseja saber?';
+    } else {
+      reply = `Recebi sua mensagem: "${message}". Para ajuda específica, pergunte sobre: câmeras, alarmes, financeiro, vigilantes, clientes ou backup.`;
+    }
+
+    // Log for webhook integrations (WhatsApp, etc)
+    console.log(`[Chatbot] Source: ${source || 'unknown'} | Phone: ${phone || 'N/A'} | Message: ${message}`);
+
+    return new Response(
+      JSON.stringify({ 
+        reply, 
+        source: source || 'webhook',
+        timestamp: new Date().toISOString() 
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    console.error('Chatbot error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Erro interno do chatbot' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
