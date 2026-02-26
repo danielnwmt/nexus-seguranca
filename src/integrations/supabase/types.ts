@@ -130,6 +130,7 @@ export type Database = {
           payment_due_day: number | null
           phone: string | null
           status: string
+          storage_server_id: string | null
           updated_at: string
         }
         Insert: {
@@ -144,6 +145,7 @@ export type Database = {
           payment_due_day?: number | null
           phone?: string | null
           status?: string
+          storage_server_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -158,9 +160,18 @@ export type Database = {
           payment_due_day?: number | null
           phone?: string | null
           status?: string
+          storage_server_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_storage_server_id_fkey"
+            columns: ["storage_server_id"]
+            isOneToOne: false
+            referencedRelation: "storage_servers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       company_settings: {
         Row: {
@@ -295,6 +306,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      storage_servers: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          ip_address: string
+          max_storage_gb: number | null
+          name: string
+          status: string
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          ip_address?: string
+          max_storage_gb?: number | null
+          name: string
+          status?: string
+          storage_path?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          ip_address?: string
+          max_storage_gb?: number | null
+          name?: string
+          status?: string
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
