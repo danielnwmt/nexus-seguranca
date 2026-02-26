@@ -12,7 +12,7 @@
 
 set -e
 
-REPO_URL="${REPO_URL:-https://github.com/SEU_USUARIO/bravo-monitoramento}"
+REPO_URL="${REPO_URL:-https://github.com/danielnwmt/bravo-seguran-a}"
 BRANCH="${BRANCH:-main}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/bravo-monitoramento}"
 

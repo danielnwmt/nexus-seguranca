@@ -3,7 +3,7 @@
 ## 🚀 Instalação Rápida (Ubuntu - Uma Linha!)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/SEU_USUARIO/bravo-monitoramento/main/installer/install-online.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/danielnwmt/bravo-seguran-a/main/installer/install-online.sh | sudo bash
 ```
 
 > Substitua `SEU_USUARIO` pelo seu usuário do GitHub. O comando baixa e instala tudo automaticamente!

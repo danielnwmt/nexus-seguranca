@@ -11,7 +11,7 @@ set -e
 
 # ---------- Parametros (editaveis) ----------
 INSTALL_DIR="${INSTALL_DIR:-/opt/bravo-monitoramento}"
-REPO_URL="${REPO_URL:-https://github.com/SEU_USUARIO/bravo-monitoramento}"
+REPO_URL="${REPO_URL:-https://github.com/danielnwmt/bravo-seguran-a}"
 PORT="${PORT:-80}"
 API_PORT="${API_PORT:-8001}"
 POSTGREST_PORT="${POSTGREST_PORT:-3000}"
