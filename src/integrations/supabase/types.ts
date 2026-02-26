@@ -201,6 +201,7 @@ export type Database = {
       guards: {
         Row: {
           client_ids: string[] | null
+          cnv: string | null
           cpf: string | null
           created_at: string
           email: string | null
@@ -214,6 +215,7 @@ export type Database = {
         }
         Insert: {
           client_ids?: string[] | null
+          cnv?: string | null
           cpf?: string | null
           created_at?: string
           email?: string | null
@@ -227,6 +229,7 @@ export type Database = {
         }
         Update: {
           client_ids?: string[] | null
+          cnv?: string | null
           cpf?: string | null
           created_at?: string
           email?: string | null

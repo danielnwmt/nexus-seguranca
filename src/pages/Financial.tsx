@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { DollarSign, Search, Plus, FileText, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban } from 'lucide-react';
+import { DollarSign, Search, Plus, FileText, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban, Printer } from 'lucide-react';
+import BoletoLayout from '@/components/financial/BoletoLayout';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,10 @@ const Financial = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ clientId: '', amount: '', dueDate: '', bank: '' });
+  const [boletoInvoice, setBoletoInvoice] = useState<any>(null);
+
+  // Only show banks that have at least one invoice (active banks)
+  const activeBanks = [...new Set(invoices.filter((i: any) => i.bank).map((i: any) => i.bank))] as string[];
 
   const filtered = invoices.filter((inv: any) => {
     const matchSearch = (inv.client_name || '').toLowerCase().includes(search.toLowerCase());
@@ -101,10 +106,18 @@ const Financial = () => {
                 <Select value={form.bank} onValueChange={v => setForm(p => ({ ...p, bank: v }))}>
                   <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o banco" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="sicredi">Sicredi</SelectItem>
-                    <SelectItem value="caixa">Caixa Econômica</SelectItem>
-                    <SelectItem value="banco_do_brasil">Banco do Brasil</SelectItem>
-                    <SelectItem value="inter">Banco Inter</SelectItem>
+                    {activeBanks.length > 0 ? (
+                      activeBanks.map(bank => (
+                        <SelectItem key={bank} value={bank}>{bankLabels[bank] || bank}</SelectItem>
+                      ))
+                    ) : (
+                      <>
+                        <SelectItem value="sicredi">Sicredi</SelectItem>
+                        <SelectItem value="caixa">Caixa Econômica</SelectItem>
+                        <SelectItem value="banco_do_brasil">Banco do Brasil</SelectItem>
+                        <SelectItem value="inter">Banco Inter</SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -192,8 +205,8 @@ const Financial = () => {
                           <CheckCircle className="w-3 h-3" /> Confirmar
                         </Button>
                       )}
-                      <Button size="sm" variant="ghost" className="h-7 text-xs gap-1">
-                        <FileText className="w-3 h-3" /> Boleto
+                      <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => setBoletoInvoice(inv)}>
+                        <Printer className="w-3 h-3" /> Boleto
                       </Button>
                     </div>
                   </td>
@@ -209,6 +222,10 @@ const Financial = () => {
           <DollarSign className="w-12 h-12 mb-3" />
           <p className="text-sm">Nenhuma cobrança encontrada</p>
         </div>
+      )}
+
+      {boletoInvoice && (
+        <BoletoLayout invoice={boletoInvoice} onClose={() => setBoletoInvoice(null)} />
       )}
     </div>
   );
