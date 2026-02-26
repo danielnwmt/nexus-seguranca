@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Download, HardDrive, Cloud, Loader2, Clock, Mail, Lock, Save } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Download, HardDrive, Cloud, Loader2, Clock, Mail, Lock, Save, Upload, FileUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -25,6 +25,9 @@ const BackupSettings = () => {
   const [selectedTables, setSelectedTables] = useState<string[]>(tables.map(t => t.key));
   const [exportTarget, setExportTarget] = useState<string>('local');
   const [loading, setLoading] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Cloud credentials
   const [cloudEmail, setCloudEmail] = useState('');
@@ -113,8 +116,110 @@ const BackupSettings = () => {
     });
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.name.endsWith('.json')) {
+        toast({ title: 'Arquivo inválido', description: 'Selecione um arquivo .json de backup.', variant: 'destructive' });
+        return;
+      }
+      setRestoreFile(file);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!restoreFile) {
+      toast({ title: 'Selecione um arquivo de backup', variant: 'destructive' });
+      return;
+    }
+
+    setRestoring(true);
+    try {
+      const text = await restoreFile.text();
+      const data: Record<string, any[]> = JSON.parse(text);
+
+      const validTables = tables.map(t => t.key);
+      const tablesToRestore = Object.keys(data).filter(k => validTables.includes(k));
+
+      if (tablesToRestore.length === 0) {
+        toast({ title: 'Backup vazio ou inválido', description: 'Nenhuma tabela reconhecida no arquivo.', variant: 'destructive' });
+        setRestoring(false);
+        return;
+      }
+
+      let restored = 0;
+      let errors = 0;
+
+      for (const table of tablesToRestore) {
+        const rows = data[table];
+        if (!Array.isArray(rows) || rows.length === 0) continue;
+
+        for (const row of rows) {
+          const { error } = await supabase.from(table as any).upsert(row as any, { onConflict: 'id' });
+          if (error) errors++;
+          else restored++;
+        }
+      }
+
+      toast({
+        title: '✅ Backup restaurado',
+        description: `${restored} registros importados de ${tablesToRestore.length} tabelas.${errors > 0 ? ` ${errors} erros.` : ''}`,
+      });
+
+      setRestoreFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err) {
+      toast({ title: 'Erro ao restaurar', description: 'Arquivo JSON inválido ou corrompido.', variant: 'destructive' });
+    } finally {
+      setRestoring(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {/* Restaurar Backup */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Upload className="w-4 h-4" /> Restaurar Backup
+          </CardTitle>
+          <CardDescription className="text-xs">Importe um arquivo de backup JSON para restaurar os dados do sistema</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-3">
+            <div
+              className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <FileUp className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+              <p className="text-sm text-foreground">
+                {restoreFile ? restoreFile.name : 'Clique para selecionar o arquivo de backup'}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {restoreFile
+                  ? `${(restoreFile.size / 1024).toFixed(1)} KB`
+                  : 'Apenas arquivos .json exportados pelo sistema'}
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+            </div>
+
+            <Button onClick={handleRestore} disabled={restoring || !restoreFile} className="w-full gap-2">
+              {restoring ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              {restoring ? 'Restaurando...' : 'Restaurar Dados'}
+            </Button>
+          </div>
+
+          <p className="text-[10px] text-muted-foreground">
+            ⚠️ A restauração utiliza <strong>upsert</strong> — registros existentes serão atualizados e novos serão inseridos.
+          </p>
+        </CardContent>
+      </Card>
       {/* Agendamento */}
       <Card className="bg-card border-border">
         <CardHeader>
