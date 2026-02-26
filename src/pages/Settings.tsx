@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store, Server, HardDrive, Bot } from 'lucide-react';
 import CompanySettings from '@/components/settings/CompanySettings';
 import StorageServers from '@/components/settings/StorageServers';
+import SystemUpdate from '@/components/settings/SystemUpdate';
 import BackupSettings from '@/components/settings/BackupSettings';
 import ChatbotSettings from '@/components/settings/ChatbotSettings';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -106,9 +107,7 @@ const Settings = () => {
     toast({ title: 'Usuário removido', variant: 'destructive' });
   };
 
-  const handleCheckUpdate = () => {
-    toast({ title: 'Sistema atualizado', description: 'Você já está na versão mais recente: v1.0.0' });
-  };
+  // handleCheckUpdate removido - agora usa SystemUpdate component
 
   return (
     <div className="space-y-6">
@@ -291,40 +290,7 @@ const Settings = () => {
 
         {/* ===== SISTEMA ===== */}
         <TabsContent value="system" className="space-y-4">
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-base">Informações do Sistema</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Versão</Label>
-                  <p className="text-sm font-mono text-foreground">v1.0.0</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Ambiente</Label>
-                  <p className="text-sm font-mono text-foreground">Produção</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Última Atualização</Label>
-                  <p className="text-sm font-mono text-foreground">25/02/2026</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Status</Label>
-                  <div className="flex items-center gap-2">
-                    <div className="status-dot status-online" />
-                    <span className="text-sm font-mono text-foreground">Online</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-border pt-4">
-                <Button onClick={handleCheckUpdate} className="gap-2">
-                  <RefreshCw className="w-4 h-4" /> Verificar Atualizações
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <SystemUpdate />
         </TabsContent>
 
         {/* ===== APP MOBILE ===== */}
