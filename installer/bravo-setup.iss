@@ -1,5 +1,6 @@
 ; ============================================================
 ;  Bravo Monitoramento - Inno Setup Installer Script
+;  PostgreSQL + PostgREST + Auth Server + Frontend
 ;  Inno Setup 6.x
 ; ============================================================
 
@@ -17,13 +18,15 @@ OutputBaseFilename=BravoMonitoramento-Setup
 Compression=lzma
 SolidCompression=yes
 PrivilegesRequired=admin
+InfoBeforeFile=pre-install-info.txt
 
 [Files]
-Source: "..\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "node_modules,\.git,dist,installer,\.lovable"
+Source: "..\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "node_modules,\.git,dist,\.lovable,postgrest,auth-server"
 
 [Icons]
 Name: "{group}\Bravo Monitoramento"; Filename: "http://localhost:80"
 Name: "{group}\Iniciar Servidor"; Filename: "{app}\iniciar-bravo.bat"
+Name: "{group}\Atualizar Sistema"; Filename: "{app}\atualizar-bravo.bat"
 Name: "{commondesktop}\Bravo Monitoramento"; Filename: "http://localhost:80"; Tasks: desktopicon
 Name: "{commondesktop}\Iniciar Bravo"; Filename: "{app}\iniciar-bravo.bat"; Tasks: desktopicon
 
@@ -31,7 +34,7 @@ Name: "{commondesktop}\Iniciar Bravo"; Filename: "{app}\iniciar-bravo.bat"; Task
 Name: "desktopicon"; Description: "Criar atalho na Area de Trabalho"; Flags: unchecked
 
 [Run]
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\install-windows.ps1"""; Description: "Configurar sistema"; Flags: postinstall runascurrentuser waituntilterminated
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\install-windows.ps1"""; Description: "Instalar e configurar sistema (PostgreSQL + PostgREST)"; Flags: postinstall runascurrentuser waituntilterminated
 Filename: "http://localhost:80"; Description: "Abrir Bravo Monitoramento"; Flags: postinstall nowait shellexec skipifsilent
 
 [UninstallRun]

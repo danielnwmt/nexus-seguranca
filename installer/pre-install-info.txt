@@ -1,25 +1,33 @@
 BRAVO MONITORAMENTO - Informacoes de Instalacao
 ================================================
 
-Este instalador ira configurar o sistema completo:
+Este instalador ira configurar o sistema completo SEM DOCKER:
 
   1. Copiar arquivos do sistema para C:\BravoMonitoramento
   2. Executar o script de configuracao automatica que:
      - Instala Node.js (se necessario)
-     - Configura o banco de dados (Docker + Supabase)
+     - Instala PostgreSQL 16 (se necessario)
+     - Cria banco de dados e tabelas automaticamente
+     - Instala PostgREST (API REST para PostgreSQL)
+     - Configura servidor de autenticacao
      - Faz o build do frontend
-     - Cria servico Windows para inicio automatico
+     - Cria servicos Windows para inicio automatico
 
 REQUISITOS:
   - Windows 10/11 ou Windows Server 2016+
   - 4 GB de RAM (minimo)
-  - 10 GB de espaco em disco
+  - 5 GB de espaco em disco
   - Conexao com internet (para download de dependencias)
-  - Docker Desktop (para banco de dados local)
 
 PORTAS UTILIZADAS:
   - 80    : Interface web (frontend)
-  - 8000  : Banco de dados (Supabase)
+  - 3000  : PostgREST (API REST)
   - 5432  : PostgreSQL
+  - 8001  : Auth Server
+
+ATUALIZACOES:
+  - Conecte ao GitHub e execute atualizar-bravo.bat
+  - Ou substitua os arquivos e execute npm run build
 
 Apos a instalacao, acesse: http://localhost
+Login padrao: admin@bravo.com / admin123
