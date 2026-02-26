@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Camera, Users, Bell, DollarSign, Shield, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Camera, Users, Bell, DollarSign, Shield, Settings, LogOut, Headphones, ClipboardList, Wrench } from 'lucide-react';
 import bravoLogo from '@/assets/bravo-logo.webp';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -8,8 +8,11 @@ const navItems = [
   { to: '/cameras', icon: Camera, label: 'Câmeras' },
   { to: '/clients', icon: Users, label: 'Clientes' },
   { to: '/guards', icon: Shield, label: 'Vigilantes' },
+  { to: '/installers', icon: Wrench, label: 'Instaladores' },
+  { to: '/service-orders', icon: ClipboardList, label: 'Ordens de Serviço' },
   { to: '/financial', icon: DollarSign, label: 'Financeiro' },
   { to: '/alarms', icon: Bell, label: 'Alarmes' },
+  { to: '/support', icon: Headphones, label: 'Atendimento' },
   { to: '/settings', icon: Settings, label: 'Configurações' },
 ];
 

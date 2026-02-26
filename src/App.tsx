@@ -13,6 +13,9 @@ import Guards from "./pages/Guards";
 import Financial from "./pages/Financial";
 import Alarms from "./pages/Alarms";
 import Settings from "./pages/Settings";
+import Installers from "./pages/Installers";
+import ServiceOrders from "./pages/ServiceOrders";
+import Support from "./pages/Support";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -34,6 +37,9 @@ const App = () => (
               <Route path="/guards" element={<Guards />} />
               <Route path="/financial" element={<Financial />} />
               <Route path="/alarms" element={<Alarms />} />
+              <Route path="/installers" element={<Installers />} />
+              <Route path="/service-orders" element={<ServiceOrders />} />
+              <Route path="/support" element={<Support />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />
