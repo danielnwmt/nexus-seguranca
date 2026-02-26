@@ -372,6 +372,48 @@ npm install -g serve 2>&1 | Out-Null
 Write-Ok "Servidor 'serve' instalado"
 
 # ----------------------------------------------------------
+# 9.1 Instalar MediaMTX (Servidor de Midia RTMP/RTSP/HLS)
+# ----------------------------------------------------------
+Write-Step "Instalando MediaMTX (servidor de midia)..."
+
+$mediamtxDir = "$InstallDir\mediamtx"
+$mediamtxExe = "$mediamtxDir\mediamtx.exe"
+
+if (Test-Path $mediamtxExe) {
+    Write-Ok "MediaMTX ja instalado"
+} else {
+    New-Item -ItemType Directory -Path $mediamtxDir -Force | Out-Null
+
+    $mediamtxUrl = "https://github.com/bluenviron/mediamtx/releases/download/v1.9.3/mediamtx_v1.9.3_windows_amd64.zip"
+    $mediamtxZip = "$env:TEMP\mediamtx.zip"
+
+    Write-Host "  Baixando MediaMTX..." -ForegroundColor Gray
+    Invoke-WebRequest -Uri $mediamtxUrl -OutFile $mediamtxZip -UseBasicParsing
+
+    Expand-Archive -Path $mediamtxZip -DestinationPath $mediamtxDir -Force
+    Remove-Item $mediamtxZip -Force -ErrorAction SilentlyContinue
+
+    if (Test-Path $mediamtxExe) {
+        Write-Ok "MediaMTX instalado"
+    } else {
+        $found = Get-ChildItem -Path $mediamtxDir -Recurse -Filter "mediamtx.exe" | Select-Object -First 1
+        if ($found) {
+            Move-Item $found.FullName $mediamtxExe -Force
+            Write-Ok "MediaMTX instalado"
+        } else {
+            Write-Warn "MediaMTX nao encontrado. Instale manualmente: https://github.com/bluenviron/mediamtx"
+        }
+    }
+}
+
+# Copiar config do MediaMTX
+$mediamtxCfgSrc = Join-Path $scriptDir "installer\mediamtx.yml"
+if (Test-Path $mediamtxCfgSrc) {
+    Copy-Item $mediamtxCfgSrc "$mediamtxDir\mediamtx.yml" -Force
+    Write-Ok "Configuracao MediaMTX copiada"
+}
+
+# ----------------------------------------------------------
 # 10. Scripts de inicializacao
 # ----------------------------------------------------------
 Write-Step "Criando scripts de inicializacao..."
@@ -385,21 +427,32 @@ echo   BRAVO MONITORAMENTO - Iniciando...
 echo =============================================
 echo.
 
-echo [1/3] Verificando PostgreSQL...
+echo [1/4] Verificando PostgreSQL...
 net start postgresql-x64-16 2>nul
 timeout /t 2 /nobreak >nul
 
-echo [2/3] Iniciando PostgREST (API REST)...
+echo [2/4] Iniciando PostgREST (API REST)...
 start /min "PostgREST" "$postgrestExe" "$postgrestDir\postgrest.conf"
 timeout /t 2 /nobreak >nul
 
-echo [3/3] Iniciando Auth Server...
+echo [3/4] Iniciando Auth Server...
 start /min "AuthServer" node "$authServerDir\server.js"
+timeout /t 2 /nobreak >nul
+
+echo [4/4] Iniciando MediaMTX (Servidor de Midia)...
+start /min "MediaMTX" "$mediamtxExe" "$mediamtxDir\mediamtx.yml"
 timeout /t 2 /nobreak >nul
 
 echo.
 echo Iniciando servidor web...
 echo Acesse: http://localhost:$Port
+echo.
+echo ============ SERVIDOR DE MIDIA ============
+echo RTMP: rtmp://localhost:1935/{nome_camera}
+echo RTSP: rtsp://localhost:8554/{nome_camera}
+echo HLS:  http://localhost:8888/{nome_camera}/
+echo ============================================
+echo.
 echo Pressione Ctrl+C para parar.
 echo.
 cd /d "$InstallDir"
@@ -410,6 +463,7 @@ $stopAll = @"
 @echo off
 echo Parando Bravo Monitoramento...
 taskkill /f /im postgrest.exe 2>nul
+taskkill /f /im mediamtx.exe 2>nul
 taskkill /f /fi "WINDOWTITLE eq AuthServer*" 2>nul
 echo Servidor parado.
 pause
@@ -488,6 +542,15 @@ if ($nssmPath) {
     nssm set BravoAuthServer Start SERVICE_AUTO_START
     nssm start BravoAuthServer
 
+    # MediaMTX como servico
+    nssm stop BravoMediaMTX 2>$null
+    nssm remove BravoMediaMTX confirm 2>$null
+    nssm install BravoMediaMTX $mediamtxExe "$mediamtxDir\mediamtx.yml"
+    nssm set BravoMediaMTX AppDirectory $mediamtxDir
+    nssm set BravoMediaMTX DisplayName "Bravo - MediaMTX (Servidor de Midia)"
+    nssm set BravoMediaMTX Start SERVICE_AUTO_START
+    nssm start BravoMediaMTX
+
     # Frontend como servico
     $servePath = (Get-Command serve).Source
     nssm stop BravoFrontend 2>$null
@@ -498,7 +561,7 @@ if ($nssmPath) {
     nssm set BravoFrontend Start SERVICE_AUTO_START
     nssm start BravoFrontend
 
-    Write-Ok "3 servicos Windows criados (inicio automatico)"
+    Write-Ok "4 servicos Windows criados (inicio automatico)"
 } else {
     Write-Warn "NSSM nao encontrado — use 'iniciar-bravo.bat' para iniciar manualmente"
     Write-Host "  Para servico automatico, instale NSSM: https://nssm.cc/download" -ForegroundColor Gray
@@ -537,7 +600,16 @@ Write-Host "  COMPONENTES INSTALADOS:" -ForegroundColor Cyan
 Write-Host "  - PostgreSQL........: localhost:5432" -ForegroundColor White
 Write-Host "  - PostgREST (API)...: localhost:$PostgRESTPort" -ForegroundColor White
 Write-Host "  - Auth Server.......: localhost:$ApiPort" -ForegroundColor White
+Write-Host "  - MediaMTX (Midia)..: RTMP :1935 | RTSP :8554 | HLS :8888" -ForegroundColor White
 Write-Host "  - Frontend..........: localhost:$Port" -ForegroundColor White
+Write-Host ""
+Write-Host "  SERVIDOR DE MIDIA (MediaMTX):" -ForegroundColor Cyan
+Write-Host "  Para enviar stream RTMP:" -ForegroundColor Gray
+Write-Host "    rtmp://localhost:1935/{nome_camera}" -ForegroundColor White
+Write-Host "  Para enviar stream RTSP:" -ForegroundColor Gray
+Write-Host "    rtsp://localhost:8554/{nome_camera}" -ForegroundColor White
+Write-Host "  Para assistir no browser (HLS):" -ForegroundColor Gray
+Write-Host "    http://localhost:8888/{nome_camera}/" -ForegroundColor White
 Write-Host ""
 Write-Host "  ACESSO:" -ForegroundColor Cyan
 Write-Host "  URL:    http://localhost:$Port" -ForegroundColor White
