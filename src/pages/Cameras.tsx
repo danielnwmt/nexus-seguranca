@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { AnalyticType } from '@/types/monitoring';
 import { ANALYTIC_LABELS } from '@/types/monitoring';
-import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
+import { useTableQuery, usePaginatedQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
 
 const RETENTION_OPTIONS = [5, 10, 15, 20, 25, 30] as const;
 const ALL_ANALYTICS: AnalyticType[] = ['lpr', 'weapon_detection', 'line_crossing', 'area_intrusion', 'loitering', 'human_car_classification', 'fallen_person', 'people_counting', 'tampering'];
@@ -29,7 +29,6 @@ interface CameraForm {
 const emptyForm: CameraForm = { name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30', analytics: [] };
 
 const Cameras = () => {
-  const { data: cameras = [], isLoading } = useTableQuery('cameras');
   const { data: clients = [] } = useTableQuery('clients');
   const insertMutation = useInsertMutation('cameras');
   const updateMutation = useUpdateMutation('cameras');
@@ -41,13 +40,22 @@ const Cameras = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newCamera, setNewCamera] = useState<CameraForm>({ ...emptyForm });
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
 
-  const filtered = cameras.filter((c: any) => {
-    const matchSearch = c.name.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = filterStatus === 'all' || c.status === filterStatus;
-    const matchProtocol = filterProtocol === 'all' || c.protocol === filterProtocol;
-    return matchSearch && matchStatus && matchProtocol;
+  const filters: Record<string, string> = {};
+  if (filterStatus !== 'all') filters.status = filterStatus;
+  if (filterProtocol !== 'all') filters.protocol = filterProtocol;
+
+  const { data: result, isLoading } = usePaginatedQuery('cameras', page, PAGE_SIZE, {
+    search: search || undefined,
+    searchColumns: ['name', 'location'],
+    filters: Object.keys(filters).length > 0 ? filters : undefined,
   });
+
+  const cameras = result?.data || [];
+  const totalPages = result?.totalPages || 0;
+  const totalCount = result?.count || 0;
 
   const resetForm = () => {
     setNewCamera({ ...emptyForm });
@@ -238,13 +246,24 @@ const Cameras = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filtered.map((camera: any) => {
+        {cameras.map((camera: any) => {
           const mapped = mapCamera(camera);
           return <CameraFeed key={camera.id} camera={mapped as any} onEdit={() => handleEdit(camera)} onDelete={() => handleDelete(camera.id)} />;
         })}
       </div>
 
-      {!isLoading && filtered.length === 0 && (
+      {/* Paginação */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-4">
+          <p className="text-xs text-muted-foreground">{totalCount} câmeras encontradas • Página {page + 1} de {totalPages}</p>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Anterior</Button>
+            <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Próxima</Button>
+          </div>
+        </div>
+      )}
+
+      {!isLoading && cameras.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
           <Camera className="w-12 h-12 mb-3" />
           <p className="text-sm">Nenhuma câmera encontrada</p>
