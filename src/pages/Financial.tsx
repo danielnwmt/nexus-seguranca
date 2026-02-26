@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { DollarSign, Search, Plus, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban, Send } from 'lucide-react';
+import { DollarSign, Search, Plus, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban, Send, Trash2, XCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useTableQuery, useInsertMutation, useUpdateMutation } from '@/hooks/useSupabaseQuery';
+import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
 
 const bankLabels: Record<string, string> = {
   sicredi: 'Sicredi',
@@ -26,6 +26,7 @@ const Financial = () => {
   const { data: clients = [] } = useTableQuery('clients');
   const insertMutation = useInsertMutation('invoices');
   const updateMutation = useUpdateMutation('invoices');
+  const deleteMutation = useDeleteMutation('invoices');
 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -65,11 +66,18 @@ const Financial = () => {
 
   const handleSendBoleto = (inv: any) => {
     setSendingBoleto(inv.id);
-    // Simula envio para registro no banco
     setTimeout(() => {
       updateMutation.mutate({ id: inv.id, boleto_url: `boleto-registrado-${Date.now()}` } as any);
       setSendingBoleto(null);
     }, 1500);
+  };
+
+  const handleCancelBoleto = (inv: any) => {
+    updateMutation.mutate({ id: inv.id, boleto_url: null } as any);
+  };
+
+  const handleDeleteInvoice = (id: string) => {
+    deleteMutation.mutate(id);
   };
 
   const formatCurrency = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -214,11 +222,21 @@ const Financial = () => {
                         </Button>
                       )}
                       {inv.boleto_url && inv.status !== 'paid' && (
-                        <span className="text-[10px] font-mono text-success mr-2">✓ Registrado</span>
+                        <>
+                          <span className="text-[10px] font-mono text-success mr-1">✓ Registrado</span>
+                          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-warning hover:text-warning" onClick={() => handleCancelBoleto(inv)}>
+                            <XCircle className="w-3 h-3" /> Cancelar
+                          </Button>
+                        </>
                       )}
                       {inv.status !== 'paid' && (
                         <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-success hover:text-success" onClick={() => markAsPaid(inv.id)}>
                           <CheckCircle className="w-3 h-3" /> Confirmar
+                        </Button>
+                      )}
+                      {!inv.boleto_url && inv.status !== 'paid' && (
+                        <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-destructive hover:text-destructive" onClick={() => handleDeleteInvoice(inv.id)}>
+                          <Trash2 className="w-3 h-3" /> Deletar
                         </Button>
                       )}
                     </div>
