@@ -19,6 +19,10 @@
 | 3000 | PostgREST (API REST) |
 | 5432 | PostgreSQL (Banco de Dados) |
 | 8001 | Auth Server (Autenticação) |
+| 1935 | MediaMTX (RTMP - receber câmeras) |
+| 8554 | MediaMTX (RTSP) |
+| 8888 | MediaMTX (HLS - visualização browser) |
+| 8889 | MediaMTX (WebRTC) |
 
 ---
 
@@ -220,34 +224,60 @@ $env:PGPASSWORD = "BravoDb2024!"
 
 ---
 
-## 🐧 Instalação no Linux (Ubuntu/Debian)
+## 🐧 Instalação no Ubuntu 24.04 LTS
+
+### Instalação Automática (Recomendado)
 
 ```bash
-# 1. Instalar PostgreSQL
-sudo apt update
-sudo apt install postgresql postgresql-contrib -y
-
-# 2. Configurar banco
-sudo -u postgres psql -c "CREATE DATABASE bravo;"
-sudo -u postgres psql -d bravo -f installer/init-database.sql
-
-# 3. Instalar Node.js
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
-
-# 4. Instalar PostgREST
-wget https://github.com/PostgREST/postgrest/releases/download/v12.2.3/postgrest-v12.2.3-linux-static-x64.tar.xz
-tar xf postgrest-*.tar.xz
-sudo mv postgrest /usr/local/bin/
-
-# 5. Build do frontend
+# 1. Baixar o projeto
+git clone https://github.com/seu-usuario/bravo-monitoramento.git /opt/bravo-monitoramento
 cd /opt/bravo-monitoramento
-npm install
-npm run build
 
-# 6. Configurar Nginx
-sudo apt install nginx -y
-# Copie a config para /etc/nginx/sites-available/bravo
+# 2. Executar o instalador
+sudo bash install-ubuntu.sh
+```
+
+O script instala **tudo automaticamente**: PostgreSQL 16, Node.js 20, PostgREST, Auth Server, MediaMTX, Nginx e cria serviços systemd.
+
+### Parâmetros Opcionais
+
+```bash
+sudo INSTALL_DIR="/srv/bravo" \
+     PORT=8080 \
+     API_PORT=8001 \
+     PG_PASSWORD="SenhaForte123!" \
+     ADMIN_EMAIL="admin@suaempresa.com" \
+     ADMIN_PASSWORD="senhaSegura456" \
+     bash install-ubuntu.sh
+```
+
+### Gerenciar Serviços
+
+```bash
+# Ver status de tudo
+sudo bash /opt/bravo-monitoramento/status-bravo.sh
+
+# Controle individual
+sudo systemctl status bravo-postgrest
+sudo systemctl status bravo-auth
+sudo systemctl status bravo-mediamtx
+sudo systemctl restart nginx
+```
+
+### Testar Câmera RTMP
+
+```bash
+# Enviar stream de teste com FFmpeg
+ffmpeg -re -i video.mp4 -c copy -f flv rtmp://localhost:1935/cam01
+
+# Verificar no browser
+# HLS: http://SEU_IP:8888/cam01/
+```
+
+### Desinstalar
+
+```bash
+sudo bash desinstalar-bravo.sh
 ```
 
 ---
