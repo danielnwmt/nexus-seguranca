@@ -46,7 +46,7 @@ const Guards = () => {
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', cpf: '', phone: '', email: '', shift: 'day', status: 'active', clientIds: [] as string[] });
+  const [form, setForm] = useState({ name: '', cpf: '', phone: '', email: '', shift: 'day', status: 'active', cnv: '', clientIds: [] as string[] });
 
   const filtered = guards.filter((g: any) =>
     g.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -61,6 +61,7 @@ const Guards = () => {
       email: form.email,
       shift: form.shift,
       status: form.status,
+      cnv: form.cnv || null,
       client_ids: form.clientIds,
     };
     if (editingId) {
@@ -80,6 +81,7 @@ const Guards = () => {
       email: guard.email || '',
       shift: guard.shift,
       status: guard.status,
+      cnv: guard.cnv || '',
       clientIds: guard.client_ids || [],
     });
     setDialogOpen(true);
@@ -97,7 +99,7 @@ const Guards = () => {
   };
 
   const resetForm = () => {
-    setForm({ name: '', cpf: '', phone: '', email: '', shift: 'day', status: 'active', clientIds: [] });
+    setForm({ name: '', cpf: '', phone: '', email: '', shift: 'day', status: 'active', cnv: '', clientIds: [] });
     setEditingId(null);
     setDialogOpen(false);
   };
@@ -139,6 +141,10 @@ const Guards = () => {
                   <Label className="text-xs text-muted-foreground">Email</Label>
                   <Input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="email@exemplo.com" className="bg-muted border-border" />
                 </div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">CNV (Carteira Nacional de Vigilante)</Label>
+                <Input value={form.cnv} onChange={e => setForm(p => ({ ...p, cnv: e.target.value }))} placeholder="Número da CNV" className="bg-muted border-border font-mono" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -197,6 +203,7 @@ const Guards = () => {
             <tr className="bg-muted/50 border-b border-border">
               <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Vigilante</th>
               <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">CPF</th>
+              <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">CNV</th>
               <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Contato</th>
               <th className="text-center text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Turno</th>
               <th className="text-left text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-4 py-3">Clientes</th>
@@ -217,6 +224,7 @@ const Guards = () => {
                     <p className="text-[10px] text-muted-foreground font-mono">Desde {guard.hire_date ? new Date(guard.hire_date).toLocaleDateString('pt-BR') : '-'}</p>
                   </td>
                   <td className="px-4 py-3"><p className="text-xs font-mono text-foreground">{guard.cpf}</p></td>
+                  <td className="px-4 py-3"><p className="text-xs font-mono text-foreground">{guard.cnv || '-'}</p></td>
                   <td className="px-4 py-3">
                     <p className="text-xs text-foreground">{guard.phone}</p>
                     <p className="text-[10px] text-muted-foreground">{guard.email}</p>
