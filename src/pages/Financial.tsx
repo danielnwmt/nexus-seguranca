@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DollarSign, Search, Plus, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban } from 'lucide-react';
+import { DollarSign, Search, Plus, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban, Send } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,7 @@ const Financial = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ clientId: '', amount: '', dueDate: '', bank: '' });
-  
+  const [sendingBoleto, setSendingBoleto] = useState<string | null>(null);
 
   // Only show banks that have at least one invoice (active banks)
   const activeBanks = [...new Set(invoices.filter((i: any) => i.bank).map((i: any) => i.bank))] as string[];
@@ -61,6 +61,15 @@ const Financial = () => {
 
   const markAsPaid = (id: string) => {
     updateMutation.mutate({ id, status: 'paid', paid_at: new Date().toISOString().split('T')[0], payment_method: 'Manual' } as any);
+  };
+
+  const handleSendBoleto = (inv: any) => {
+    setSendingBoleto(inv.id);
+    // Simula envio para registro no banco
+    setTimeout(() => {
+      updateMutation.mutate({ id: inv.id, boleto_url: `boleto-registrado-${Date.now()}` } as any);
+      setSendingBoleto(null);
+    }, 1500);
   };
 
   const formatCurrency = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -199,6 +208,14 @@ const Financial = () => {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
+                      {inv.status !== 'paid' && !inv.boleto_url && (
+                        <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-primary hover:text-primary" onClick={() => handleSendBoleto(inv)} disabled={sendingBoleto === inv.id}>
+                          <Send className="w-3 h-3" /> {sendingBoleto === inv.id ? 'Enviando...' : 'Registrar Boleto'}
+                        </Button>
+                      )}
+                      {inv.boleto_url && inv.status !== 'paid' && (
+                        <span className="text-[10px] font-mono text-success mr-2">✓ Registrado</span>
+                      )}
                       {inv.status !== 'paid' && (
                         <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-success hover:text-success" onClick={() => markAsPaid(inv.id)}>
                           <CheckCircle className="w-3 h-3" /> Confirmar
