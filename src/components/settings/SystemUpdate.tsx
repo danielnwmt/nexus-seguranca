@@ -185,9 +185,7 @@ const SystemUpdate = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Versão</Label>
-              <p className="text-sm font-mono text-foreground">
-                {versionInfo?.version !== 'unknown' ? `#${versionInfo?.version}` : 'v1.0.0'}
-              </p>
+              <p className="text-sm font-mono text-foreground">v1.0.0</p>
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Ambiente</Label>
