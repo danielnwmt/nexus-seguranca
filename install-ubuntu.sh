@@ -11,6 +11,7 @@ set -e
 
 # ---------- Parametros (editaveis) ----------
 INSTALL_DIR="${INSTALL_DIR:-/opt/bravo-monitoramento}"
+REPO_URL="${REPO_URL:-https://github.com/SEU_USUARIO/bravo-monitoramento}"
 PORT="${PORT:-80}"
 API_PORT="${API_PORT:-8001}"
 POSTGREST_PORT="${POSTGREST_PORT:-3000}"
@@ -489,26 +490,32 @@ SCRIPT
 
 cat > "$INSTALL_DIR/atualizar-bravo.sh" << SCRIPT
 #!/bin/bash
-echo "Atualizando Bravo Monitoramento..."
+echo ""
+echo "============================================="
+echo "  BRAVO MONITORAMENTO - Atualizacao"
+echo "============================================="
+echo ""
 cd "$INSTALL_DIR"
 
-echo "Parando servicos..."
-sudo systemctl stop bravo-auth bravo-postgrest
-
-echo "Baixando atualizacoes..."
+echo "[1/4] Baixando atualizacoes do GitHub..."
 git pull origin main
 
-echo "Reinstalando dependencias..."
+echo "[2/4] Instalando dependencias..."
 npm install --legacy-peer-deps
 
-echo "Gerando novo build..."
+echo "[3/4] Gerando novo build..."
 npm run build
 
-echo "Reiniciando servicos..."
-sudo systemctl start bravo-postgrest bravo-auth
+echo "[4/4] Reiniciando servicos..."
+sudo systemctl restart bravo-auth
 sudo systemctl restart nginx
 
-echo "Atualizacao concluida!"
+echo ""
+echo "============================================="
+echo "  ATUALIZACAO CONCLUIDA!"
+echo "  Recarregue a pagina no navegador."
+echo "============================================="
+echo ""
 SCRIPT
 
 chmod +x "$INSTALL_DIR"/*.sh

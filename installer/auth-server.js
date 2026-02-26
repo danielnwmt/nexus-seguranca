@@ -214,6 +214,71 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, {});
     }
 
+    // ---- SYSTEM UPDATE ENDPOINT ----
+    if (path === '/api/system/update' && req.method === 'POST') {
+      // Verificar autenticacao
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+
+      const { execSync } = require('child_process');
+      const INSTALL_DIR = process.env.INSTALL_DIR || '/opt/bravo-monitoramento';
+
+      try {
+        // Git pull
+        const gitOutput = execSync(`cd ${INSTALL_DIR} && git pull origin main 2>&1`, { timeout: 60000 }).toString();
+        
+        if (gitOutput.includes('Already up to date')) {
+          return sendJSON(res, 200, { 
+            status: 'up_to_date', 
+            message: 'Sistema ja esta na versao mais recente.',
+            output: gitOutput.trim()
+          });
+        }
+
+        // Reinstalar dependencias e rebuild
+        execSync(`cd ${INSTALL_DIR} && npm install --legacy-peer-deps 2>&1`, { timeout: 300000 });
+        execSync(`cd ${INSTALL_DIR} && npm run build 2>&1`, { timeout: 300000 });
+        
+        // Restart nginx para servir novos arquivos
+        try { execSync('sudo systemctl restart nginx 2>&1', { timeout: 10000 }); } catch(e) {}
+
+        return sendJSON(res, 200, { 
+          status: 'updated', 
+          message: 'Sistema atualizado com sucesso! Recarregue a pagina.',
+          output: gitOutput.trim()
+        });
+      } catch (error) {
+        return sendJSON(res, 500, { 
+          status: 'error', 
+          message: 'Erro ao atualizar: ' + error.message,
+          output: error.stdout ? error.stdout.toString() : ''
+        });
+      }
+    }
+
+    // GET /api/system/version
+    if (path === '/api/system/version' && req.method === 'GET') {
+      const { execSync } = require('child_process');
+      const INSTALL_DIR = process.env.INSTALL_DIR || '/opt/bravo-monitoramento';
+      
+      try {
+        const commitHash = execSync(`cd ${INSTALL_DIR} && git rev-parse --short HEAD 2>/dev/null`).toString().trim();
+        const commitDate = execSync(`cd ${INSTALL_DIR} && git log -1 --format="%ci" 2>/dev/null`).toString().trim();
+        const branch = execSync(`cd ${INSTALL_DIR} && git rev-parse --abbrev-ref HEAD 2>/dev/null`).toString().trim();
+        
+        return sendJSON(res, 200, {
+          version: commitHash,
+          date: commitDate,
+          branch: branch
+        });
+      } catch {
+        return sendJSON(res, 200, { version: 'unknown', date: '', branch: '' });
+      }
+    }
+
     // ---- REST API (proxy para PostgREST) ----
     if (path.startsWith('/rest/v1/')) {
       const postgrestPath = path.replace('/rest/v1/', '/');

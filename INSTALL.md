@@ -1,5 +1,34 @@
 # Manual de Instalação — Bravo Monitoramento
 
+## 🚀 Instalação Rápida (Ubuntu - Uma Linha!)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SEU_USUARIO/bravo-monitoramento/main/installer/install-online.sh | sudo bash
+```
+
+> Substitua `SEU_USUARIO` pelo seu usuário do GitHub. O comando baixa e instala tudo automaticamente!
+
+### Com repositório customizado:
+```bash
+curl -fsSL URL_DO_SCRIPT | sudo REPO_URL="https://github.com/user/repo" bash
+```
+
+---
+
+## 📦 Atualização do Sistema
+
+### Pelo navegador:
+1. Acesse **Configurações → Sistema**
+2. Clique em **"Atualizar Sistema"**
+3. O sistema faz `git pull`, rebuild e reinicia automaticamente
+
+### Pelo terminal:
+```bash
+bash /opt/bravo-monitoramento/atualizar-bravo.sh
+```
+
+---
+
 ## 🖥️ Instalação no Windows (Sem Docker)
 
 ### Requisitos Mínimos
