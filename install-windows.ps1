@@ -192,6 +192,40 @@ ON CONFLICT (email) DO NOTHING;
 Write-Ok "Usuario admin criado: $AdminEmail"
 
 # ----------------------------------------------------------
+# 3.1 Criar pasta de gravacoes e servidor padrao
+# ----------------------------------------------------------
+Write-Step "Configurando armazenamento local..."
+
+$storagePath = "$InstallDir\Gravacoes"
+if (!(Test-Path $storagePath)) {
+    New-Item -ItemType Directory -Path $storagePath -Force | Out-Null
+}
+Write-Ok "Pasta de gravacoes criada: $storagePath"
+
+# Obter IP local
+$localIP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notlike "*Loopback*" -and $_.PrefixOrigin -ne "WellKnown" } | Select-Object -First 1).IPAddress
+if (!$localIP) { $localIP = "127.0.0.1" }
+
+# Registrar servidor padrao no banco
+$createServer = @"
+INSERT INTO public.storage_servers (name, ip_address, storage_path, max_storage_gb, status, description)
+VALUES ('Servidor Local', '$localIP', '$($storagePath -replace "\\", "\\")', 
+  $(([math]::Round((Get-PSDrive -Name ($storagePath.Substring(0,1))) | Select-Object -ExpandProperty Free) / 1GB)), 
+  'active', 'Servidor de gravacao local - configurado automaticamente')
+ON CONFLICT DO NOTHING;
+"@
+try {
+    & $psqlPath -h localhost -U postgres -d bravo -c $createServer 2>&1 | Out-Null
+    Write-Ok "Servidor de gravacao registrado no banco (IP: $localIP)"
+} catch {
+    Write-Warn "Nao foi possivel registrar servidor automaticamente"
+}
+
+# Criar subpastas de exemplo
+New-Item -ItemType Directory -Path "$storagePath\_modelo\CAM01" -Force | Out-Null
+Write-Ok "Estrutura de pastas criada"
+
+# ----------------------------------------------------------
 # 4. Instalar PostgREST
 # ----------------------------------------------------------
 Write-Step "Instalando PostgREST..."

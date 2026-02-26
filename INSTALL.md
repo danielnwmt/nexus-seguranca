@@ -119,24 +119,33 @@ O script faz:
 
 ---
 
-## 🗄️ Servidores de Gravação
+## 🗄️ Armazenamento Local de Imagens
 
-O sistema permite cadastrar **servidores de gravação** para armazenar as imagens das câmeras:
+### Configuração Automática
+
+O instalador cria automaticamente:
+- 📁 Pasta `C:\BravoMonitoramento\Gravacoes`
+- 🖥️ Servidor local registrado no banco com o IP da máquina
+- 📂 Estrutura modelo de subpastas
+
+### Configuração Manual (outros servidores)
 
 1. Acesse **Configurações → Servidores**
 2. Clique em **Novo Servidor**
 3. Informe:
-   - **Nome:** Ex: "Servidor Principal"
+   - **Nome:** Ex: "NVR Escritório"
    - **IP:** Ex: `192.168.1.100`
-   - **Caminho:** Ex: `D:\Gravacoes`
+   - **Caminho:** Ex: `D:\Gravacoes` ou `\\192.168.1.100\gravacoes`
    - **Capacidade:** Em GB
 4. No **cadastro do cliente**, selecione o servidor de gravação desejado
 
-### Exemplo de Estrutura de Pastas
+### Estrutura de Pastas
+
+O sistema organiza as gravações automaticamente:
 
 ```
-D:\Gravacoes\
-├── cliente-joao-abc123\
+C:\BravoMonitoramento\Gravacoes\
+├── cliente-joao\
 │   ├── CAM01\
 │   │   ├── 2026-02-26\
 │   │   │   ├── 08-00-00.mp4
@@ -144,10 +153,21 @@ D:\Gravacoes\
 │   │   └── ...
 │   └── CAM02\
 │       └── ...
-├── cliente-maria-def456\
+├── cliente-maria\
 │   └── ...
-└── ...
+└── _modelo\
+    └── CAM01\           ← pasta de exemplo criada pelo instalador
 ```
+
+### Alterar local de gravação
+
+Para usar outro disco (ex: `D:\`), passe o parâmetro na instalação:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File install-windows.ps1 -InstallDir "D:\BravoMonitoramento"
+```
+
+Ou altere manualmente em **Configurações → Servidores** após a instalação.
 
 ---
 
