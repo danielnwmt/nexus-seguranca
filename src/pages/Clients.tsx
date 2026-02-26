@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Search, Users, Pencil, Trash2, Camera } from 'lucide-react';
+import { Plus, Search, Users, Pencil, Trash2, Camera, Printer } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -39,12 +39,15 @@ const maskPhone = (value: string) => {
 const Clients = () => {
   const { toast } = useToast();
   const { data: clients = [], isLoading } = useTableQuery('clients');
+  const { data: invoices = [] } = useTableQuery('invoices');
   const insertMutation = useInsertMutation('clients');
   const updateMutation = useUpdateMutation('clients');
   const deleteMutation = useDeleteMutation('clients');
 
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [boletosDialogOpen, setBoletosDialogOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<any>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '' });
   const { data: storageServers = [] } = useTableQuery('storage_servers');
@@ -114,6 +117,37 @@ const Clients = () => {
     setForm(defaultForm);
     setEditingId(null);
     setDialogOpen(false);
+  };
+
+  const handleShowBoletos = (client: any) => {
+    setSelectedClient(client);
+    setBoletosDialogOpen(true);
+  };
+
+  const clientBoletos = selectedClient
+    ? invoices.filter((inv: any) => inv.client_id === selectedClient.id && inv.boleto_url)
+    : [];
+
+  const handlePrintBoleto = (inv: any) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html><head><title>Boleto - ${selectedClient?.name}</title>
+      <style>body{font-family:monospace;padding:40px}h1{font-size:18px}table{width:100%;border-collapse:collapse;margin-top:20px}td,th{border:1px solid #333;padding:8px;text-align:left}th{background:#f0f0f0}</style>
+      </head><body>
+      <h1>Boleto de Cobrança</h1>
+      <table>
+        <tr><th>Cliente</th><td>${inv.client_name}</td></tr>
+        <tr><th>Valor</th><td>R$ ${Number(inv.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td></tr>
+        <tr><th>Vencimento</th><td>${inv.due_date ? new Date(inv.due_date).toLocaleDateString('pt-BR') : '-'}</td></tr>
+        <tr><th>Banco</th><td>${inv.bank || '-'}</td></tr>
+        <tr><th>Status</th><td>${inv.status === 'paid' ? 'Pago' : 'Pendente'}</td></tr>
+        <tr><th>Registro</th><td>${inv.boleto_url}</td></tr>
+      </table>
+      <script>window.print();</script>
+      </body></html>
+    `);
+    printWindow.document.close();
   };
 
   return (
@@ -229,6 +263,9 @@ const Clients = () => {
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
+                    <button onClick={() => handleShowBoletos(client)} className="w-7 h-7 rounded flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Boletos">
+                      <Printer className="w-3.5 h-3.5" />
+                    </button>
                     <button onClick={() => handleEdit(client)} className="w-7 h-7 rounded flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
@@ -249,6 +286,32 @@ const Clients = () => {
           <p className="text-sm">Nenhum cliente encontrado</p>
         </div>
       )}
+
+      {/* Dialog de Boletos do Cliente */}
+      <Dialog open={boletosDialogOpen} onOpenChange={setBoletosDialogOpen}>
+        <DialogContent className="bg-card border-border max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Boletos - {selectedClient?.name}</DialogTitle>
+          </DialogHeader>
+          {clientBoletos.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">Nenhum boleto registrado para este cliente.</p>
+          ) : (
+            <div className="space-y-3">
+              {clientBoletos.map((inv: any) => (
+                <div key={inv.id} className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div>
+                    <p className="text-sm font-mono text-foreground">R$ {Number(inv.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-[10px] text-muted-foreground">Venc: {inv.due_date ? new Date(inv.due_date).toLocaleDateString('pt-BR') : '-'} • {inv.status === 'paid' ? 'Pago' : 'Pendente'}</p>
+                  </div>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => handlePrintBoleto(inv)}>
+                    <Printer className="w-3 h-3" /> Imprimir
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
