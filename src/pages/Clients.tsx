@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
+import { useTableQuery, usePaginatedQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
 
 const maskCpfCnpj = (value: string) => {
   const digits = value.replace(/\D/g, '').slice(0, 14);
@@ -38,7 +38,6 @@ const maskPhone = (value: string) => {
 
 const Clients = () => {
   const { toast } = useToast();
-  const { data: clients = [], isLoading } = useTableQuery('clients');
   const { data: invoices = [] } = useTableQuery('invoices');
   const insertMutation = useInsertMutation('clients');
   const updateMutation = useUpdateMutation('clients');
@@ -52,12 +51,17 @@ const Clients = () => {
   const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { data: storageServers = [] } = useTableQuery('storage_servers');
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
 
-  const filtered = clients.filter((c: any) =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    (c.email || '').toLowerCase().includes(search.toLowerCase()) ||
-    (c.cpf || '').includes(search)
-  );
+  const { data: result, isLoading } = usePaginatedQuery('clients', page, PAGE_SIZE, {
+    search: search || undefined,
+    searchColumns: ['name', 'email', 'cpf'],
+  });
+
+  const clients = result?.data || [];
+  const totalPages = result?.totalPages || 0;
+  const totalCount = result?.count || 0;
 
   const createClientFolder = async (clientName: string, clientId: string) => {
     try {
@@ -261,7 +265,7 @@ const Clients = () => {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((client: any) => (
+            {clients.map((client: any) => (
               <tr key={client.id} className="border-b border-border hover:bg-muted/30 transition-colors">
                 <td className="px-4 py-3">
                   <p className="text-sm font-medium text-foreground">{client.name}</p>
@@ -305,8 +309,18 @@ const Clients = () => {
           </tbody>
         </table>
       </div>
+      {/* Paginação */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-4">
+          <p className="text-xs text-muted-foreground">{totalCount} clientes encontrados • Página {page + 1} de {totalPages}</p>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Anterior</Button>
+            <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Próxima</Button>
+          </div>
+        </div>
+      )}
 
-      {!isLoading && filtered.length === 0 && (
+      {!isLoading && clients.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
           <Users className="w-12 h-12 mb-3" />
           <p className="text-sm">Nenhum cliente encontrado</p>
