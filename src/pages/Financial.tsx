@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { DollarSign, Search, Plus, FileText, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban, Printer } from 'lucide-react';
-import BoletoLayout from '@/components/financial/BoletoLayout';
+import { DollarSign, Search, Plus, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -32,7 +31,7 @@ const Financial = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ clientId: '', amount: '', dueDate: '', bank: '' });
-  const [boletoInvoice, setBoletoInvoice] = useState<any>(null);
+  
 
   // Only show banks that have at least one invoice (active banks)
   const activeBanks = [...new Set(invoices.filter((i: any) => i.bank).map((i: any) => i.bank))] as string[];
@@ -205,9 +204,6 @@ const Financial = () => {
                           <CheckCircle className="w-3 h-3" /> Confirmar
                         </Button>
                       )}
-                      <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => setBoletoInvoice(inv)}>
-                        <Printer className="w-3 h-3" /> Boleto
-                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -224,9 +220,6 @@ const Financial = () => {
         </div>
       )}
 
-      {boletoInvoice && (
-        <BoletoLayout invoice={boletoInvoice} onClose={() => setBoletoInvoice(null)} />
-      )}
     </div>
   );
 };
