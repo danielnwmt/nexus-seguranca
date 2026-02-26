@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bot, Plus, Trash2, Save, Webhook, MessageSquare } from 'lucide-react';
+import { Bot, Plus, Trash2, Save, Webhook, MessageSquare, Link, TestTube } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,10 +17,10 @@ interface BotAction {
 
 const ChatbotSettings = () => {
   const { toast } = useToast();
-  const [webhookUrl, setWebhookUrl] = useState('');
-  const [gupshupApiKey, setGupshupApiKey] = useState('');
-  const [gupshupAppName, setGupshupAppName] = useState('');
+  const [n8nWebhookUrl, setN8nWebhookUrl] = useState('');
+  const [n8nWebhookTest, setN8nWebhookTest] = useState('');
   const [botEnabled, setBotEnabled] = useState(true);
+  const [testLoading, setTestLoading] = useState(false);
 
   const [actions, setActions] = useState<BotAction[]>([
     { id: '1', keyword: 'câmera', response: 'Para verificar o status das câmeras, acesse o menu Câmeras no painel principal.', active: true },
@@ -52,21 +52,56 @@ const ChatbotSettings = () => {
     setActions(prev => prev.map(a => a.id === id ? { ...a, active: !a.active } : a));
   };
 
+  const handleTestWebhook = async () => {
+    const url = n8nWebhookTest || n8nWebhookUrl;
+    if (!url) {
+      toast({ title: 'Informe a URL do webhook n8n', variant: 'destructive' });
+      return;
+    }
+    setTestLoading(true);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'teste', source: 'bravo-test' }),
+      });
+      if (res.ok) {
+        toast({ title: 'Webhook conectado!', description: 'O n8n respondeu com sucesso.' });
+      } else {
+        toast({ title: 'Erro no webhook', description: `Status: ${res.status}`, variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Falha na conexão', description: 'Verifique a URL do webhook e se o n8n está ativo.', variant: 'destructive' });
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   const handleSave = () => {
-    toast({ title: 'Configurações do Chatbot salvas', description: 'As ações e o webhook foram atualizados.' });
+    if (!n8nWebhookUrl) {
+      toast({ title: 'Informe a URL do webhook de produção', variant: 'destructive' });
+      return;
+    }
+    // Save to localStorage for the chat widget to use
+    localStorage.setItem('bravo_n8n_webhook', n8nWebhookUrl);
+    localStorage.setItem('bravo_bot_actions', JSON.stringify(actions.filter(a => a.active)));
+    localStorage.setItem('bravo_bot_enabled', String(botEnabled));
+    toast({ title: 'Configurações do Chatbot salvas', description: 'Webhook n8n e ações atualizados.' });
   };
 
   return (
     <div className="space-y-4">
-      {/* Webhook Gupshup */}
+      {/* Webhook n8n */}
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Webhook className="w-4 h-4" /> Integração Gupshup (WhatsApp)
+            <Webhook className="w-4 h-4" /> Integração n8n (Webhook)
           </CardTitle>
-          <CardDescription className="text-xs">Configure o webhook da Gupshup para integrar o chatbot com WhatsApp</CardDescription>
+          <CardDescription className="text-xs">
+            Configure os webhooks do n8n para receber e responder mensagens de atendimento ao cliente
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <Label className="text-sm">Chatbot Ativo</Label>
@@ -76,67 +111,65 @@ const ChatbotSettings = () => {
           </div>
 
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">URL do Webhook (Gupshup)</Label>
+            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+              <Link className="w-3 h-3" /> URL do Webhook n8n (Produção)
+            </Label>
             <Input
-              value={webhookUrl}
-              onChange={e => setWebhookUrl(e.target.value)}
-              placeholder="https://api.gupshup.io/wa/webhook/..."
+              value={n8nWebhookUrl}
+              onChange={e => setN8nWebhookUrl(e.target.value)}
+              placeholder="https://seu-n8n.app/webhook/chatbot"
+              className="bg-muted border-border text-sm font-mono"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Cole aqui a URL do nó Webhook do seu workflow n8n de produção.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+              <TestTube className="w-3 h-3" /> URL do Webhook n8n (Teste) — opcional
+            </Label>
+            <Input
+              value={n8nWebhookTest}
+              onChange={e => setN8nWebhookTest(e.target.value)}
+              placeholder="https://seu-n8n.app/webhook-test/chatbot"
               className="bg-muted border-border text-sm font-mono"
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">API Key Gupshup</Label>
-              <Input
-                type="password"
-                value={gupshupApiKey}
-                onChange={e => setGupshupApiKey(e.target.value)}
-                placeholder="••••••••"
-                className="bg-muted border-border text-sm"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Nome do App Gupshup</Label>
-              <Input
-                value={gupshupAppName}
-                onChange={e => setGupshupAppName(e.target.value)}
-                placeholder="bravo-whatsapp"
-                className="bg-muted border-border text-sm"
-              />
-            </div>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTestWebhook}
+            disabled={testLoading}
+            className="gap-2"
+          >
+            <TestTube className="w-3.5 h-3.5" />
+            {testLoading ? 'Testando...' : 'Testar Webhook'}
+          </Button>
 
-          <div className="bg-muted/50 rounded-lg p-3 border border-border">
-            <Label className="text-xs text-muted-foreground">Callback URL (cole na Gupshup)</Label>
-            <div className="flex gap-2 mt-1">
-              <Input
-                readOnly
-                value={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chatbot-webhook`}
-                className="bg-muted border-border text-xs font-mono"
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  navigator.clipboard.writeText(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chatbot-webhook`);
-                  toast({ title: 'URL copiada!' });
-                }}
-              >
-                Copiar
-              </Button>
-            </div>
+          <div className="bg-muted/50 rounded-lg p-3 border border-border space-y-2">
+            <Label className="text-xs font-medium text-foreground">Como configurar no n8n:</Label>
+            <ol className="text-[11px] text-muted-foreground space-y-1 list-decimal list-inside">
+              <li>Crie um novo workflow no n8n</li>
+              <li>Adicione um nó <strong>Webhook</strong> como trigger (método POST)</li>
+              <li>Adicione nós para processar a mensagem (ex: AI Agent, HTTP Request, etc.)</li>
+              <li>No nó final, retorne um JSON com <code className="bg-muted px-1 rounded">{"{ \"reply\": \"sua resposta\" }"}</code></li>
+              <li>Ative o workflow e cole a URL do webhook acima</li>
+            </ol>
           </div>
         </CardContent>
       </Card>
 
-      {/* Ações do Bot */}
+      {/* Ações do Bot (fallback local) */}
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <MessageSquare className="w-4 h-4" /> Ações do Chatbot
+            <MessageSquare className="w-4 h-4" /> Ações do Chatbot (Fallback)
           </CardTitle>
-          <CardDescription className="text-xs">Defina palavras-chave e respostas automáticas para o atendimento</CardDescription>
+          <CardDescription className="text-xs">
+            Respostas automáticas locais quando o webhook n8n não responder ou estiver offline
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Existing actions */}

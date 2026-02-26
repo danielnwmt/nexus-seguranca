@@ -2,13 +2,17 @@ import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, Send, X, Bot, User, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { supabase } from '@/integrations/supabase/client';
 
 interface ChatMessage {
   id: string;
   role: 'user' | 'bot';
   content: string;
   timestamp: Date;
+}
+
+interface BotAction {
+  keyword: string;
+  response: string;
 }
 
 const ChatWidget = () => {
@@ -26,6 +30,19 @@ const ChatWidget = () => {
     }
   }, [messages]);
 
+  const getFallbackReply = (message: string): string | null => {
+    try {
+      const actionsJson = localStorage.getItem('bravo_bot_actions');
+      if (!actionsJson) return null;
+      const actions: BotAction[] = JSON.parse(actionsJson);
+      const lower = message.toLowerCase();
+      const match = actions.find(a => lower.includes(a.keyword.toLowerCase()));
+      return match?.response || null;
+    } catch {
+      return null;
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() || loading) return;
 
@@ -40,22 +57,49 @@ const ChatWidget = () => {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('chatbot-webhook', {
-        body: { message: userMsg.content, source: 'internal' },
-      });
+      const webhookUrl = localStorage.getItem('bravo_n8n_webhook');
+      const botEnabled = localStorage.getItem('bravo_bot_enabled') !== 'false';
 
-      const botReply: ChatMessage = {
+      let replyText = '';
+
+      if (webhookUrl && botEnabled) {
+        // Try n8n webhook first
+        try {
+          const res = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: userMsg.content,
+              source: 'bravo-chat',
+              timestamp: new Date().toISOString(),
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            replyText = data?.reply || data?.output || data?.message || data?.text || '';
+          }
+        } catch {
+          // n8n failed, will fallback
+        }
+      }
+
+      // Fallback to local actions
+      if (!replyText) {
+        replyText = getFallbackReply(userMsg.content) || 'Desculpe, não entendi. Digite "ajuda" para ver o que posso fazer.';
+      }
+
+      setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'bot',
-        content: data?.reply || 'Desculpe, não consegui processar sua mensagem.',
+        content: replyText,
         timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, botReply]);
+      }]);
     } catch {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'bot',
-        content: 'Erro ao conectar com o servidor. Tente novamente.',
+        content: 'Erro ao processar sua mensagem. Tente novamente.',
         timestamp: new Date(),
       }]);
     } finally {
@@ -82,7 +126,7 @@ const ChatWidget = () => {
           <Bot className="w-5 h-5" />
           <div>
             <p className="text-sm font-semibold">Assistente Bravo</p>
-            <p className="text-[10px] opacity-80">Online • Webhook ativo</p>
+            <p className="text-[10px] opacity-80">Online • n8n</p>
           </div>
         </div>
         <button onClick={() => setOpen(false)} className="hover:opacity-70 transition-opacity">
