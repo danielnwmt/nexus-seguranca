@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store, Server, HardDrive } from 'lucide-react';
+import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store, Server, HardDrive, Bot } from 'lucide-react';
 import CompanySettings from '@/components/settings/CompanySettings';
 import StorageServers from '@/components/settings/StorageServers';
 import BackupSettings from '@/components/settings/BackupSettings';
+import ChatbotSettings from '@/components/settings/ChatbotSettings';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -126,6 +127,7 @@ const Settings = () => {
           <TabsTrigger value="permissions" className="gap-2"><ShieldCheck className="w-4 h-4" />Permissões</TabsTrigger>
           <TabsTrigger value="storage" className="gap-2"><Server className="w-4 h-4" />Servidores</TabsTrigger>
           <TabsTrigger value="backup" className="gap-2"><HardDrive className="w-4 h-4" />Backup</TabsTrigger>
+          <TabsTrigger value="chatbot" className="gap-2"><Bot className="w-4 h-4" />Chatbot</TabsTrigger>
           <TabsTrigger value="system" className="gap-2"><RefreshCw className="w-4 h-4" />Sistema</TabsTrigger>
           <TabsTrigger value="mobile" className="gap-2"><Smartphone className="w-4 h-4" />App Mobile</TabsTrigger>
         </TabsList>
@@ -215,6 +217,11 @@ const Settings = () => {
         {/* ===== BACKUP ===== */}
         <TabsContent value="backup" className="space-y-4">
           <BackupSettings />
+        </TabsContent>
+
+        {/* ===== CHATBOT ===== */}
+        <TabsContent value="chatbot" className="space-y-4">
+          <ChatbotSettings />
         </TabsContent>
 
         {/* ===== PERMISSÕES ===== */}
