@@ -1,0 +1,357 @@
+-- ============================================================
+--  Bravo Monitoramento — Inicializacao do Banco de Dados
+--  PostgreSQL + PostgREST (sem Docker/Supabase)
+-- ============================================================
+
+-- 1. Criar roles para PostgREST
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN
+    CREATE ROLE anon NOLOGIN;
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE ROLE authenticated NOLOGIN;
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticator') THEN
+    CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD 'bravo_auth_2024';
+  END IF;
+END
+$$;
+
+GRANT anon TO authenticator;
+GRANT authenticated TO authenticator;
+
+-- 2. Schema de autenticacao (simula auth.users do Supabase)
+CREATE SCHEMA IF NOT EXISTS auth;
+
+CREATE TABLE IF NOT EXISTS auth.users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT UNIQUE NOT NULL,
+  encrypted_password TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  email_confirmed_at TIMESTAMPTZ DEFAULT now(),
+  raw_user_meta_data JSONB DEFAULT '{}'::jsonb
+);
+
+-- Funcao para verificar usuario autenticado (compativel com PostgREST JWT)
+CREATE OR REPLACE FUNCTION auth.uid()
+RETURNS UUID
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT NULLIF(current_setting('request.jwt.claims', true)::json->>'sub', '')::UUID
+$$;
+
+CREATE OR REPLACE FUNCTION auth.role()
+RETURNS TEXT
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT NULLIF(current_setting('request.jwt.claims', true)::json->>'role', '')::TEXT
+$$;
+
+-- 3. Enum de roles
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'app_role') THEN
+    CREATE TYPE public.app_role AS ENUM ('admin', 'n1', 'n2');
+  END IF;
+END
+$$;
+
+-- 4. Tabelas principais
+CREATE TABLE IF NOT EXISTS public.clients (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  cpf TEXT,
+  email TEXT,
+  phone TEXT,
+  address TEXT,
+  cameras_count INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'active',
+  monthly_fee NUMERIC,
+  payment_due_day INTEGER,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.cameras (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  client_id UUID REFERENCES public.clients(id) ON DELETE SET NULL,
+  stream_url TEXT,
+  protocol TEXT DEFAULT 'RTSP',
+  status TEXT DEFAULT 'online',
+  location TEXT,
+  resolution TEXT,
+  storage_path TEXT,
+  retention_days INTEGER DEFAULT 30,
+  analytics TEXT[],
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.guards (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  cpf TEXT,
+  phone TEXT,
+  email TEXT,
+  shift TEXT DEFAULT 'day',
+  status TEXT DEFAULT 'active',
+  client_ids TEXT[],
+  hire_date DATE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.alarms (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  camera_id UUID REFERENCES public.cameras(id) ON DELETE SET NULL,
+  camera_name TEXT,
+  client_name TEXT,
+  type TEXT DEFAULT 'motion',
+  severity TEXT DEFAULT 'medium',
+  message TEXT,
+  acknowledged BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.invoices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID REFERENCES public.clients(id) ON DELETE SET NULL,
+  client_name TEXT,
+  amount NUMERIC DEFAULT 0,
+  due_date DATE,
+  status TEXT DEFAULT 'pending',
+  payment_method TEXT,
+  bank TEXT,
+  paid_at DATE,
+  boleto_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.company_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT DEFAULT 'Bravo Monitoramento',
+  cnpj TEXT,
+  email TEXT,
+  phone TEXT,
+  address TEXT,
+  logo_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.user_roles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  role app_role DEFAULT 'admin'
+);
+
+-- 5. Funcoes auxiliares
+CREATE OR REPLACE FUNCTION public.is_authenticated()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+  SELECT auth.uid() IS NOT NULL
+$$;
+
+CREATE OR REPLACE FUNCTION public.has_role(_user_id UUID, _role app_role)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles
+    WHERE user_id = _user_id AND role = _role
+  )
+$$;
+
+CREATE OR REPLACE FUNCTION public.handle_updated_at()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.update_client_cameras_count()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
+    UPDATE public.clients SET cameras_count = (
+      SELECT COUNT(*) FROM public.cameras WHERE client_id = NEW.client_id
+    ) WHERE id = NEW.client_id;
+  END IF;
+  IF TG_OP = 'DELETE' OR TG_OP = 'UPDATE' THEN
+    UPDATE public.clients SET cameras_count = (
+      SELECT COUNT(*) FROM public.cameras WHERE client_id = OLD.client_id
+    ) WHERE id = OLD.client_id;
+  END IF;
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  INSERT INTO public.user_roles (user_id, role) VALUES (NEW.id, 'admin');
+  RETURN NEW;
+END;
+$$;
+
+-- 6. Triggers
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+DROP TRIGGER IF EXISTS update_clients_updated_at ON public.clients;
+CREATE TRIGGER update_clients_updated_at
+  BEFORE UPDATE ON public.clients
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+DROP TRIGGER IF EXISTS update_cameras_updated_at ON public.cameras;
+CREATE TRIGGER update_cameras_updated_at
+  BEFORE UPDATE ON public.cameras
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+DROP TRIGGER IF EXISTS update_guards_updated_at ON public.guards;
+CREATE TRIGGER update_guards_updated_at
+  BEFORE UPDATE ON public.guards
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+DROP TRIGGER IF EXISTS update_alarms_updated_at ON public.alarms;
+CREATE TRIGGER update_alarms_updated_at
+  BEFORE UPDATE ON public.alarms
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+DROP TRIGGER IF EXISTS update_invoices_updated_at ON public.invoices;
+CREATE TRIGGER update_invoices_updated_at
+  BEFORE UPDATE ON public.invoices
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+DROP TRIGGER IF EXISTS update_company_settings_updated_at ON public.company_settings;
+CREATE TRIGGER update_company_settings_updated_at
+  BEFORE UPDATE ON public.company_settings
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+DROP TRIGGER IF EXISTS update_cameras_count ON public.cameras;
+CREATE TRIGGER update_cameras_count
+  AFTER INSERT OR UPDATE OF client_id OR DELETE ON public.cameras
+  FOR EACH ROW EXECUTE FUNCTION public.update_client_cameras_count();
+
+-- 7. RLS (Row Level Security)
+ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cameras ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.guards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.alarms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.company_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+
+-- Politicas: usuarios autenticados podem tudo
+CREATE POLICY IF NOT EXISTS "auth_all_clients" ON public.clients FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY IF NOT EXISTS "auth_all_cameras" ON public.cameras FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY IF NOT EXISTS "auth_all_guards" ON public.guards FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY IF NOT EXISTS "auth_all_alarms" ON public.alarms FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY IF NOT EXISTS "auth_all_invoices" ON public.invoices FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY IF NOT EXISTS "auth_all_company" ON public.company_settings FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY IF NOT EXISTS "auth_all_roles" ON public.user_roles FOR ALL USING (auth.uid() IS NOT NULL);
+
+-- 8. Permissoes para PostgREST
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT USAGE ON SCHEMA auth TO anon, authenticated;
+
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+
+GRANT SELECT ON auth.users TO authenticated;
+
+-- 9. Dados iniciais
+INSERT INTO public.company_settings (name) 
+VALUES ('Bravo Monitoramento')
+ON CONFLICT DO NOTHING;
+
+-- 10. Funcao de login (retorna JWT claims)
+CREATE OR REPLACE FUNCTION public.login(email TEXT, pass TEXT)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  _user auth.users%ROWTYPE;
+  result JSON;
+BEGIN
+  SELECT * INTO _user FROM auth.users
+  WHERE auth.users.email = login.email
+  AND auth.users.encrypted_password = crypt(pass, auth.users.encrypted_password);
+
+  IF _user.id IS NULL THEN
+    RAISE EXCEPTION 'Invalid email or password';
+  END IF;
+
+  SELECT json_build_object(
+    'sub', _user.id,
+    'email', _user.email,
+    'role', 'authenticated',
+    'iat', extract(epoch from now())::integer,
+    'exp', extract(epoch from now() + interval '24 hours')::integer
+  ) INTO result;
+
+  RETURN result;
+END;
+$$;
+
+-- Funcao de registro
+CREATE OR REPLACE FUNCTION public.signup(email TEXT, pass TEXT)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  _user auth.users%ROWTYPE;
+  result JSON;
+BEGIN
+  INSERT INTO auth.users (email, encrypted_password)
+  VALUES (signup.email, crypt(pass, gen_salt('bf')))
+  RETURNING * INTO _user;
+
+  SELECT json_build_object(
+    'sub', _user.id,
+    'email', _user.email,
+    'role', 'authenticated'
+  ) INTO result;
+
+  RETURN result;
+END;
+$$;
+
+-- Permitir login/signup para anon
+GRANT EXECUTE ON FUNCTION public.login(TEXT, TEXT) TO anon;
+GRANT EXECUTE ON FUNCTION public.signup(TEXT, TEXT) TO anon;
+
+-- Extensao pgcrypto para hash de senhas
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+RAISE NOTICE 'Banco de dados inicializado com sucesso!';
