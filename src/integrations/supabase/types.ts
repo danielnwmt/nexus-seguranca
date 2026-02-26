@@ -254,6 +254,42 @@ export type Database = {
         }
         Relationships: []
       }
+      installers: {
+        Row: {
+          cpf: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          specialty: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cpf?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          specialty?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cpf?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          specialty?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           amount: number
@@ -303,6 +339,72 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_orders: {
+        Row: {
+          client_id: string | null
+          client_name: string | null
+          completed_date: string | null
+          created_at: string
+          description: string | null
+          id: string
+          installer_id: string | null
+          installer_name: string | null
+          notes: string | null
+          order_number: string
+          scheduled_date: string | null
+          status: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          client_name?: string | null
+          completed_date?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          installer_id?: string | null
+          installer_name?: string | null
+          notes?: string | null
+          order_number?: string
+          scheduled_date?: string | null
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          client_name?: string | null
+          completed_date?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          installer_id?: string | null
+          installer_name?: string | null
+          notes?: string | null
+          order_number?: string
+          scheduled_date?: string | null
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_orders_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_orders_installer_id_fkey"
+            columns: ["installer_id"]
+            isOneToOne: false
+            referencedRelation: "installers"
             referencedColumns: ["id"]
           },
         ]
