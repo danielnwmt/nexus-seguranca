@@ -219,7 +219,7 @@ const SystemUpdate = () => {
         <CardContent>
           <div className="bg-muted p-3 rounded-lg border border-border">
             <code className="text-xs font-mono text-foreground break-all">
-              curl -fsSL https://raw.githubusercontent.com/SEU_USUARIO/bravo-monitoramento/main/installer/install-online.sh | sudo bash
+              curl -fsSL https://raw.githubusercontent.com/danielnwmt/bravo-seguran-a/main/installer/install-online.sh | sudo bash
             </code>
           </div>
           <p className="text-xs text-muted-foreground mt-2">
