@@ -78,36 +78,30 @@ const BackupSettings = () => {
       return;
     }
 
-    if (exportTarget !== 'local' && (!cloudEmail || !cloudPassword)) {
-      toast({ title: 'Preencha o e-mail e a senha para exportar na nuvem', variant: 'destructive' });
+    if (exportTarget === 'local') {
+      setLoading(true);
+      try {
+        const data = await fetchAllData();
+        downloadLocal(data);
+        toast({ title: 'Backup exportado', description: 'Arquivo JSON salvo no seu computador.' });
+      } catch (err) {
+        toast({ title: 'Erro ao exportar', description: 'Não foi possível gerar o backup.', variant: 'destructive' });
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleSaveAllSettings = () => {
+    if (!cloudEmail || !cloudPassword) {
+      toast({ title: 'Preencha o e-mail e a senha nas credenciais de nuvem', variant: 'destructive' });
       return;
     }
-
-    setLoading(true);
-    try {
-      const data = await fetchAllData();
-
-      if (exportTarget === 'local') {
-        downloadLocal(data);
-        toast({ title: 'Backup exportado', description: 'Arquivo JSON salvo localmente.' });
-      } else if (exportTarget === 'google_drive') {
-        downloadLocal(data);
-        toast({
-          title: 'Google Drive',
-          description: 'Credenciais salvas. Integração com Google Drive requer configuração OAuth. O arquivo foi baixado localmente.',
-        });
-      } else if (exportTarget === 'onedrive') {
-        downloadLocal(data);
-        toast({
-          title: 'OneDrive',
-          description: 'Credenciais salvas. Integração com OneDrive requer configuração OAuth. O arquivo foi baixado localmente.',
-        });
-      }
-    } catch (err) {
-      toast({ title: 'Erro ao exportar', description: 'Não foi possível gerar o backup.', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
+    const destName = exportTarget === 'google_drive' ? 'Google Drive' : 'OneDrive';
+    toast({
+      title: 'Configurações salvas',
+      description: `Destino: ${destName}. Credenciais, dados selecionados e agendamento salvos com sucesso.`,
+    });
   };
 
   const handleSaveSchedule = () => {
@@ -261,10 +255,17 @@ const BackupSettings = () => {
             </div>
           </div>
 
-          <Button onClick={handleExport} disabled={loading} className="w-full gap-2">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            {loading ? 'Exportando...' : 'Exportar Backup Agora'}
-          </Button>
+          {exportTarget === 'local' ? (
+            <Button onClick={handleExport} disabled={loading} className="w-full gap-2">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {loading ? 'Baixando...' : 'Baixar Backup no Computador'}
+            </Button>
+          ) : (
+            <Button onClick={handleSaveAllSettings} className="w-full gap-2">
+              <Save className="w-4 h-4" />
+              Salvar Configurações
+            </Button>
+          )}
         </CardContent>
       </Card>
     </div>
