@@ -1,0 +1,64 @@
+# ============================================================
+#  MediaMTX - Servidor de Mídia para Bravo Monitoramento
+#  Recebe RTMP/RTSP e disponibiliza como HLS para o browser
+# ============================================================
+
+# Log
+logLevel: info
+logDestinations: [stdout]
+
+# API para gerenciamento
+api: yes
+apiAddress: :9997
+
+# Métricas
+metrics: no
+
+# ---- RTSP Server ----
+rtspAddress: :8554
+rtspEncryption: "no"
+rtspServerKey: ""
+rtspServerCert: ""
+
+# ---- RTMP Server ----
+rtmpAddress: :1935
+rtmpEncryption: "no"
+
+# ---- HLS Server (para browser) ----
+hlsAddress: :8888
+hlsEncryption: no
+hlsAlwaysRemux: no
+hlsSegmentCount: 3
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsSegmentMaxSize: 50M
+hlsAllowOrigin: '*'
+
+# ---- WebRTC Server (alternativa de baixa latência) ----
+webrtcAddress: :8889
+webrtcEncryption: no
+webrtcAllowOrigin: '*'
+
+# ---- Paths (câmeras) ----
+# Cada câmera publica em um path único
+# Ex: rtmp://servidor:1935/cam01
+#     rtsp://servidor:8554/cam01
+# E pode ser acessada via:
+#     HLS:    http://servidor:8888/cam01/
+#     WebRTC: http://servidor:8889/cam01/
+
+paths:
+  # Path genérico - aceita qualquer stream
+  all_others:
+    # Qualquer source pode publicar
+    # Para restringir, configure publishUser/publishPass por path
+  
+  # Exemplo de câmera com source RTSP externo:
+  # cam_recepcao:
+  #   source: rtsp://admin:senha@192.168.1.100:554/stream1
+  #   sourceOnDemand: yes
+  
+  # Exemplo de câmera que recebe RTMP push:
+  # cam_portaria:
+  #   # A câmera/encoder envia para rtmp://servidor:1935/cam_portaria
+  #   # Visualizar em http://servidor:8888/cam_portaria/
