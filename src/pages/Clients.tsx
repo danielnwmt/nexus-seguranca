@@ -50,6 +50,7 @@ const Clients = () => {
   const [selectedClient, setSelectedClient] = useState<any>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '' });
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const { data: storageServers = [] } = useTableQuery('storage_servers');
 
   const filtered = clients.filter((c: any) =>
@@ -68,7 +69,24 @@ const Clients = () => {
     }
   };
 
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+    if (!form.name.trim()) newErrors.name = 'Nome é obrigatório';
+    if (!form.cpf.trim()) newErrors.cpf = 'CPF/CNPJ é obrigatório';
+    if (!form.email.trim()) newErrors.email = 'Email é obrigatório';
+    if (!form.phone.trim()) newErrors.phone = 'Telefone é obrigatório';
+    if (!form.address.trim()) newErrors.address = 'Endereço é obrigatório';
+    if (!form.monthlyFee || Number(form.monthlyFee) <= 0) newErrors.monthlyFee = 'Mensalidade é obrigatória';
+    if (!form.paymentDueDay || Number(form.paymentDueDay) < 1 || Number(form.paymentDueDay) > 31) newErrors.paymentDueDay = 'Dia de vencimento inválido (1-31)';
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      toast({ title: 'Campos obrigatórios', description: Object.values(newErrors).join(', '), variant: 'destructive' });
+    }
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSave = async () => {
+    if (!validate()) return;
     const payload = {
       name: form.name,
       cpf: form.cpf,
@@ -115,6 +133,7 @@ const Clients = () => {
   const defaultForm = { name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '' };
   const resetForm = () => {
     setForm(defaultForm);
+    setErrors({});
     setEditingId(null);
     setDialogOpen(false);
   };
@@ -159,7 +178,7 @@ const Clients = () => {
         </div>
         <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) resetForm(); else setDialogOpen(true); }}>
           <DialogTrigger asChild>
-            <Button className="gap-2" onClick={() => { setEditingId(null); setForm(defaultForm); }}>
+            <Button className="gap-2" onClick={() => { setEditingId(null); setForm(defaultForm); setErrors({}); }}>
               <Plus className="w-4 h-4" /> Novo Cliente
             </Button>
           </DialogTrigger>
@@ -170,36 +189,43 @@ const Clients = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs text-muted-foreground">Nome</Label>
-                  <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Nome do cliente" className="bg-muted border-border" />
+                  <Label className="text-xs text-muted-foreground">Nome *</Label>
+                  <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Nome do cliente" className={`bg-muted border-border ${errors.name ? 'border-destructive' : ''}`} />
+                  {errors.name && <p className="text-[10px] text-destructive mt-1">{errors.name}</p>}
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground">CPF / CNPJ</Label>
-                  <Input value={form.cpf} onChange={e => setForm(p => ({ ...p, cpf: maskCpfCnpj(e.target.value) }))} placeholder="000.000.000-00" className="bg-muted border-border font-mono" />
+                  <Label className="text-xs text-muted-foreground">CPF / CNPJ *</Label>
+                  <Input value={form.cpf} onChange={e => setForm(p => ({ ...p, cpf: maskCpfCnpj(e.target.value) }))} placeholder="000.000.000-00" className={`bg-muted border-border font-mono ${errors.cpf ? 'border-destructive' : ''}`} />
+                  {errors.cpf && <p className="text-[10px] text-destructive mt-1">{errors.cpf}</p>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs text-muted-foreground">Email</Label>
-                  <Input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="email@exemplo.com" className="bg-muted border-border" />
+                  <Label className="text-xs text-muted-foreground">Email *</Label>
+                  <Input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="email@exemplo.com" className={`bg-muted border-border ${errors.email ? 'border-destructive' : ''}`} />
+                  {errors.email && <p className="text-[10px] text-destructive mt-1">{errors.email}</p>}
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground">Telefone</Label>
-                  <Input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: maskPhone(e.target.value) }))} placeholder="(11) 99999-9999" className="bg-muted border-border font-mono" />
+                  <Label className="text-xs text-muted-foreground">Telefone *</Label>
+                  <Input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: maskPhone(e.target.value) }))} placeholder="(11) 99999-9999" className={`bg-muted border-border font-mono ${errors.phone ? 'border-destructive' : ''}`} />
+                  {errors.phone && <p className="text-[10px] text-destructive mt-1">{errors.phone}</p>}
                 </div>
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Endereço</Label>
-                <Input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} placeholder="Rua, número - Cidade" className="bg-muted border-border" />
+                <Label className="text-xs text-muted-foreground">Endereço *</Label>
+                <Input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} placeholder="Rua, número - Cidade" className={`bg-muted border-border ${errors.address ? 'border-destructive' : ''}`} />
+                {errors.address && <p className="text-[10px] text-destructive mt-1">{errors.address}</p>}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs text-muted-foreground">Mensalidade (R$)</Label>
-                  <Input type="number" value={form.monthlyFee} onChange={e => setForm(p => ({ ...p, monthlyFee: e.target.value }))} placeholder="1500.00" className="bg-muted border-border font-mono" />
+                  <Label className="text-xs text-muted-foreground">Mensalidade (R$) *</Label>
+                  <Input type="number" value={form.monthlyFee} onChange={e => setForm(p => ({ ...p, monthlyFee: e.target.value }))} placeholder="1500.00" className={`bg-muted border-border font-mono ${errors.monthlyFee ? 'border-destructive' : ''}`} />
+                  {errors.monthlyFee && <p className="text-[10px] text-destructive mt-1">{errors.monthlyFee}</p>}
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground">Dia Vencimento</Label>
-                  <Input type="number" min="1" max="31" value={form.paymentDueDay} onChange={e => setForm(p => ({ ...p, paymentDueDay: e.target.value }))} placeholder="10" className="bg-muted border-border font-mono" />
+                  <Label className="text-xs text-muted-foreground">Dia Vencimento *</Label>
+                  <Input type="number" min="1" max="31" value={form.paymentDueDay} onChange={e => setForm(p => ({ ...p, paymentDueDay: e.target.value }))} placeholder="10" className={`bg-muted border-border font-mono ${errors.paymentDueDay ? 'border-destructive' : ''}`} />
+                  {errors.paymentDueDay && <p className="text-[10px] text-destructive mt-1">{errors.paymentDueDay}</p>}
                 </div>
               </div>
               <div>
@@ -287,7 +313,6 @@ const Clients = () => {
         </div>
       )}
 
-      {/* Dialog de Boletos do Cliente */}
       <Dialog open={boletosDialogOpen} onOpenChange={setBoletosDialogOpen}>
         <DialogContent className="bg-card border-border max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>

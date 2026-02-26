@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { DollarSign, Search, Plus, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban, Send, Trash2, XCircle } from 'lucide-react';
+import { DollarSign, Search, Plus, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
+import { useToast } from '@/hooks/use-toast';
+import { useTableQuery, useInsertMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
 
 const bankLabels: Record<string, string> = {
   sicredi: 'Sicredi',
@@ -22,19 +23,18 @@ const statusConfig: Record<string, { label: string; icon: React.ElementType; cla
 };
 
 const Financial = () => {
+  const { toast } = useToast();
   const { data: invoices = [], isLoading } = useTableQuery('invoices');
   const { data: clients = [] } = useTableQuery('clients');
   const insertMutation = useInsertMutation('invoices');
-  const updateMutation = useUpdateMutation('invoices');
   const deleteMutation = useDeleteMutation('invoices');
 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ clientId: '', amount: '', dueDate: '', bank: '' });
-  const [sendingBoleto, setSendingBoleto] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Only show banks that have at least one invoice (active banks)
   const activeBanks = [...new Set(invoices.filter((i: any) => i.bank).map((i: any) => i.bank))] as string[];
 
   const filtered = invoices.filter((inv: any) => {
@@ -47,7 +47,21 @@ const Financial = () => {
   const totalPendente = invoices.filter((i: any) => i.status === 'pending').reduce((sum: number, i: any) => sum + Number(i.amount), 0);
   const totalAtrasado = invoices.filter((i: any) => i.status === 'overdue').reduce((sum: number, i: any) => sum + Number(i.amount), 0);
 
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+    if (!form.clientId) newErrors.clientId = 'Selecione um cliente';
+    if (!form.amount || Number(form.amount) <= 0) newErrors.amount = 'Informe um valor válido';
+    if (!form.dueDate) newErrors.dueDate = 'Informe a data de vencimento';
+    if (!form.bank) newErrors.bank = 'Selecione o banco';
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      toast({ title: 'Campos obrigatórios', description: Object.values(newErrors).join(', '), variant: 'destructive' });
+    }
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSave = () => {
+    if (!validate()) return;
     const client = clients.find((c: any) => c.id === form.clientId);
     insertMutation.mutate({
       client_id: form.clientId,
@@ -57,23 +71,8 @@ const Financial = () => {
       bank: form.bank || null,
     } as any);
     setForm({ clientId: '', amount: '', dueDate: '', bank: '' });
+    setErrors({});
     setDialogOpen(false);
-  };
-
-  const markAsPaid = (id: string) => {
-    updateMutation.mutate({ id, status: 'paid', paid_at: new Date().toISOString().split('T')[0], payment_method: 'Manual' } as any);
-  };
-
-  const handleSendBoleto = (inv: any) => {
-    setSendingBoleto(inv.id);
-    setTimeout(() => {
-      updateMutation.mutate({ id: inv.id, boleto_url: `boleto-registrado-${Date.now()}` } as any);
-      setSendingBoleto(null);
-    }, 1500);
-  };
-
-  const handleCancelBoleto = (inv: any) => {
-    updateMutation.mutate({ id: inv.id, boleto_url: null } as any);
   };
 
   const handleDeleteInvoice = (id: string) => {
@@ -87,9 +86,9 @@ const Financial = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Financeiro</h1>
-          <p className="text-sm text-muted-foreground font-mono">Controle de mensalidades e boletos</p>
+          <p className="text-sm text-muted-foreground font-mono">Controle de mensalidades e cobranças</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) { setErrors({}); } setDialogOpen(v); }}>
           <DialogTrigger asChild>
             <Button className="gap-2"><Plus className="w-4 h-4" /> Nova Cobrança</Button>
           </DialogTrigger>
@@ -99,28 +98,31 @@ const Financial = () => {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label className="text-xs text-muted-foreground">Cliente</Label>
+                <Label className="text-xs text-muted-foreground">Cliente *</Label>
                 <Select value={form.clientId} onValueChange={v => setForm(p => ({ ...p, clientId: v }))}>
-                  <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
+                  <SelectTrigger className={`bg-muted border-border ${errors.clientId ? 'border-destructive' : ''}`}><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
                   <SelectContent>
                     {clients.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                {errors.clientId && <p className="text-[10px] text-destructive mt-1">{errors.clientId}</p>}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs text-muted-foreground">Valor (R$)</Label>
-                  <Input type="number" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} placeholder="1500.00" className="bg-muted border-border font-mono" />
+                  <Label className="text-xs text-muted-foreground">Valor (R$) *</Label>
+                  <Input type="number" value={form.amount} onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} placeholder="1500.00" className={`bg-muted border-border font-mono ${errors.amount ? 'border-destructive' : ''}`} />
+                  {errors.amount && <p className="text-[10px] text-destructive mt-1">{errors.amount}</p>}
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground">Vencimento</Label>
-                  <Input type="date" value={form.dueDate} onChange={e => setForm(p => ({ ...p, dueDate: e.target.value }))} className="bg-muted border-border font-mono" />
+                  <Label className="text-xs text-muted-foreground">Vencimento *</Label>
+                  <Input type="date" value={form.dueDate} onChange={e => setForm(p => ({ ...p, dueDate: e.target.value }))} className={`bg-muted border-border font-mono ${errors.dueDate ? 'border-destructive' : ''}`} />
+                  {errors.dueDate && <p className="text-[10px] text-destructive mt-1">{errors.dueDate}</p>}
                 </div>
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Banco para Boleto</Label>
+                <Label className="text-xs text-muted-foreground">Banco *</Label>
                 <Select value={form.bank} onValueChange={v => setForm(p => ({ ...p, bank: v }))}>
-                  <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o banco" /></SelectTrigger>
+                  <SelectTrigger className={`bg-muted border-border ${errors.bank ? 'border-destructive' : ''}`}><SelectValue placeholder="Selecione o banco" /></SelectTrigger>
                   <SelectContent>
                     {activeBanks.length > 0 ? (
                       activeBanks.map(bank => (
@@ -136,6 +138,7 @@ const Financial = () => {
                     )}
                   </SelectContent>
                 </Select>
+                {errors.bank && <p className="text-[10px] text-destructive mt-1">{errors.bank}</p>}
               </div>
               <Button onClick={handleSave} className="w-full">Gerar Cobrança</Button>
             </div>
@@ -216,25 +219,7 @@ const Financial = () => {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {inv.status !== 'paid' && !inv.boleto_url && (
-                        <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-primary hover:text-primary" onClick={() => handleSendBoleto(inv)} disabled={sendingBoleto === inv.id}>
-                          <Send className="w-3 h-3" /> {sendingBoleto === inv.id ? 'Enviando...' : 'Registrar Boleto'}
-                        </Button>
-                      )}
-                      {inv.boleto_url && inv.status !== 'paid' && (
-                        <>
-                          <span className="text-[10px] font-mono text-success mr-1">✓ Registrado</span>
-                          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-warning hover:text-warning" onClick={() => handleCancelBoleto(inv)}>
-                            <XCircle className="w-3 h-3" /> Cancelar
-                          </Button>
-                        </>
-                      )}
                       {inv.status !== 'paid' && (
-                        <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-success hover:text-success" onClick={() => markAsPaid(inv.id)}>
-                          <CheckCircle className="w-3 h-3" /> Confirmar
-                        </Button>
-                      )}
-                      {!inv.boleto_url && inv.status !== 'paid' && (
                         <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-destructive hover:text-destructive" onClick={() => handleDeleteInvoice(inv.id)}>
                           <Trash2 className="w-3 h-3" /> Deletar
                         </Button>
@@ -254,7 +239,6 @@ const Financial = () => {
           <p className="text-sm">Nenhuma cobrança encontrada</p>
         </div>
       )}
-
     </div>
   );
 };
