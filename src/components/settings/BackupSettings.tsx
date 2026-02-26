@@ -197,13 +197,47 @@ const BackupSettings = () => {
         </CardContent>
       </Card>
 
+      {/* Destino do Backup */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Cloud className="w-4 h-4" /> Destino do Backup
+          </CardTitle>
+          <CardDescription className="text-xs">Selecione para onde o backup será enviado</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Select value={exportTarget} onValueChange={setExportTarget}>
+            <SelectTrigger className="bg-muted border-border">
+              <SelectValue placeholder="Selecione o destino" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="local">
+                <span className="flex items-center gap-2"><Download className="w-3 h-3" /> Download Local (JSON)</span>
+              </SelectItem>
+              <SelectItem value="google_drive">
+                <span className="flex items-center gap-2"><Cloud className="w-3 h-3" /> Google Drive</span>
+              </SelectItem>
+              <SelectItem value="onedrive">
+                <span className="flex items-center gap-2"><Cloud className="w-3 h-3" /> OneDrive</span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          {exportTarget !== 'local' && (
+            <p className="text-[10px] text-muted-foreground">
+              Preencha as credenciais de nuvem acima para enviar o backup para {exportTarget === 'google_drive' ? 'Google Drive' : 'OneDrive'}.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Exportar Backup */}
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <HardDrive className="w-4 h-4" /> Exportar Backup
           </CardTitle>
-          <CardDescription className="text-xs">Selecione os dados e o destino do backup</CardDescription>
+          <CardDescription className="text-xs">Selecione os dados e exporte o backup</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -225,26 +259,6 @@ const BackupSettings = () => {
                 </div>
               ))}
             </div>
-          </div>
-
-          <div>
-            <Label className="text-xs text-muted-foreground">Destino do Backup</Label>
-            <Select value={exportTarget} onValueChange={setExportTarget}>
-              <SelectTrigger className="bg-muted border-border mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="local">
-                  <span className="flex items-center gap-2"><Download className="w-3 h-3" /> Download Local (JSON)</span>
-                </SelectItem>
-                <SelectItem value="google_drive">
-                  <span className="flex items-center gap-2"><Cloud className="w-3 h-3" /> Google Drive</span>
-                </SelectItem>
-                <SelectItem value="onedrive">
-                  <span className="flex items-center gap-2"><Cloud className="w-3 h-3" /> OneDrive</span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           <Button onClick={handleExport} disabled={loading} className="w-full gap-2">
