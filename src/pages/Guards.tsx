@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/use-toast';
 import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
 
 const maskCpf = (value: string) => {
@@ -37,6 +38,7 @@ const statusLabels: Record<string, { label: string; className: string }> = {
 };
 
 const Guards = () => {
+  const { toast } = useToast();
   const { data: guards = [], isLoading } = useTableQuery('guards');
   const { data: clients = [] } = useTableQuery('clients');
   const insertMutation = useInsertMutation('guards');
@@ -47,13 +49,29 @@ const Guards = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', cpf: '', phone: '', email: '', shift: 'day', status: 'active', cnv: '', clientIds: [] as string[] });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const filtered = guards.filter((g: any) =>
     g.name.toLowerCase().includes(search.toLowerCase()) ||
     (g.cpf || '').includes(search)
   );
 
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+    if (!form.name.trim()) newErrors.name = 'Nome é obrigatório';
+    if (!form.cpf.trim()) newErrors.cpf = 'CPF é obrigatório';
+    if (!form.phone.trim()) newErrors.phone = 'Telefone é obrigatório';
+    if (!form.email.trim()) newErrors.email = 'Email é obrigatório';
+    if (!form.cnv.trim()) newErrors.cnv = 'CNV é obrigatória';
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      toast({ title: 'Campos obrigatórios', description: Object.values(newErrors).join(', '), variant: 'destructive' });
+    }
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSave = () => {
+    if (!validate()) return;
     const payload = {
       name: form.name,
       cpf: form.cpf,
@@ -100,6 +118,7 @@ const Guards = () => {
 
   const resetForm = () => {
     setForm({ name: '', cpf: '', phone: '', email: '', shift: 'day', status: 'active', cnv: '', clientIds: [] });
+    setErrors({});
     setEditingId(null);
     setDialogOpen(false);
   };
@@ -124,27 +143,32 @@ const Guards = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs text-muted-foreground">Nome</Label>
-                  <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Nome completo" className="bg-muted border-border" />
+                  <Label className="text-xs text-muted-foreground">Nome *</Label>
+                  <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Nome completo" className={`bg-muted border-border ${errors.name ? 'border-destructive' : ''}`} />
+                  {errors.name && <p className="text-[10px] text-destructive mt-1">{errors.name}</p>}
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground">CPF</Label>
-                  <Input value={form.cpf} onChange={e => setForm(p => ({ ...p, cpf: maskCpf(e.target.value) }))} placeholder="000.000.000-00" className="bg-muted border-border font-mono" />
+                  <Label className="text-xs text-muted-foreground">CPF *</Label>
+                  <Input value={form.cpf} onChange={e => setForm(p => ({ ...p, cpf: maskCpf(e.target.value) }))} placeholder="000.000.000-00" className={`bg-muted border-border font-mono ${errors.cpf ? 'border-destructive' : ''}`} />
+                  {errors.cpf && <p className="text-[10px] text-destructive mt-1">{errors.cpf}</p>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs text-muted-foreground">Telefone</Label>
-                  <Input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: maskPhone(e.target.value) }))} placeholder="(11) 91234-5678" className="bg-muted border-border font-mono" />
+                  <Label className="text-xs text-muted-foreground">Telefone *</Label>
+                  <Input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: maskPhone(e.target.value) }))} placeholder="(11) 91234-5678" className={`bg-muted border-border font-mono ${errors.phone ? 'border-destructive' : ''}`} />
+                  {errors.phone && <p className="text-[10px] text-destructive mt-1">{errors.phone}</p>}
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground">Email</Label>
-                  <Input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="email@exemplo.com" className="bg-muted border-border" />
+                  <Label className="text-xs text-muted-foreground">Email *</Label>
+                  <Input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="email@exemplo.com" className={`bg-muted border-border ${errors.email ? 'border-destructive' : ''}`} />
+                  {errors.email && <p className="text-[10px] text-destructive mt-1">{errors.email}</p>}
                 </div>
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">CNV (Carteira Nacional de Vigilante)</Label>
-                <Input value={form.cnv} onChange={e => setForm(p => ({ ...p, cnv: e.target.value }))} placeholder="Número da CNV" className="bg-muted border-border font-mono" />
+                <Label className="text-xs text-muted-foreground">CNV (Carteira Nacional de Vigilante) *</Label>
+                <Input value={form.cnv} onChange={e => setForm(p => ({ ...p, cnv: e.target.value }))} placeholder="Número da CNV" className={`bg-muted border-border font-mono ${errors.cnv ? 'border-destructive' : ''}`} />
+                {errors.cnv && <p className="text-[10px] text-destructive mt-1">{errors.cnv}</p>}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
