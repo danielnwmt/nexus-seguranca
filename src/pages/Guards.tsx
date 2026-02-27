@@ -67,8 +67,9 @@ const Guards = () => {
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', cpf: '', phone: '', email: '', shift: 'day', status: 'active', cnv: '', city: '', clientIds: [] as string[] });
+  const [form, setForm] = useState({ name: '', cpf: '', phone: '', email: '', shift: 'day', status: 'active', cnv: '', state: '', city: '', clientIds: [] as string[] });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [cities, setCities] = useState<string[]>([]);
 
   // Patrol route state
   const [routeDialogOpen, setRouteDialogOpen] = useState(false);
@@ -130,7 +131,7 @@ const Guards = () => {
     if (!validate()) return;
     const payload = {
       name: form.name, cpf: form.cpf, phone: form.phone, email: form.email,
-      shift: form.shift, status: form.status, cnv: form.cnv || null, city: form.city || null, client_ids: form.clientIds,
+      shift: form.shift, status: form.status, cnv: form.cnv || null, state: form.state || null, city: form.city || null, client_ids: form.clientIds,
     };
     if (editingId) {
       updateMutation.mutate({ id: editingId, ...payload } as any);
@@ -140,13 +141,20 @@ const Guards = () => {
     resetForm();
   };
 
-  const handleEdit = (guard: any) => {
+  const handleEdit = async (guard: any) => {
     setEditingId(guard.id);
     setForm({
       name: guard.name, cpf: guard.cpf || '', phone: guard.phone || '', email: guard.email || '',
-      shift: guard.shift, status: guard.status, cnv: guard.cnv || '', city: guard.city || '',
+      shift: guard.shift, status: guard.status, cnv: guard.cnv || '', state: guard.state || '', city: guard.city || '',
       clientIds: guard.client_ids || [],
     });
+    if (guard.state) {
+      try {
+        const res = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${guard.state}/municipios?orderBy=nome`);
+        const data = await res.json();
+        setCities(data.map((m: any) => m.nome));
+      } catch { setCities([]); }
+    }
     setDialogOpen(true);
   };
 
@@ -162,7 +170,8 @@ const Guards = () => {
   };
 
   const resetForm = () => {
-    setForm({ name: '', cpf: '', phone: '', email: '', shift: 'day', status: 'active', cnv: '', city: '', clientIds: [] });
+    setForm({ name: '', cpf: '', phone: '', email: '', shift: 'day', status: 'active', cnv: '', state: '', city: '', clientIds: [] });
+    setCities([]);
     setErrors({});
     setEditingId(null);
     setDialogOpen(false);
@@ -279,10 +288,38 @@ const Guards = () => {
                     <Input value={form.cnv} onChange={e => setForm(p => ({ ...p, cnv: e.target.value }))} placeholder="Número da CNV" className={`bg-muted border-border font-mono ${errors.cnv ? 'border-destructive' : ''}`} />
                     {errors.cnv && <p className="text-[10px] text-destructive mt-1">{errors.cnv}</p>}
                   </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Cidade</Label>
-                    <Input value={form.city} onChange={e => setForm(p => ({ ...p, city: e.target.value }))} placeholder="Ex: Brasília, DF" className="bg-muted border-border" />
-                    <p className="text-[10px] text-muted-foreground mt-0.5">O mapa da ronda abrirá nesta cidade</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Estado (UF)</Label>
+                      <Select value={form.state} onValueChange={async (uf) => {
+                        setForm(p => ({ ...p, state: uf, city: '' }));
+                        setCities([]);
+                        try {
+                          const res = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios?orderBy=nome`);
+                          const data = await res.json();
+                          setCities(data.map((m: any) => m.nome));
+                        } catch { setCities([]); }
+                      }}>
+                        <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o estado" /></SelectTrigger>
+                        <SelectContent>
+                          {['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map(uf => (
+                            <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Cidade</Label>
+                      <Select value={form.city} onValueChange={v => setForm(p => ({ ...p, city: v }))} disabled={cities.length === 0}>
+                        <SelectTrigger className="bg-muted border-border"><SelectValue placeholder={form.state ? 'Selecione a cidade' : 'Selecione o estado primeiro'} /></SelectTrigger>
+                        <SelectContent>
+                          {cities.map(c => (
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">O mapa da ronda abrirá nesta cidade</p>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
