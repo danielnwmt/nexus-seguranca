@@ -1,0 +1,1 @@
+ALTER TABLE public.patrol_routes ADD COLUMN IF NOT EXISTS city TEXT;
