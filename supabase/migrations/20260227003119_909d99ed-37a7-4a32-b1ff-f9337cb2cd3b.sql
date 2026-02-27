@@ -1,0 +1,1 @@
+ALTER TABLE public.company_settings ADD COLUMN razao_social text DEFAULT '';
