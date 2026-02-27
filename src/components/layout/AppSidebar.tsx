@@ -28,7 +28,7 @@ const AppSidebar = () => {
         <div className="flex items-center gap-3">
           <img src={company?.logo_url || bravoLogo} alt={company?.name || 'Bravo Monitoramento'} className="w-9 h-9 object-contain" />
           <div>
-            <h1 className="text-sm font-bold text-foreground tracking-wide">{company?.name?.toUpperCase() || 'BRAVO'}</h1>
+            <h1 className="text-sm font-bold text-foreground tracking-wide">{company?.name?.toUpperCase() || 'PROTENEXUS'}</h1>
             <p className="text-[10px] font-mono text-muted-foreground tracking-widest">MONITORAMENTO</p>
           </div>
         </div>

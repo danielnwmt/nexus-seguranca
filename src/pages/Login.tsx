@@ -35,7 +35,7 @@ const Login = () => {
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
           <img src={company?.logo_url || bravoLogo} alt={company?.name || 'Bravo'} className="w-16 h-16 object-contain mb-4" />
-          <h1 className="text-xl font-bold text-foreground tracking-wide">{company?.name?.toUpperCase() || 'BRAVO'}</h1>
+          <h1 className="text-xl font-bold text-foreground tracking-wide">{company?.name?.toUpperCase() || 'PROTENEXUS'}</h1>
           <p className="text-[10px] font-mono text-muted-foreground tracking-widest">MONITORAMENTO</p>
         </div>
 
@@ -48,7 +48,7 @@ const Login = () => {
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="admin@bravo.com"
+                placeholder="seu@email.com"
                 className="pl-9 bg-muted border-border"
                 required
               />
@@ -81,9 +81,6 @@ const Login = () => {
           </Button>
         </form>
 
-        <p className="text-center text-[10px] text-muted-foreground font-mono mt-6">
-          Acesso restrito a administradores
-        </p>
       </div>
     </div>
   );
