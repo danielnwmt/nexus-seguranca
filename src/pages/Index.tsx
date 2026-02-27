@@ -1,4 +1,4 @@
-import { Camera, Users, Bell, AlertTriangle, Video, Shield } from 'lucide-react';
+import { Camera, Users, Bell, AlertTriangle, Video, Shield, UserX } from 'lucide-react';
 import StatsCard from '@/components/dashboard/StatsCard';
 import CameraFeed from '@/components/dashboard/CameraFeed';
 import AlarmItem from '@/components/dashboard/AlarmItem';
@@ -45,10 +45,11 @@ const Index = () => {
         <p className="text-sm text-muted-foreground font-mono">Visão geral do sistema de monitoramento</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatsCard title="Câmeras Online" value={onlineCameras} icon={Video} variant="success" trend={`${filteredCameras.length} total`} />
         <StatsCard title="Câmeras Offline" value={offlineCameras} icon={Camera} variant="danger" />
-        <StatsCard title="Clientes Ativos" value={clients.filter((c: any) => c.status === 'active').length} icon={Users} />
+        <StatsCard title="Clientes Ativos" value={clients.filter((c: any) => c.status === 'active').length} icon={Users} trend={`${clients.length} total`} />
+        <StatsCard title="Clientes Inativos" value={clients.filter((c: any) => c.status === 'inactive').length} icon={UserX} variant={clients.filter((c: any) => c.status === 'inactive').length > 0 ? 'danger' : 'default'} />
         <StatsCard title="Alarmes Ativos" value={activeAlarms} icon={Bell} variant={activeAlarms > 0 ? 'warning' : 'default'} />
       </div>
 
