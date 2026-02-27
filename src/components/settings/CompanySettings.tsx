@@ -38,6 +38,7 @@ const CompanySettings = () => {
   const [form, setForm] = useState({
     id: '',
     name: 'Bravo Monitoramento',
+    razao_social: '',
     cnpj: '',
     address: '',
     phone: '',
@@ -59,6 +60,7 @@ const CompanySettings = () => {
       setForm({
         id: data.id,
         name: data.name || '',
+        razao_social: (data as any).razao_social || '',
         cnpj: data.cnpj || '',
         address: data.address || '',
         phone: data.phone || '',
@@ -99,13 +101,14 @@ const CompanySettings = () => {
       .from('company_settings')
       .update({
         name: form.name,
+        razao_social: form.razao_social,
         cnpj: form.cnpj,
         address: form.address,
         phone: form.phone,
         email: form.email,
         logo_url: form.logo_url,
         updated_at: new Date().toISOString(),
-      })
+      } as any)
       .eq('id', form.id);
 
     setLoading(false);
@@ -154,14 +157,26 @@ const CompanySettings = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Nome da Empresa</Label>
+            <Label className="text-xs text-muted-foreground">Nome Fantasia</Label>
             <Input
               value={form.name}
               onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
               className="bg-muted border-border"
-              placeholder="Nome da empresa"
+              placeholder="Nome fantasia"
             />
           </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Razão Social</Label>
+            <Input
+              value={form.razao_social}
+              onChange={e => setForm(p => ({ ...p, razao_social: e.target.value }))}
+              className="bg-muted border-border"
+              placeholder="Razão social da empresa"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">CNPJ</Label>
             <Input
