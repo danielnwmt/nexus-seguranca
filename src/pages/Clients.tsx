@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Search, Users, Pencil, Trash2, Camera, Printer } from 'lucide-react';
+import { Plus, Search, Users, Pencil, Trash2, Camera, Printer, UserX, UserCheck } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -296,10 +296,21 @@ const Clients = () => {
                     <button onClick={() => handleShowBoletos(client)} className="w-7 h-7 rounded flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Boletos">
                       <Printer className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => handleEdit(client)} className="w-7 h-7 rounded flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+                    <button onClick={() => handleEdit(client)} className="w-7 h-7 rounded flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Editar">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => handleDelete(client.id)} className="w-7 h-7 rounded flex items-center justify-center hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive">
+                    <button
+                      onClick={() => {
+                        const newStatus = client.status === 'active' ? 'inactive' : 'active';
+                        updateMutation.mutate({ id: client.id, status: newStatus } as any);
+                        toast({ title: newStatus === 'active' ? 'Cliente ativado' : 'Cliente inativado' });
+                      }}
+                      className={`w-7 h-7 rounded flex items-center justify-center hover:bg-muted transition-colors ${client.status === 'active' ? 'text-warning hover:text-warning' : 'text-success hover:text-success'}`}
+                      title={client.status === 'active' ? 'Inativar' : 'Ativar'}
+                    >
+                      {client.status === 'active' ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
+                    </button>
+                    <button onClick={() => handleDelete(client.id)} className="w-7 h-7 rounded flex items-center justify-center hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive" title="Excluir">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
