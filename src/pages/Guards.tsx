@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Shield, Plus, Search, Pencil, Trash2, Moon, Sun, Clock, MapPin, Route } from 'lucide-react';
+import { Shield, Plus, Search, Pencil, Trash2, Moon, Sun, Clock, MapPin, Route, ArrowRightLeft } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -80,6 +81,9 @@ const Guards = () => {
   const [routeMapCenter, setRouteMapCenter] = useState<[number, number] | undefined>(undefined);
   const [viewRouteGuard, setViewRouteGuard] = useState<any>(null);
   const [viewMapCenter, setViewMapCenter] = useState<[number, number] | undefined>(undefined);
+  const [deleteRouteId, setDeleteRouteId] = useState<string | null>(null);
+  const [transferRoute, setTransferRoute] = useState<any>(null);
+  const [transferTargetGuard, setTransferTargetGuard] = useState<string>('');
 
   // Fetch patrol routes
   const { data: patrolRoutes = [] } = useQuery({
@@ -219,9 +223,28 @@ const Guards = () => {
       if (error) throw error;
       toast({ title: 'Rota removida' });
       queryClient.invalidateQueries({ queryKey: ['patrol_routes'] });
+      if (viewRouteGuard?.routeId === routeId) setViewRouteGuard(null);
     } catch {
       toast({ title: 'Erro ao remover', variant: 'destructive' });
     }
+    setDeleteRouteId(null);
+  };
+
+  const handleTransferRoute = async () => {
+    if (!transferRoute || !transferTargetGuard) return;
+    try {
+      const targetGuard = guards.find((g: any) => g.id === transferTargetGuard);
+      const { error } = await (supabase.from('patrol_routes') as any)
+        .update({ guard_id: transferTargetGuard, city: targetGuard?.city || transferRoute.city })
+        .eq('id', transferRoute.id);
+      if (error) throw error;
+      toast({ title: 'Rota transferida', description: `Rota transferida para ${targetGuard?.name}` });
+      queryClient.invalidateQueries({ queryKey: ['patrol_routes'] });
+    } catch {
+      toast({ title: 'Erro ao transferir rota', variant: 'destructive' });
+    }
+    setTransferRoute(null);
+    setTransferTargetGuard('');
   };
 
   const getGuardRoutes = (guardId: string) => patrolRoutes.filter((r: any) => r.guard_id === guardId);
@@ -482,7 +505,10 @@ const Guards = () => {
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="text-[10px] font-mono text-muted-foreground">{(route.waypoints || []).length} pts</span>
-                        <button onClick={(e) => { e.stopPropagation(); handleDeleteRoute(route.id); }} className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                        <button onClick={(e) => { e.stopPropagation(); setTransferRoute(route); }} className="w-6 h-6 rounded flex items-center justify-center hover:bg-primary/10 text-muted-foreground hover:text-primary" title="Transferir rota">
+                          <ArrowRightLeft className="w-3 h-3" />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteRouteId(route.id); }} className="w-6 h-6 rounded flex items-center justify-center hover:bg-destructive/10 text-muted-foreground hover:text-destructive" title="Remover rota">
                           <Trash2 className="w-3 h-3" />
                         </button>
                       </div>
@@ -554,6 +580,50 @@ const Guards = () => {
                 <Button variant="outline" onClick={() => setRouteWaypoints([])}>Limpar</Button>
                 <Button onClick={handleSaveRoute} className="gap-2"><MapPin className="w-4 h-4" /> Salvar Rota</Button>
               </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete route confirmation */}
+      <AlertDialog open={!!deleteRouteId} onOpenChange={(v) => { if (!v) setDeleteRouteId(null); }}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Remover Rota</AlertDialogTitle>
+            <AlertDialogDescription>Tem certeza que deseja remover esta rota de ronda? Esta ação não pode ser desfeita.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteRouteId && handleDeleteRoute(deleteRouteId)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Remover</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Transfer route dialog */}
+      <Dialog open={!!transferRoute} onOpenChange={(v) => { if (!v) { setTransferRoute(null); setTransferTargetGuard(''); } }}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground flex items-center gap-2"><ArrowRightLeft className="w-4 h-4" /> Transferir Rota</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Rota: <span className="text-foreground font-medium">{transferRoute?.name}</span></p>
+              <p className="text-xs text-muted-foreground mt-1">Vigilante atual: <span className="text-foreground">{guards.find((g: any) => g.id === transferRoute?.guard_id)?.name || 'Desconhecido'}</span></p>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Transferir para</Label>
+              <Select value={transferTargetGuard} onValueChange={setTransferTargetGuard}>
+                <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o vigilante" /></SelectTrigger>
+                <SelectContent>
+                  {guards.filter((g: any) => g.id !== transferRoute?.guard_id).map((g: any) => (
+                    <SelectItem key={g.id} value={g.id}>{g.name}{g.city ? ` — ${g.city}` : ''}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setTransferRoute(null); setTransferTargetGuard(''); }}>Cancelar</Button>
+              <Button onClick={handleTransferRoute} disabled={!transferTargetGuard} className="gap-2"><ArrowRightLeft className="w-4 h-4" /> Transferir</Button>
             </div>
           </div>
         </DialogContent>
