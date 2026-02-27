@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Lock, Mail, AlertCircle } from 'lucide-react';
 import bravoLogo from '@/assets/bravo-logo.webp';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
 
 const Login = () => {
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  const { data: company } = useCompanySettings();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -32,8 +34,8 @@ const Login = () => {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <img src={bravoLogo} alt="Bravo" className="w-16 h-16 object-contain mb-4" />
-          <h1 className="text-xl font-bold text-foreground tracking-wide">BRAVO</h1>
+          <img src={company?.logo_url || bravoLogo} alt={company?.name || 'Bravo'} className="w-16 h-16 object-contain mb-4" />
+          <h1 className="text-xl font-bold text-foreground tracking-wide">{company?.name?.toUpperCase() || 'BRAVO'}</h1>
           <p className="text-[10px] font-mono text-muted-foreground tracking-widest">MONITORAMENTO</p>
         </div>
 

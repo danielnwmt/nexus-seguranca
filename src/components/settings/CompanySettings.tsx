@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 const maskCNPJ = (value: string) => {
   return value
@@ -31,6 +32,7 @@ const maskPhone = (value: string) => {
 
 const CompanySettings = () => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -87,6 +89,7 @@ const CompanySettings = () => {
     const logoUrl = urlData.publicUrl;
     setLogoPreview(logoUrl);
     setForm(p => ({ ...p, logo_url: logoUrl }));
+    queryClient.invalidateQueries({ queryKey: ['company_settings'] });
     toast({ title: 'Logo enviado com sucesso' });
   };
 
@@ -109,6 +112,7 @@ const CompanySettings = () => {
     if (error) {
       toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' });
     } else {
+      queryClient.invalidateQueries({ queryKey: ['company_settings'] });
       toast({ title: 'Dados da empresa salvos com sucesso' });
     }
   };

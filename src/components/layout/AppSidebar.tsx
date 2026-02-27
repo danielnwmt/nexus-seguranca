@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Camera, Users, Bell, DollarSign, Shield, Settings, LogOut, Headphones, ClipboardList, Wrench } from 'lucide-react';
 import bravoLogo from '@/assets/bravo-logo.webp';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -19,14 +20,15 @@ const navItems = [
 const AppSidebar = () => {
   const location = useLocation();
   const { signOut, user } = useAuth();
+  const { data: company } = useCompanySettings();
 
   return (
     <aside className="w-64 h-screen bg-sidebar border-r border-sidebar-border flex flex-col fixed left-0 top-0 z-30">
       <div className="p-5 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <img src={bravoLogo} alt="Bravo Monitoramento" className="w-9 h-9 object-contain" />
+          <img src={company?.logo_url || bravoLogo} alt={company?.name || 'Bravo Monitoramento'} className="w-9 h-9 object-contain" />
           <div>
-            <h1 className="text-sm font-bold text-foreground tracking-wide">BRAVO</h1>
+            <h1 className="text-sm font-bold text-foreground tracking-wide">{company?.name?.toUpperCase() || 'BRAVO'}</h1>
             <p className="text-[10px] font-mono text-muted-foreground tracking-widest">MONITORAMENTO</p>
           </div>
         </div>
