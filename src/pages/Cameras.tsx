@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Camera, Plus, Search, HardDrive, Calendar, Brain } from 'lucide-react';
+import { Camera, Plus, Search, HardDrive, Calendar, Brain, Video } from 'lucide-react';
 import CameraFeed from '@/components/dashboard/CameraFeed';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,9 @@ import { useTableQuery, usePaginatedQuery, useInsertMutation, useUpdateMutation,
 
 const RETENTION_OPTIONS = [5, 10, 15, 20, 25, 30] as const;
 const ALL_ANALYTICS: AnalyticType[] = ['lpr', 'weapon_detection', 'line_crossing', 'area_intrusion', 'loitering', 'human_car_classification', 'fallen_person', 'people_counting', 'tampering'];
+const VIDEO_ENCODINGS = ['H.264', 'H.264+', 'H.265'] as const;
+const BITRATE_OPTIONS = [256, 512, 1024, 2048, 3072, 4096, 6144, 8192] as const;
+const CAMERA_BRANDS = ['Hikvision', 'Dahua', 'Intelbras', 'Axis', 'Bosch', 'Samsung', 'Vivotek', 'Giga', 'Motorola', 'TP-Link', 'Outro'] as const;
 
 interface CameraForm {
   name: string;
@@ -24,9 +27,12 @@ interface CameraForm {
   storagePath: string;
   retentionDays: string;
   analytics: AnalyticType[];
+  videoEncoding: string;
+  maxBitrate: string;
+  brand: string;
 }
 
-const emptyForm: CameraForm = { name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30', analytics: [] };
+const emptyForm: CameraForm = { name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30', analytics: [], videoEncoding: 'H.264', maxBitrate: '4096', brand: '' };
 
 const Cameras = () => {
   const { data: clients = [] } = useTableQuery('clients');
@@ -83,6 +89,9 @@ const Cameras = () => {
       storage_path: newCamera.storagePath,
       retention_days: Number(newCamera.retentionDays),
       analytics: newCamera.analytics,
+      video_encoding: newCamera.videoEncoding,
+      max_bitrate: Number(newCamera.maxBitrate),
+      brand: newCamera.brand || null,
     };
     if (editingId) {
       updateMutation.mutate({ id: editingId, ...payload } as any);
@@ -104,6 +113,9 @@ const Cameras = () => {
       storagePath: camera.storage_path || '',
       retentionDays: String(camera.retention_days || 30),
       analytics: camera.analytics || [],
+      videoEncoding: camera.video_encoding || 'H.264',
+      maxBitrate: String(camera.max_bitrate || 4096),
+      brand: camera.brand || '',
     });
     setDialogOpen(true);
   };
@@ -180,6 +192,41 @@ const Cameras = () => {
                 <div>
                   <Label className="text-xs text-muted-foreground">Resolução</Label>
                   <Input value={newCamera.resolution} onChange={e => setNewCamera(p => ({ ...p, resolution: e.target.value }))} className="bg-muted border-border font-mono text-xs" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Marca da Câmera</Label>
+                <Select value={newCamera.brand} onValueChange={v => setNewCamera(p => ({ ...p, brand: v }))}>
+                  <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione a marca" /></SelectTrigger>
+                  <SelectContent>
+                    {CAMERA_BRANDS.map(b => (
+                      <SelectItem key={b} value={b}>{b}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1"><Video className="w-3 h-3" /> Codec de Vídeo</Label>
+                  <Select value={newCamera.videoEncoding} onValueChange={v => setNewCamera(p => ({ ...p, videoEncoding: v }))}>
+                    <SelectTrigger className="bg-muted border-border"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {VIDEO_ENCODINGS.map(enc => (
+                        <SelectItem key={enc} value={enc}>{enc}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Bit Rate Máx. (Kbps)</Label>
+                  <Select value={newCamera.maxBitrate} onValueChange={v => setNewCamera(p => ({ ...p, maxBitrate: v }))}>
+                    <SelectTrigger className="bg-muted border-border"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {BITRATE_OPTIONS.map(br => (
+                        <SelectItem key={br} value={String(br)}>{br} Kbps</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div>

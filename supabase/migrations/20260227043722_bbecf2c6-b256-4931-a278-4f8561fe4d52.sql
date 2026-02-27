@@ -1,0 +1,4 @@
+ALTER TABLE public.cameras 
+  ADD COLUMN IF NOT EXISTS video_encoding text DEFAULT 'H.264',
+  ADD COLUMN IF NOT EXISTS max_bitrate integer DEFAULT 4096,
+  ADD COLUMN IF NOT EXISTS brand text DEFAULT NULL;
