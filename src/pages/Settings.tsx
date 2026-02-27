@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store, Server, HardDrive, Bot } from 'lucide-react';
+import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store, Server, HardDrive, Bot, Globe } from 'lucide-react';
 import CompanySettings from '@/components/settings/CompanySettings';
 import StorageServers from '@/components/settings/StorageServers';
 import SystemUpdate from '@/components/settings/SystemUpdate';
 import BackupSettings from '@/components/settings/BackupSettings';
 import ChatbotSettings from '@/components/settings/ChatbotSettings';
+import DomainSSL from '@/components/settings/DomainSSL';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -127,6 +128,7 @@ const Settings = () => {
           <TabsTrigger value="storage" className="gap-2"><Server className="w-4 h-4" />Servidores</TabsTrigger>
           <TabsTrigger value="backup" className="gap-2"><HardDrive className="w-4 h-4" />Backup</TabsTrigger>
           <TabsTrigger value="chatbot" className="gap-2"><Bot className="w-4 h-4" />Chatbot</TabsTrigger>
+          <TabsTrigger value="domain" className="gap-2"><Globe className="w-4 h-4" />Domínio</TabsTrigger>
           <TabsTrigger value="system" className="gap-2"><RefreshCw className="w-4 h-4" />Sistema</TabsTrigger>
           <TabsTrigger value="mobile" className="gap-2"><Smartphone className="w-4 h-4" />App Mobile</TabsTrigger>
         </TabsList>
@@ -286,6 +288,11 @@ const Settings = () => {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ===== DOMÍNIO / SSL ===== */}
+        <TabsContent value="domain" className="space-y-4">
+          <DomainSSL />
         </TabsContent>
 
         {/* ===== SISTEMA ===== */}
