@@ -1,0 +1,1 @@
+ALTER TABLE public.guards ADD COLUMN IF NOT EXISTS city TEXT;

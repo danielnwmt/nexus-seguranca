@@ -67,7 +67,7 @@ const Guards = () => {
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', cpf: '', phone: '', email: '', shift: 'day', status: 'active', cnv: '', clientIds: [] as string[] });
+  const [form, setForm] = useState({ name: '', cpf: '', phone: '', email: '', shift: 'day', status: 'active', cnv: '', city: '', clientIds: [] as string[] });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Patrol route state
@@ -76,7 +76,6 @@ const Guards = () => {
   const [routeWaypoints, setRouteWaypoints] = useState<{ lat: number; lng: number }[]>([]);
   const [routeName, setRouteName] = useState('Ronda');
   const [selectedRouteClient, setSelectedRouteClient] = useState<string>('');
-  const [routeCity, setRouteCity] = useState('');
   const [routeMapCenter, setRouteMapCenter] = useState<[number, number] | undefined>(undefined);
   const [viewRouteGuard, setViewRouteGuard] = useState<any>(null);
   const [viewMapCenter, setViewMapCenter] = useState<[number, number] | undefined>(undefined);
@@ -91,15 +90,6 @@ const Guards = () => {
     },
   });
 
-  // Geocode when city changes in route creation
-  useEffect(() => {
-    if (!routeCity || routeCity.length < 3) return;
-    const timer = setTimeout(async () => {
-      const coords = await geocodeCity(routeCity);
-      if (coords) setRouteMapCenter(coords);
-    }, 800);
-    return () => clearTimeout(timer);
-  }, [routeCity]);
 
   // When selecting a route to view, center on its city or first waypoint
   const handleSelectRoute = async (route: any) => {
@@ -140,7 +130,7 @@ const Guards = () => {
     if (!validate()) return;
     const payload = {
       name: form.name, cpf: form.cpf, phone: form.phone, email: form.email,
-      shift: form.shift, status: form.status, cnv: form.cnv || null, client_ids: form.clientIds,
+      shift: form.shift, status: form.status, cnv: form.cnv || null, city: form.city || null, client_ids: form.clientIds,
     };
     if (editingId) {
       updateMutation.mutate({ id: editingId, ...payload } as any);
@@ -154,7 +144,7 @@ const Guards = () => {
     setEditingId(guard.id);
     setForm({
       name: guard.name, cpf: guard.cpf || '', phone: guard.phone || '', email: guard.email || '',
-      shift: guard.shift, status: guard.status, cnv: guard.cnv || '',
+      shift: guard.shift, status: guard.status, cnv: guard.cnv || '', city: guard.city || '',
       clientIds: guard.client_ids || [],
     });
     setDialogOpen(true);
@@ -172,29 +162,29 @@ const Guards = () => {
   };
 
   const resetForm = () => {
-    setForm({ name: '', cpf: '', phone: '', email: '', shift: 'day', status: 'active', cnv: '', clientIds: [] });
+    setForm({ name: '', cpf: '', phone: '', email: '', shift: 'day', status: 'active', cnv: '', city: '', clientIds: [] });
     setErrors({});
     setEditingId(null);
     setDialogOpen(false);
   };
 
-  const openRouteDialog = (guard: any) => {
+  const openRouteDialog = async (guard: any) => {
     setSelectedGuardForRoute(guard);
     setRouteWaypoints([]);
     setRouteName('Ronda');
     setSelectedRouteClient('');
-    setRouteCity('');
     setRouteMapCenter(undefined);
     setRouteDialogOpen(true);
+    // Geocode guard's city to center map
+    if (guard.city) {
+      const coords = await geocodeCity(guard.city);
+      if (coords) setRouteMapCenter(coords);
+    }
   };
 
   const handleSaveRoute = async () => {
     if (routeWaypoints.length < 2) {
       toast({ title: 'Adicione pelo menos 2 pontos na rota', variant: 'destructive' });
-      return;
-    }
-    if (!routeCity.trim()) {
-      toast({ title: 'Informe a cidade da ronda', variant: 'destructive' });
       return;
     }
     try {
@@ -203,7 +193,7 @@ const Guards = () => {
         client_id: selectedRouteClient || null,
         name: routeName,
         waypoints: routeWaypoints,
-        city: routeCity,
+        city: selectedGuardForRoute?.city || null,
       });
       if (error) throw error;
       toast({ title: 'Rota de ronda salva com sucesso' });
@@ -288,6 +278,11 @@ const Guards = () => {
                     <Label className="text-xs text-muted-foreground">CNV (Carteira Nacional de Vigilante) *</Label>
                     <Input value={form.cnv} onChange={e => setForm(p => ({ ...p, cnv: e.target.value }))} placeholder="Número da CNV" className={`bg-muted border-border font-mono ${errors.cnv ? 'border-destructive' : ''}`} />
                     {errors.cnv && <p className="text-[10px] text-destructive mt-1">{errors.cnv}</p>}
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Cidade</Label>
+                    <Input value={form.city} onChange={e => setForm(p => ({ ...p, city: e.target.value }))} placeholder="Ex: Brasília, DF" className="bg-muted border-border" />
+                    <p className="text-[10px] text-muted-foreground mt-0.5">O mapa da ronda abrirá nesta cidade</p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -487,15 +482,10 @@ const Guards = () => {
             <DialogTitle className="text-foreground">Nova Rota de Ronda — {selectedGuardForRoute?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs text-muted-foreground">Nome da Rota</Label>
                 <Input value={routeName} onChange={e => setRouteName(e.target.value)} placeholder="Ex: Ronda Noturna" className="bg-muted border-border" />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Cidade *</Label>
-                <Input value={routeCity} onChange={e => setRouteCity(e.target.value)} placeholder="Ex: Brasília, DF" className="bg-muted border-border" />
-                <p className="text-[10px] text-muted-foreground mt-0.5">O mapa abrirá nesta cidade</p>
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Cliente (opcional)</Label>
@@ -507,6 +497,11 @@ const Guards = () => {
                 </Select>
               </div>
             </div>
+            {selectedGuardForRoute?.city && (
+              <p className="text-xs text-primary font-mono flex items-center gap-1">
+                <MapPin className="w-3 h-3" /> Mapa centralizado em: {selectedGuardForRoute.city}
+              </p>
+            )}
             <div className="h-[400px]">
               <PatrolRouteMap
                 waypoints={routeWaypoints}
