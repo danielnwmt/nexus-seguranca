@@ -55,7 +55,7 @@ $$;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'app_role') THEN
-    CREATE TYPE public.app_role AS ENUM ('admin', 'n1', 'n2');
+    CREATE TYPE public.app_role AS ENUM ('admin', 'n1', 'n2', 'n3');
   END IF;
 END
 $$;
@@ -134,9 +134,24 @@ CREATE TABLE IF NOT EXISTS public.invoices (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS public.bills (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  description TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'general',
+  amount NUMERIC DEFAULT 0,
+  due_date DATE,
+  paid_at DATE,
+  status TEXT DEFAULT 'pending',
+  supplier TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS public.company_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT DEFAULT 'Bravo Monitoramento',
+  name TEXT DEFAULT 'Protenexus Monitoramento',
+  razao_social TEXT,
   cnpj TEXT,
   email TEXT,
   phone TEXT,
@@ -266,6 +281,7 @@ ALTER TABLE public.cameras ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.guards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.alarms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bills ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.company_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 
@@ -275,6 +291,7 @@ CREATE POLICY IF NOT EXISTS "auth_all_cameras" ON public.cameras FOR ALL USING (
 CREATE POLICY IF NOT EXISTS "auth_all_guards" ON public.guards FOR ALL USING (auth.uid() IS NOT NULL);
 CREATE POLICY IF NOT EXISTS "auth_all_alarms" ON public.alarms FOR ALL USING (auth.uid() IS NOT NULL);
 CREATE POLICY IF NOT EXISTS "auth_all_invoices" ON public.invoices FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY IF NOT EXISTS "auth_all_bills" ON public.bills FOR ALL USING (auth.uid() IS NOT NULL);
 CREATE POLICY IF NOT EXISTS "auth_all_company" ON public.company_settings FOR ALL USING (auth.uid() IS NOT NULL);
 CREATE POLICY IF NOT EXISTS "auth_all_roles" ON public.user_roles FOR ALL USING (auth.uid() IS NOT NULL);
 
@@ -290,8 +307,13 @@ GRANT SELECT ON auth.users TO authenticated;
 
 -- 9. Dados iniciais
 INSERT INTO public.company_settings (name) 
-VALUES ('Bravo Monitoramento')
+VALUES ('Protenexus Monitoramento')
 ON CONFLICT DO NOTHING;
+
+-- 10. Usuario administrador padrao (admin@protenexus.com / 1234)
+INSERT INTO auth.users (email, encrypted_password)
+VALUES ('admin@protenexus.com', crypt('1234', gen_salt('bf')))
+ON CONFLICT (email) DO NOTHING;
 
 -- 10. Funcao de login (retorna JWT claims)
 CREATE OR REPLACE FUNCTION public.login(email TEXT, pass TEXT)

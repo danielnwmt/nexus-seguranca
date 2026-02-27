@@ -61,6 +61,48 @@ export type Database = {
           },
         ]
       }
+      bills: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          description: string
+          due_date: string | null
+          id: string
+          notes: string | null
+          paid_at: string | null
+          status: string
+          supplier: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          status?: string
+          supplier?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          status?: string
+          supplier?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cameras: {
         Row: {
           analytics: string[] | null
