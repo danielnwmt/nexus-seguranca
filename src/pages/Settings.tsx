@@ -98,8 +98,24 @@ const Settings = () => {
   ]);
 
   const [users, setUsers] = useState<SystemUser[]>([
-    { id: '1', name: 'Administrador', email: 'admin@bravo.com', password: '1234', level: 'admin', active: true },
+    { id: '1', name: 'Administrador', email: 'admin@protenexus.com', password: '1234', level: 'admin', active: true },
   ]);
+
+  const [permissions, setPermissions] = useState<Record<string, Record<string, boolean>>>(
+    JSON.parse(JSON.stringify(defaultPermissions))
+  );
+
+  const handleTogglePermission = (level: string, key: string) => {
+    if (level === 'admin') return; // Admin sempre tem tudo
+    setPermissions(prev => ({
+      ...prev,
+      [level]: { ...prev[level], [key]: !prev[level][key] },
+    }));
+  };
+
+  const handleSavePermissions = () => {
+    toast({ title: 'Permissões salvas', description: 'As permissões foram atualizadas com sucesso.' });
+  };
 
   const [pwaEnabled, setPwaEnabled] = useState(true);
   const systemUrl = window.location.origin;
@@ -277,9 +293,14 @@ const Settings = () => {
 
           {/* Permissions Matrix */}
           <Card className="bg-card border-border">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Matriz de Permissões</CardTitle>
-              <CardDescription className="text-xs">Visualize o que cada nível de acesso pode fazer no sistema</CardDescription>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Matriz de Permissões</CardTitle>
+                <CardDescription className="text-xs">Clique nos checkboxes para editar as permissões de cada nível</CardDescription>
+              </div>
+              <Button size="sm" onClick={handleSavePermissions} className="gap-1">
+                <Save className="w-4 h-4" /> Salvar Permissões
+              </Button>
             </CardHeader>
             <CardContent>
               <Table>
@@ -298,11 +319,12 @@ const Settings = () => {
                       <TableCell className="font-medium text-sm">{mod.label}</TableCell>
                       {(['N1', 'N2', 'N3', 'admin'] as const).map(level => (
                         <TableCell key={level} className="text-center">
-                          {defaultPermissions[level][mod.key] ? (
-                            <span className="text-emerald-400 text-sm">✓</span>
-                          ) : (
-                            <span className="text-destructive text-sm">✗</span>
-                          )}
+                          <Switch
+                            checked={permissions[level][mod.key]}
+                            onCheckedChange={() => handleTogglePermission(level, mod.key)}
+                            disabled={level === 'admin'}
+                            className="mx-auto"
+                          />
                         </TableCell>
                       ))}
                     </TableRow>
