@@ -265,6 +265,7 @@ export type Database = {
       }
       guards: {
         Row: {
+          city: string | null
           client_ids: string[] | null
           cnv: string | null
           cpf: string | null
@@ -279,6 +280,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          city?: string | null
           client_ids?: string[] | null
           cnv?: string | null
           cpf?: string | null
@@ -293,6 +295,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          city?: string | null
           client_ids?: string[] | null
           cnv?: string | null
           cpf?: string | null
