@@ -106,10 +106,12 @@ export type Database = {
       cameras: {
         Row: {
           analytics: string[] | null
+          brand: string | null
           client_id: string | null
           created_at: string
           id: string
           location: string | null
+          max_bitrate: number | null
           name: string
           protocol: string
           resolution: string | null
@@ -118,13 +120,16 @@ export type Database = {
           storage_path: string | null
           stream_url: string | null
           updated_at: string
+          video_encoding: string | null
         }
         Insert: {
           analytics?: string[] | null
+          brand?: string | null
           client_id?: string | null
           created_at?: string
           id?: string
           location?: string | null
+          max_bitrate?: number | null
           name: string
           protocol?: string
           resolution?: string | null
@@ -133,13 +138,16 @@ export type Database = {
           storage_path?: string | null
           stream_url?: string | null
           updated_at?: string
+          video_encoding?: string | null
         }
         Update: {
           analytics?: string[] | null
+          brand?: string | null
           client_id?: string | null
           created_at?: string
           id?: string
           location?: string | null
+          max_bitrate?: number | null
           name?: string
           protocol?: string
           resolution?: string | null
@@ -148,6 +156,7 @@ export type Database = {
           storage_path?: string | null
           stream_url?: string | null
           updated_at?: string
+          video_encoding?: string | null
         }
         Relationships: [
           {
