@@ -60,10 +60,10 @@ const Installers = () => {
     try {
       if (editing) {
         await updateMutation.mutateAsync({ id: editing.id, ...form });
-        toast({ title: 'Instalador atualizado' });
+        toast({ title: 'Técnico atualizado' });
       } else {
         await insertMutation.mutateAsync(form);
-        toast({ title: 'Instalador cadastrado' });
+        toast({ title: 'Técnico cadastrado' });
       }
       setDialogOpen(false);
     } catch { toast({ title: 'Erro ao salvar', variant: 'destructive' }); }
@@ -72,7 +72,7 @@ const Installers = () => {
   const handleDelete = async (id: string) => {
     try {
       await deleteMutation.mutateAsync(id);
-      toast({ title: 'Instalador removido', variant: 'destructive' });
+      toast({ title: 'Técnico removido', variant: 'destructive' });
     } catch { toast({ title: 'Erro ao remover', variant: 'destructive' }); }
   };
 
@@ -81,7 +81,7 @@ const Installers = () => {
       <div className="flex items-center gap-3">
         <Wrench className="w-6 h-6 text-primary" />
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Instaladores</h1>
+          <h1 className="text-2xl font-bold text-foreground">Técnicos</h1>
           <p className="text-sm text-muted-foreground font-mono">Cadastro e gestão da equipe técnica</p>
         </div>
       </div>
@@ -89,9 +89,9 @@ const Installers = () => {
       <div className="flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Buscar instalador..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 bg-card border-border" />
+          <Input placeholder="Buscar técnico..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 bg-card border-border" />
         </div>
-        <Button onClick={openAdd} className="gap-2"><Plus className="w-4 h-4" /> Novo Instalador</Button>
+        <Button onClick={openAdd} className="gap-2"><Plus className="w-4 h-4" /> Novo Técnico</Button>
       </div>
 
       <Card className="bg-card border-border">
@@ -134,7 +134,7 @@ const Installers = () => {
                   </TableRow>
                 ))}
                 {filtered.length === 0 && (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhum instalador cadastrado</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhum técnico cadastrado</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -144,7 +144,7 @@ const Installers = () => {
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="bg-card border-border">
-          <DialogHeader><DialogTitle>{editing ? 'Editar Instalador' : 'Novo Instalador'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editing ? 'Editar Técnico' : 'Novo Técnico'}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1"><Label className="text-xs">Nome *</Label><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="bg-muted border-border" /></div>
             <div className="grid grid-cols-2 gap-3">

@@ -9,7 +9,7 @@ const navItems = [
   { to: '/cameras', icon: Camera, label: 'Câmeras' },
   { to: '/clients', icon: Users, label: 'Clientes' },
   { to: '/guards', icon: Shield, label: 'Vigilantes' },
-  { to: '/installers', icon: Wrench, label: 'Instaladores' },
+  { to: '/installers', icon: Wrench, label: 'Técnicos' },
   { to: '/service-orders', icon: ClipboardList, label: 'Ordens de Serviço' },
   { to: '/financial', icon: DollarSign, label: 'Financeiro' },
   { to: '/alarms', icon: Bell, label: 'Alarmes' },

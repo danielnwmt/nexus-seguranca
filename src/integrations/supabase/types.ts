@@ -397,6 +397,57 @@ export type Database = {
           },
         ]
       }
+      patrol_routes: {
+        Row: {
+          active: boolean
+          client_id: string | null
+          created_at: string
+          description: string | null
+          guard_id: string | null
+          id: string
+          name: string
+          updated_at: string
+          waypoints: Json
+        }
+        Insert: {
+          active?: boolean
+          client_id?: string | null
+          created_at?: string
+          description?: string | null
+          guard_id?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          waypoints?: Json
+        }
+        Update: {
+          active?: boolean
+          client_id?: string | null
+          created_at?: string
+          description?: string | null
+          guard_id?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          waypoints?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patrol_routes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patrol_routes_guard_id_fkey"
+            columns: ["guard_id"]
+            isOneToOne: false
+            referencedRelation: "guards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_orders: {
         Row: {
           client_id: string | null
