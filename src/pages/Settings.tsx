@@ -34,7 +34,7 @@ interface SystemUser {
   name: string;
   email: string;
   password: string;
-  level: 'N1' | 'N2' | 'admin';
+  level: 'N1' | 'N2' | 'N3' | 'admin';
   active: boolean;
 }
 
@@ -46,9 +46,45 @@ const bankLabels: Record<string, string> = {
 };
 
 const levelDescriptions: Record<string, string> = {
-  N1: 'Apenas visualização',
+  N1: 'Apenas visualização de câmeras e dashboard',
   N2: 'Visualização, adiciona vigilante, câmera e edita. Sem acesso financeiro.',
+  N3: 'Operador avançado. Acesso a tudo exceto configurações e gerenciamento de usuários.',
   admin: 'Acesso total ao sistema',
+};
+
+const permissionModules = [
+  { label: 'Dashboard', key: 'dashboard' },
+  { label: 'Câmeras (visualizar)', key: 'cameras_view' },
+  { label: 'Câmeras (editar)', key: 'cameras_edit' },
+  { label: 'Clientes (visualizar)', key: 'clients_view' },
+  { label: 'Clientes (editar)', key: 'clients_edit' },
+  { label: 'Vigilantes', key: 'guards' },
+  { label: 'Instaladores', key: 'installers' },
+  { label: 'Ordens de Serviço', key: 'service_orders' },
+  { label: 'Financeiro', key: 'financial' },
+  { label: 'Alarmes', key: 'alarms' },
+  { label: 'Atendimento', key: 'support' },
+  { label: 'Configurações', key: 'settings' },
+  { label: 'Gerenciar Usuários', key: 'users' },
+];
+
+const defaultPermissions: Record<string, Record<string, boolean>> = {
+  N1: {
+    dashboard: true, cameras_view: true, cameras_edit: false, clients_view: false, clients_edit: false,
+    guards: false, installers: false, service_orders: false, financial: false, alarms: true, support: false, settings: false, users: false,
+  },
+  N2: {
+    dashboard: true, cameras_view: true, cameras_edit: true, clients_view: true, clients_edit: false,
+    guards: true, installers: false, service_orders: false, financial: false, alarms: true, support: true, settings: false, users: false,
+  },
+  N3: {
+    dashboard: true, cameras_view: true, cameras_edit: true, clients_view: true, clients_edit: true,
+    guards: true, installers: true, service_orders: true, financial: true, alarms: true, support: true, settings: false, users: false,
+  },
+  admin: {
+    dashboard: true, cameras_view: true, cameras_edit: true, clients_view: true, clients_edit: true,
+    guards: true, installers: true, service_orders: true, financial: true, alarms: true, support: true, settings: true, users: true,
+  },
 };
 
 const Settings = () => {
@@ -228,8 +264,8 @@ const Settings = () => {
         {/* ===== PERMISSÕES ===== */}
         <TabsContent value="permissions" className="space-y-4">
           {/* Legend */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {(['N1', 'N2', 'admin'] as const).map(level => (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            {(['N1', 'N2', 'N3', 'admin'] as const).map(level => (
               <Card key={level} className="bg-card border-border">
                 <CardContent className="p-4">
                   <Badge variant={level === 'admin' ? 'default' : 'secondary'} className="mb-2">{level === 'admin' ? 'Admin' : level}</Badge>
@@ -239,6 +275,44 @@ const Settings = () => {
             ))}
           </div>
 
+          {/* Permissions Matrix */}
+          <Card className="bg-card border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Matriz de Permissões</CardTitle>
+              <CardDescription className="text-xs">Visualize o que cada nível de acesso pode fazer no sistema</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Módulo</TableHead>
+                    <TableHead className="text-center">N1</TableHead>
+                    <TableHead className="text-center">N2</TableHead>
+                    <TableHead className="text-center">N3</TableHead>
+                    <TableHead className="text-center">Admin</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {permissionModules.map(mod => (
+                    <TableRow key={mod.key}>
+                      <TableCell className="font-medium text-sm">{mod.label}</TableCell>
+                      {(['N1', 'N2', 'N3', 'admin'] as const).map(level => (
+                        <TableCell key={level} className="text-center">
+                          {defaultPermissions[level][mod.key] ? (
+                            <span className="text-emerald-400 text-sm">✓</span>
+                          ) : (
+                            <span className="text-destructive text-sm">✗</span>
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Users Table */}
           <Card className="bg-card border-border">
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
               <CardTitle className="text-base">Usuários do Sistema</CardTitle>
@@ -395,6 +469,7 @@ const Settings = () => {
                 <SelectContent>
                   <SelectItem value="N1">N1 — Apenas Visualização</SelectItem>
                   <SelectItem value="N2">N2 — Operador (sem financeiro)</SelectItem>
+                  <SelectItem value="N3">N3 — Operador Avançado</SelectItem>
                   <SelectItem value="admin">Admin — Acesso Total</SelectItem>
                 </SelectContent>
               </Select>
