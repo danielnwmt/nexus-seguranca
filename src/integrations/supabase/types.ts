@@ -400,6 +400,7 @@ export type Database = {
       patrol_routes: {
         Row: {
           active: boolean
+          city: string | null
           client_id: string | null
           created_at: string
           description: string | null
@@ -411,6 +412,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          city?: string | null
           client_id?: string | null
           created_at?: string
           description?: string | null
@@ -422,6 +424,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          city?: string | null
           client_id?: string | null
           created_at?: string
           description?: string | null

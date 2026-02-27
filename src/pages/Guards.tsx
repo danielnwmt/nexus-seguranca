@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Shield, Plus, Search, Pencil, Trash2, Moon, Sun, Clock, MapPin, Route } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -41,6 +41,20 @@ const statusLabels: Record<string, { label: string; className: string }> = {
   on_leave: { label: 'Afastado', className: 'bg-warning/10 text-warning' },
 };
 
+// Geocode city name to lat/lng using Nominatim
+const geocodeCity = async (city: string): Promise<[number, number] | null> => {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1&countrycodes=br`);
+    const data = await res.json();
+    if (data.length > 0) {
+      return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+    }
+  } catch (e) {
+    console.warn('Geocode failed', e);
+  }
+  return null;
+};
+
 const Guards = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -62,7 +76,10 @@ const Guards = () => {
   const [routeWaypoints, setRouteWaypoints] = useState<{ lat: number; lng: number }[]>([]);
   const [routeName, setRouteName] = useState('Ronda');
   const [selectedRouteClient, setSelectedRouteClient] = useState<string>('');
+  const [routeCity, setRouteCity] = useState('');
+  const [routeMapCenter, setRouteMapCenter] = useState<[number, number] | undefined>(undefined);
   const [viewRouteGuard, setViewRouteGuard] = useState<any>(null);
+  const [viewMapCenter, setViewMapCenter] = useState<[number, number] | undefined>(undefined);
 
   // Fetch patrol routes
   const { data: patrolRoutes = [] } = useQuery({
@@ -73,6 +90,32 @@ const Guards = () => {
       return data || [];
     },
   });
+
+  // Geocode when city changes in route creation
+  useEffect(() => {
+    if (!routeCity || routeCity.length < 3) return;
+    const timer = setTimeout(async () => {
+      const coords = await geocodeCity(routeCity);
+      if (coords) setRouteMapCenter(coords);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [routeCity]);
+
+  // When selecting a route to view, center on its city or first waypoint
+  const handleSelectRoute = async (route: any) => {
+    const guard = guards.find((g: any) => g.id === route.guard_id);
+    setViewRouteGuard({ ...guard, routeId: route.id, waypoints: route.waypoints });
+    if (route.city) {
+      const coords = await geocodeCity(route.city);
+      if (coords) {
+        setViewMapCenter(coords);
+        return;
+      }
+    }
+    if (route.waypoints?.length > 0) {
+      setViewMapCenter([route.waypoints[0].lat, route.waypoints[0].lng]);
+    }
+  };
 
   const filtered = guards.filter((g: any) =>
     g.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -140,6 +183,8 @@ const Guards = () => {
     setRouteWaypoints([]);
     setRouteName('Ronda');
     setSelectedRouteClient('');
+    setRouteCity('');
+    setRouteMapCenter(undefined);
     setRouteDialogOpen(true);
   };
 
@@ -148,12 +193,17 @@ const Guards = () => {
       toast({ title: 'Adicione pelo menos 2 pontos na rota', variant: 'destructive' });
       return;
     }
+    if (!routeCity.trim()) {
+      toast({ title: 'Informe a cidade da ronda', variant: 'destructive' });
+      return;
+    }
     try {
       const { error } = await (supabase.from('patrol_routes') as any).insert({
         guard_id: selectedGuardForRoute.id,
         client_id: selectedRouteClient || null,
         name: routeName,
         waypoints: routeWaypoints,
+        city: routeCity,
       });
       if (error) throw error;
       toast({ title: 'Rota de ronda salva com sucesso' });
@@ -385,13 +435,18 @@ const Guards = () => {
                   <div
                     key={route.id}
                     className={`rounded-lg border p-3 cursor-pointer transition-colors ${isSelected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/30'}`}
-                    onClick={() => setViewRouteGuard({ ...guard, routeId: route.id, waypoints: route.waypoints })}
+                    onClick={() => handleSelectRoute(route)}
                   >
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-foreground">{route.name}</p>
                         <p className="text-[10px] text-muted-foreground font-mono">{guard?.name || 'Vigilante removido'}</p>
                         {client && <p className="text-[10px] text-muted-foreground">Cliente: {client.name}</p>}
+                        {route.city && (
+                          <p className="text-[10px] text-primary font-mono flex items-center gap-1 mt-0.5">
+                            <MapPin className="w-2.5 h-2.5" /> {route.city}
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="text-[10px] font-mono text-muted-foreground">{(route.waypoints || []).length} pts</span>
@@ -412,6 +467,7 @@ const Guards = () => {
                   waypoints={viewRouteGuard.waypoints || []}
                   guardName={viewRouteGuard.name}
                   className="h-full"
+                  center={viewMapCenter}
                 />
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-muted-foreground bg-muted/30">
@@ -431,10 +487,15 @@ const Guards = () => {
             <DialogTitle className="text-foreground">Nova Rota de Ronda — {selectedGuardForRoute?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div>
                 <Label className="text-xs text-muted-foreground">Nome da Rota</Label>
                 <Input value={routeName} onChange={e => setRouteName(e.target.value)} placeholder="Ex: Ronda Noturna" className="bg-muted border-border" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Cidade *</Label>
+                <Input value={routeCity} onChange={e => setRouteCity(e.target.value)} placeholder="Ex: Brasília, DF" className="bg-muted border-border" />
+                <p className="text-[10px] text-muted-foreground mt-0.5">O mapa abrirá nesta cidade</p>
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Cliente (opcional)</Label>
@@ -452,6 +513,7 @@ const Guards = () => {
                 onWaypointsChange={setRouteWaypoints}
                 editable
                 className="h-full"
+                center={routeMapCenter}
               />
             </div>
             <div className="flex items-center justify-between">
