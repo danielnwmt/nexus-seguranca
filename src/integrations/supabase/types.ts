@@ -61,6 +61,60 @@ export type Database = {
           },
         ]
       }
+      analytics_events: {
+        Row: {
+          camera_id: string | null
+          camera_name: string | null
+          client_id: string | null
+          client_name: string | null
+          confidence: number | null
+          created_at: string
+          details: Json | null
+          event_type: string
+          id: string
+          thumbnail_url: string | null
+        }
+        Insert: {
+          camera_id?: string | null
+          camera_name?: string | null
+          client_id?: string | null
+          client_name?: string | null
+          confidence?: number | null
+          created_at?: string
+          details?: Json | null
+          event_type?: string
+          id?: string
+          thumbnail_url?: string | null
+        }
+        Update: {
+          camera_id?: string | null
+          camera_name?: string | null
+          client_id?: string | null
+          client_name?: string | null
+          confidence?: number | null
+          created_at?: string
+          details?: Json | null
+          event_type?: string
+          id?: string
+          thumbnail_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analytics_events_camera_id_fkey"
+            columns: ["camera_id"]
+            isOneToOne: false
+            referencedRelation: "cameras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analytics_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bills: {
         Row: {
           amount: number

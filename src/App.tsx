@@ -17,6 +17,7 @@ import Installers from "./pages/Installers";
 import ServiceOrders from "./pages/ServiceOrders";
 import Support from "./pages/Support";
 import Login from "./pages/Login";
+import Analytics from "./pages/Analytics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const App = () => (
               <Route path="/installers" element={<Installers />} />
               <Route path="/service-orders" element={<ServiceOrders />} />
               <Route path="/support" element={<Support />} />
+              <Route path="/analytics" element={<Analytics />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />
