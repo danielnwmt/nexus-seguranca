@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-#  Bravo Monitoramento — Instalador Completo Ubuntu 24.04 LTS
+#  Nexus Monitoramento — Instalador Completo Ubuntu 24.04 LTS
 #  Instala: PostgreSQL + PostgREST + Auth Server + MediaMTX + Frontend
 #  SEM Docker! Tudo nativo.
 #  Execute como root:
@@ -10,15 +10,15 @@
 set -e
 
 # ---------- Parametros (editaveis) ----------
-INSTALL_DIR="${INSTALL_DIR:-/opt/bravo-monitoramento}"
+INSTALL_DIR="${INSTALL_DIR:-/opt/nexus-monitoramento}"
 REPO_URL="${REPO_URL:-https://github.com/danielnwmt/bravo-seguran-a}"
 PORT="${PORT:-80}"
 API_PORT="${API_PORT:-8001}"
 POSTGREST_PORT="${POSTGREST_PORT:-3000}"
-PG_PASSWORD="${PG_PASSWORD:-BravoDb2024!}"
-JWT_SECRET="${JWT_SECRET:-bravo-monitoramento-jwt-secret-key-2024-super-seguro}"
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@bravo.com}"
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin123}"
+PG_PASSWORD="${PG_PASSWORD:-NexusDb2024!}"
+JWT_SECRET="${JWT_SECRET:-nexus-monitoramento-jwt-secret-key-2024-super-seguro}"
+ADMIN_EMAIL="${ADMIN_EMAIL:-admin@protenexus.com}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-1234}"
 
 # ---------- Cores ----------
 RED='\033[0;31m'
@@ -39,7 +39,7 @@ fi
 
 echo ""
 echo -e "${CYAN}=============================================${NC}"
-echo -e "   BRAVO MONITORAMENTO — Instalador Ubuntu"
+echo -e "   NEXUS MONITORAMENTO — Instalador Ubuntu"
 echo -e "   PostgreSQL + PostgREST + MediaMTX + Frontend"
 echo -e "   (Sem Docker!)"
 echo -e "${CYAN}=============================================${NC}"
@@ -99,12 +99,12 @@ step "Configurando banco de dados..."
 sudo -u postgres psql -c "ALTER USER postgres PASSWORD '$PG_PASSWORD';" > /dev/null 2>&1
 
 # Criar banco
-DB_EXISTS=$(sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='bravo'" 2>/dev/null | tr -d ' ')
+DB_EXISTS=$(sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='nexus'" 2>/dev/null | tr -d ' ')
 if [ "$DB_EXISTS" = "1" ]; then
-  ok "Banco 'bravo' ja existe"
+  ok "Banco 'nexus' ja existe"
 else
-  sudo -u postgres psql -c "CREATE DATABASE bravo;" > /dev/null 2>&1
-  ok "Banco 'bravo' criado"
+  sudo -u postgres psql -c "CREATE DATABASE nexus;" > /dev/null 2>&1
+  ok "Banco 'nexus' criado"
 fi
 
 # Executar script de inicializacao
@@ -114,14 +114,14 @@ if [ ! -f "$SQL_FILE" ]; then
 fi
 
 if [ -f "$SQL_FILE" ]; then
-  sudo -u postgres psql -d bravo -f "$SQL_FILE" > /dev/null 2>&1
+  sudo -u postgres psql -d nexus -f "$SQL_FILE" > /dev/null 2>&1
   ok "Tabelas e funcoes criadas"
 else
   err "Arquivo init-database.sql nao encontrado em: $SQL_FILE"
 fi
 
 # Criar usuario admin
-sudo -u postgres psql -d bravo -c "
+sudo -u postgres psql -d nexus -c "
   INSERT INTO auth.users (email, encrypted_password)
   VALUES ('$ADMIN_EMAIL', crypt('$ADMIN_PASSWORD', gen_salt('bf')))
   ON CONFLICT (email) DO NOTHING;
@@ -143,7 +143,7 @@ LOCAL_IP=$(hostname -I | awk '{print $1}')
 DISK_GB=$(df -BG "$INSTALL_DIR" 2>/dev/null | tail -1 | awk '{print $4}' | tr -d 'G')
 [ -z "$DISK_GB" ] && DISK_GB=100
 
-sudo -u postgres psql -d bravo -c "
+sudo -u postgres psql -d nexus -c "
   INSERT INTO public.storage_servers (name, ip_address, storage_path, max_storage_gb, status, description)
   VALUES ('Servidor Local', '$LOCAL_IP', '$STORAGE_PATH', $DISK_GB, 'active', 'Servidor de gravacao local - configurado automaticamente')
   ON CONFLICT DO NOTHING;
@@ -180,7 +180,7 @@ fi
 
 # Criar config
 cat > "$POSTGREST_DIR/postgrest.conf" << EOF
-db-uri = "postgres://authenticator:bravo_auth_2024@localhost:5432/bravo"
+db-uri = "postgres://authenticator:nexus_auth_2024@localhost:5432/nexus"
 db-schemas = "public"
 db-anon-role = "anon"
 db-pool = 10
@@ -190,7 +190,7 @@ jwt-secret = "$JWT_SECRET"
 EOF
 ok "Configuracao PostgREST criada"
 
-sudo -u postgres psql -d bravo -c "ALTER ROLE authenticator WITH PASSWORD 'bravo_auth_2024';" > /dev/null 2>&1
+sudo -u postgres psql -d nexus -c "ALTER ROLE authenticator WITH PASSWORD 'nexus_auth_2024';" > /dev/null 2>&1
 
 # ----------------------------------------------------------
 # 7. Configurar Auth Server
@@ -305,7 +305,7 @@ step "Instalando e configurando Nginx..."
 
 apt-get install -y -qq nginx > /dev/null 2>&1
 
-cat > /etc/nginx/sites-available/bravo << EOF
+cat > /etc/nginx/sites-available/nexus << EOF
 server {
     listen $PORT;
     server_name _;
@@ -348,13 +348,13 @@ server {
     }
 
     # Logs
-    access_log /var/log/nginx/bravo_access.log;
-    error_log /var/log/nginx/bravo_error.log;
+    access_log /var/log/nginx/nexus_access.log;
+    error_log /var/log/nginx/nexus_error.log;
 }
 EOF
 
 # Ativar site e desativar default
-ln -sf /etc/nginx/sites-available/bravo /etc/nginx/sites-enabled/bravo
+ln -sf /etc/nginx/sites-available/nexus /etc/nginx/sites-enabled/nexus
 rm -f /etc/nginx/sites-enabled/default
 
 nginx -t > /dev/null 2>&1
@@ -380,9 +380,9 @@ ok "Portas liberadas: $PORT, 1935, 8554, 8888, 8889"
 step "Criando servicos systemd..."
 
 # PostgREST
-cat > /etc/systemd/system/bravo-postgrest.service << EOF
+cat > /etc/systemd/system/nexus-postgrest.service << EOF
 [Unit]
-Description=Bravo - PostgREST (API REST)
+Description=Nexus - PostgREST (API REST)
 After=postgresql.service
 Requires=postgresql.service
 
@@ -398,10 +398,10 @@ WantedBy=multi-user.target
 EOF
 
 # Auth Server
-cat > /etc/systemd/system/bravo-auth.service << EOF
+cat > /etc/systemd/system/nexus-auth.service << EOF
 [Unit]
-Description=Bravo - Auth Server
-After=postgresql.service bravo-postgrest.service
+Description=Nexus - Auth Server
+After=postgresql.service nexus-postgrest.service
 
 [Service]
 Type=simple
@@ -417,9 +417,9 @@ WantedBy=multi-user.target
 EOF
 
 # MediaMTX
-cat > /etc/systemd/system/bravo-mediamtx.service << EOF
+cat > /etc/systemd/system/nexus-mediamtx.service << EOF
 [Unit]
-Description=Bravo - MediaMTX (Servidor de Midia RTMP/RTSP/HLS)
+Description=Nexus - MediaMTX (Servidor de Midia RTMP/RTSP/HLS)
 After=network.target
 
 [Service]
@@ -437,10 +437,10 @@ EOF
 
 # Recarregar e ativar
 systemctl daemon-reload
-systemctl enable bravo-postgrest bravo-auth bravo-mediamtx > /dev/null 2>&1
-systemctl start bravo-postgrest
-systemctl start bravo-auth
-systemctl start bravo-mediamtx
+systemctl enable nexus-postgrest nexus-auth nexus-mediamtx > /dev/null 2>&1
+systemctl start nexus-postgrest
+systemctl start nexus-auth
+systemctl start nexus-mediamtx
 ok "3 servicos criados e iniciados (inicio automatico)"
 
 # ----------------------------------------------------------
@@ -448,13 +448,13 @@ ok "3 servicos criados e iniciados (inicio automatico)"
 # ----------------------------------------------------------
 step "Criando scripts de controle..."
 
-cat > "$INSTALL_DIR/iniciar-bravo.sh" << 'SCRIPT'
+cat > "$INSTALL_DIR/iniciar-nexus.sh" << 'SCRIPT'
 #!/bin/bash
-echo "Iniciando Bravo Monitoramento..."
+echo "Iniciando Nexus Monitoramento..."
 sudo systemctl start postgresql
-sudo systemctl start bravo-postgrest
-sudo systemctl start bravo-auth
-sudo systemctl start bravo-mediamtx
+sudo systemctl start nexus-postgrest
+sudo systemctl start nexus-auth
+sudo systemctl start nexus-mediamtx
 sudo systemctl start nginx
 echo "Todos os servicos iniciados!"
 echo ""
@@ -462,22 +462,22 @@ echo "Frontend:  http://localhost:PORT_PLACEHOLDER"
 echo "RTMP:      rtmp://localhost:1935/{camera}"
 echo "HLS:       http://localhost:8888/{camera}/"
 SCRIPT
-sed -i "s|PORT_PLACEHOLDER|$PORT|" "$INSTALL_DIR/iniciar-bravo.sh"
+sed -i "s|PORT_PLACEHOLDER|$PORT|" "$INSTALL_DIR/iniciar-nexus.sh"
 
-cat > "$INSTALL_DIR/parar-bravo.sh" << 'SCRIPT'
+cat > "$INSTALL_DIR/parar-nexus.sh" << 'SCRIPT'
 #!/bin/bash
-echo "Parando Bravo Monitoramento..."
-sudo systemctl stop bravo-mediamtx
-sudo systemctl stop bravo-auth
-sudo systemctl stop bravo-postgrest
+echo "Parando Nexus Monitoramento..."
+sudo systemctl stop nexus-mediamtx
+sudo systemctl stop nexus-auth
+sudo systemctl stop nexus-postgrest
 echo "Servicos parados."
 SCRIPT
 
-cat > "$INSTALL_DIR/status-bravo.sh" << 'SCRIPT'
+cat > "$INSTALL_DIR/status-nexus.sh" << 'SCRIPT'
 #!/bin/bash
-echo "========== STATUS BRAVO MONITORAMENTO =========="
+echo "========== STATUS NEXUS MONITORAMENTO =========="
 echo ""
-for svc in postgresql nginx bravo-postgrest bravo-auth bravo-mediamtx; do
+for svc in postgresql nginx nexus-postgrest nexus-auth nexus-mediamtx; do
   STATUS=$(systemctl is-active "$svc" 2>/dev/null)
   if [ "$STATUS" = "active" ]; then
     echo -e "  \033[0;32m● $svc\033[0m"
@@ -488,11 +488,11 @@ done
 echo ""
 SCRIPT
 
-cat > "$INSTALL_DIR/atualizar-bravo.sh" << SCRIPT
+cat > "$INSTALL_DIR/atualizar-nexus.sh" << SCRIPT
 #!/bin/bash
 echo ""
 echo "============================================="
-echo "  BRAVO MONITORAMENTO - Atualizacao"
+echo "  NEXUS MONITORAMENTO - Atualizacao"
 echo "============================================="
 echo ""
 cd "$INSTALL_DIR"
@@ -507,7 +507,7 @@ echo "[3/4] Gerando novo build..."
 npm run build
 
 echo "[4/4] Reiniciando servicos..."
-sudo systemctl restart bravo-auth
+sudo systemctl restart nexus-auth
 sudo systemctl restart nginx
 
 echo ""
@@ -519,7 +519,7 @@ echo ""
 SCRIPT
 
 chmod +x "$INSTALL_DIR"/*.sh
-ok "Scripts criados: iniciar/parar/status/atualizar-bravo.sh"
+ok "Scripts criados: iniciar/parar/status/atualizar-nexus.sh"
 
 # ----------------------------------------------------------
 # Resumo
@@ -550,15 +550,15 @@ echo -e "  Email:  $ADMIN_EMAIL"
 echo -e "  Senha:  $ADMIN_PASSWORD"
 echo ""
 echo -e "  ${CYAN}SCRIPTS:${NC}"
-echo -e "  Status:     sudo bash status-bravo.sh"
-echo -e "  Iniciar:    sudo bash iniciar-bravo.sh"
-echo -e "  Parar:      sudo bash parar-bravo.sh"
-echo -e "  Atualizar:  bash atualizar-bravo.sh"
+echo -e "  Status:     sudo bash status-nexus.sh"
+echo -e "  Iniciar:    sudo bash iniciar-nexus.sh"
+echo -e "  Parar:      sudo bash parar-nexus.sh"
+echo -e "  Atualizar:  bash atualizar-nexus.sh"
 echo ""
 echo -e "  ${CYAN}SERVICOS SYSTEMD:${NC}"
-echo -e "  sudo systemctl status bravo-postgrest"
-echo -e "  sudo systemctl status bravo-auth"
-echo -e "  sudo systemctl status bravo-mediamtx"
+echo -e "  sudo systemctl status nexus-postgrest"
+echo -e "  sudo systemctl status nexus-auth"
+echo -e "  sudo systemctl status nexus-mediamtx"
 echo ""
 echo -e "  ${YELLOW}⚠️  Troque a senha do admin apos o primeiro login!${NC}"
 echo ""

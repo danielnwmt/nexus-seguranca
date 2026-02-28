@@ -1,5 +1,5 @@
 -- ============================================================
---  Bravo Monitoramento — Inicializacao do Banco de Dados
+--  Nexus Monitoramento — Inicializacao do Banco de Dados
 --  PostgreSQL + PostgREST (sem Docker/Supabase)
 -- ============================================================
 
@@ -13,7 +13,7 @@ BEGIN
     CREATE ROLE authenticated NOLOGIN;
   END IF;
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticator') THEN
-    CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD 'bravo_auth_2024';
+    CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD 'nexus_auth_2024';
   END IF;
 END
 $$;

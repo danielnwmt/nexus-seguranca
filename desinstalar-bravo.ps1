@@ -1,21 +1,21 @@
 #Requires -RunAsAdministrator
 # ============================================================
-#  Bravo Monitoramento — Desinstalador Windows
+#  Nexus Monitoramento — Desinstalador Windows
 # ============================================================
 
 param(
-    [string]$InstallDir = "C:\BravoMonitoramento"
+    [string]$InstallDir = "C:\NexusMonitoramento"
 )
 
 $ErrorActionPreference = "SilentlyContinue"
 
 Write-Host ""
 Write-Host "=============================================" -ForegroundColor Red
-Write-Host "   BRAVO MONITORAMENTO — Desinstalar" -ForegroundColor White
+Write-Host "   NEXUS MONITORAMENTO — Desinstalar" -ForegroundColor White
 Write-Host "=============================================" -ForegroundColor Red
 Write-Host ""
 
-$confirm = Read-Host "Deseja remover o Bravo Monitoramento? (s/n)"
+$confirm = Read-Host "Deseja remover o Nexus Monitoramento? (s/n)"
 if ($confirm -ne "s") {
     Write-Host "Cancelado." -ForegroundColor Yellow
     exit 0
@@ -23,12 +23,12 @@ if ($confirm -ne "s") {
 
 # Parar e remover servico
 Write-Host "Parando servico..." -ForegroundColor Cyan
-nssm stop BravoMonitoramento 2>$null
-nssm remove BravoMonitoramento confirm 2>$null
+nssm stop NexusMonitoramento 2>$null
+nssm remove NexusMonitoramento confirm 2>$null
 
 # Remover atalho
 $desktopPath = [Environment]::GetFolderPath("Desktop")
-$shortcutPath = Join-Path $desktopPath "Bravo Monitoramento.lnk"
+$shortcutPath = Join-Path $desktopPath "Nexus Monitoramento.lnk"
 if (Test-Path $shortcutPath) {
     Remove-Item $shortcutPath -Force
     Write-Host "  ✅ Atalho removido" -ForegroundColor Green
@@ -41,5 +41,5 @@ if (Test-Path $InstallDir) {
 }
 
 Write-Host ""
-Write-Host "Bravo Monitoramento desinstalado com sucesso." -ForegroundColor Green
+Write-Host "Nexus Monitoramento desinstalado com sucesso." -ForegroundColor Green
 Write-Host ""
