@@ -122,7 +122,7 @@ const ServiceOrders = () => {
       <body><h1>Ordem de Serviço — ${o.order_number}</h1>
       <table>
         <tr><td>Cliente</td><td>${o.client_name || '—'}</td></tr>
-        <tr><td>Instalador</td><td>${o.installer_name || '—'}</td></tr>
+        <tr><td>Técnico</td><td>${o.installer_name || '—'}</td></tr>
         <tr><td>Tipo</td><td>${typeLabels[o.type] || o.type}</td></tr>
         <tr><td>Status</td><td>${statusConfig[o.status]?.label || o.status}</td></tr>
         <tr><td>Data Agendada</td><td>${o.scheduled_date || '—'}</td></tr>
@@ -175,7 +175,7 @@ const ServiceOrders = () => {
                 <TableRow>
                   <TableHead>Nº OS</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Instalador</TableHead>
+                  <TableHead>Técnico</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Data Agendada</TableHead>
@@ -224,9 +224,9 @@ const ServiceOrders = () => {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Instalador</Label>
+              <Label className="text-xs">Técnico</Label>
               <Select value={form.installer_id} onValueChange={selectInstaller}>
-                <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o instalador" /></SelectTrigger>
+                <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o técnico" /></SelectTrigger>
                 <SelectContent>{installers.map(i => <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
