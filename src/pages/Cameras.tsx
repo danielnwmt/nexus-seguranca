@@ -303,7 +303,7 @@ const Cameras = () => {
                   <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
                     {RETENTION_OPTIONS.map(d => (
-                      <SelectItem key={d} value={String(d)}>{d === 0 ? 'Tempo Real (sem retenção)' : `${d} dias`}</SelectItem>
+                      <SelectItem key={d} value={String(d)}>{d === 0 ? 'Tempo Real' : `${d} dias`}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
