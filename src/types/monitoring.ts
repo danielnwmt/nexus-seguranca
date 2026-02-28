@@ -46,7 +46,7 @@ export interface Camera {
   location: string;
   resolution: string;
   storagePath: string;
-  retentionDays: 5 | 10 | 15 | 20 | 25 | 30;
+  retentionDays: 0 | 5 | 10 | 15 | 20 | 25 | 30;
   analytics: AnalyticType[];
 }
 
