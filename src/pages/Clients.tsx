@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Search, Users, Pencil, Trash2, Camera, Printer, UserX, UserCheck } from 'lucide-react';
+import { Plus, Search, Users, Pencil, Trash2, Camera, Printer, UserX, UserCheck, Eye } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useTableQuery, usePaginatedQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
+import ClientCameraViewer from '@/components/clients/ClientCameraViewer';
 
 const maskCpfCnpj = (value: string) => {
   const digits = value.replace(/\D/g, '').slice(0, 14);
@@ -47,6 +48,9 @@ const Clients = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [boletosDialogOpen, setBoletosDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<any>(null);
+  const [cameraViewerOpen, setCameraViewerOpen] = useState(false);
+  const [cameraViewerClient, setCameraViewerClient] = useState<any>(null);
+  const { data: allCameras = [] } = useTableQuery('cameras');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -278,10 +282,14 @@ const Clients = () => {
                   <p className="text-[10px] text-muted-foreground">{client.phone}</p>
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <span className="inline-flex items-center gap-1 text-xs font-mono text-foreground">
+                  <button
+                    onClick={() => { setCameraViewerClient(client); setCameraViewerOpen(true); }}
+                    className="inline-flex items-center gap-1 text-xs font-mono text-foreground hover:text-primary transition-colors"
+                    title="Visualizar câmeras"
+                  >
                     <Camera className="w-3 h-3 text-primary" />
                     {client.cameras_count}
-                  </span>
+                  </button>
                 </td>
                 <td className="px-4 py-3 text-center">
                   <span className={`inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full ${
@@ -293,6 +301,9 @@ const Clients = () => {
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
+                    <button onClick={() => { setCameraViewerClient(client); setCameraViewerOpen(true); }} className="w-7 h-7 rounded flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-primary" title="Ver Câmeras">
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
                     <button onClick={() => handleShowBoletos(client)} className="w-7 h-7 rounded flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Boletos">
                       <Printer className="w-3.5 h-3.5" />
                     </button>
@@ -362,6 +373,14 @@ const Clients = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      <ClientCameraViewer
+        open={cameraViewerOpen}
+        onOpenChange={setCameraViewerOpen}
+        client={cameraViewerClient}
+        cameras={allCameras}
+        allClients={clients}
+      />
     </div>
   );
 };
