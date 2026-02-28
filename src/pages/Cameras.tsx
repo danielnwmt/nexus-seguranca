@@ -18,6 +18,7 @@ const RETENTION_OPTIONS = [5, 10, 15, 20, 25, 30] as const;
 const ALL_ANALYTICS: AnalyticType[] = ['lpr', 'weapon_detection', 'line_crossing', 'area_intrusion', 'loitering', 'human_car_classification', 'fallen_person', 'people_counting', 'tampering'];
 const VIDEO_ENCODINGS = ['H.264', 'H.264+', 'H.265'] as const;
 const BITRATE_OPTIONS = [256, 512, 1024, 2048, 3072, 4096, 6144, 8192] as const;
+const RESOLUTION_OPTIONS = ['640x480', '1280x720', '1920x1080', '2560x1440', '3840x2160'] as const;
 const CAMERA_BRANDS = ['Hikvision', 'Dahua', 'Intelbras', 'Axis', 'Bosch', 'Samsung', 'Vivotek', 'Giga', 'Motorola', 'TP-Link', 'Outro'] as const;
 
 interface CameraForm {
@@ -187,8 +188,8 @@ const Cameras = () => {
                 <Label className="text-xs text-muted-foreground">Nome</Label>
                 <Input value={newCamera.name} onChange={e => setNewCamera(p => ({ ...p, name: e.target.value }))} placeholder="CAM-10 Recepção" className="bg-muted border-border" />
               </div>
-              {/* Stream Key - auto-generated, shown after save */}
-              {editingId && editingStreamKey && (
+              {/* Stream Key - auto-generated for RTMP only, shown after save */}
+              {editingId && editingStreamKey && newCamera.protocol === 'RTMP' && (
                 <div className="bg-muted/50 rounded-lg p-3 border border-border space-y-2">
                   <Label className="text-xs text-muted-foreground flex items-center gap-1"><Key className="w-3 h-3" /> Stream Key (gerada automaticamente)</Label>
                   <div className="flex gap-2">
@@ -219,16 +220,16 @@ const Cameras = () => {
                   )}
                 </div>
               )}
-              {!editingId && (
+              {!editingId && newCamera.protocol === 'RTMP' && (
                 <div className="bg-muted/30 rounded-lg p-3 border border-dashed border-border">
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Key className="w-3 h-3" /> A Stream Key será gerada automaticamente ao salvar a câmera.
+                    <Key className="w-3 h-3" /> A Stream Key será gerada automaticamente ao salvar a câmera (somente RTMP).
                   </p>
                 </div>
               )}
               <div>
-                <Label className="text-xs text-muted-foreground">URL do Stream (opcional, override manual)</Label>
-                <Input value={newCamera.streamUrl} onChange={e => setNewCamera(p => ({ ...p, streamUrl: e.target.value }))} placeholder="rtsp://192.168.1.100:554/stream1" className="bg-muted border-border font-mono text-xs" />
+                <Label className="text-xs text-muted-foreground">URL do Stream {newCamera.protocol === 'RTMP' ? '(opcional, override manual)' : ''}</Label>
+                <Input value={newCamera.streamUrl} onChange={e => setNewCamera(p => ({ ...p, streamUrl: e.target.value }))} placeholder={newCamera.protocol === 'RTMP' ? 'rtmp://192.168.1.100:1935/stream1' : 'rtsp://192.168.1.100:554/stream1'} className="bg-muted border-border font-mono text-xs" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -243,7 +244,14 @@ const Cameras = () => {
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Resolução</Label>
-                  <Input value={newCamera.resolution} onChange={e => setNewCamera(p => ({ ...p, resolution: e.target.value }))} className="bg-muted border-border font-mono text-xs" />
+                  <Select value={newCamera.resolution} onValueChange={v => setNewCamera(p => ({ ...p, resolution: v }))}>
+                    <SelectTrigger className="bg-muted border-border"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {RESOLUTION_OPTIONS.map(r => (
+                        <SelectItem key={r} value={r}>{r}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div>
