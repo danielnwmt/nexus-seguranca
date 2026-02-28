@@ -1,0 +1,1 @@
+ALTER TABLE public.cameras ADD COLUMN IF NOT EXISTS snapshot_url text DEFAULT NULL;

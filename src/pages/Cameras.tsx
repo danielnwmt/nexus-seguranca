@@ -24,6 +24,7 @@ const CAMERA_BRANDS = ['Hikvision', 'Dahua', 'Intelbras', 'Axis', 'Bosch', 'Sams
 interface CameraForm {
   name: string;
   streamUrl: string;
+  snapshotUrl: string;
   protocol: 'RTSP' | 'RTMP';
   location: string;
   resolution: string;
@@ -36,7 +37,7 @@ interface CameraForm {
   brand: string;
 }
 
-const emptyForm: CameraForm = { name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30', analytics: [], videoEncoding: 'H.264', maxBitrate: '4096', brand: '' };
+const emptyForm: CameraForm = { name: '', streamUrl: '', snapshotUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30', analytics: [], videoEncoding: 'H.264', maxBitrate: '4096', brand: '' };
 
 const Cameras = () => {
   const { toast } = useToast();
@@ -92,6 +93,7 @@ const Cameras = () => {
       name: newCamera.name,
       client_id: newCamera.clientId || null,
       stream_url: newCamera.streamUrl,
+      snapshot_url: newCamera.snapshotUrl || null,
       protocol: newCamera.protocol,
       location: newCamera.location,
       resolution: newCamera.resolution,
@@ -116,6 +118,7 @@ const Cameras = () => {
     setNewCamera({
       name: camera.name,
       streamUrl: camera.stream_url || '',
+      snapshotUrl: camera.snapshot_url || '',
       protocol: camera.protocol || 'RTSP',
       location: camera.location || '',
       resolution: camera.resolution || '1920x1080',
@@ -230,6 +233,11 @@ const Cameras = () => {
               <div>
                 <Label className="text-xs text-muted-foreground">URL do Stream {newCamera.protocol === 'RTMP' ? '(opcional, override manual)' : ''}</Label>
                 <Input value={newCamera.streamUrl} onChange={e => setNewCamera(p => ({ ...p, streamUrl: e.target.value }))} placeholder={newCamera.protocol === 'RTMP' ? 'rtmp://192.168.1.100:1935/stream1' : 'rtsp://192.168.1.100:554/stream1'} className="bg-muted border-border font-mono text-xs" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground flex items-center gap-1"><Brain className="w-3 h-3" /> URL de Snapshot (para IA automática)</Label>
+                <Input value={newCamera.snapshotUrl} onChange={e => setNewCamera(p => ({ ...p, snapshotUrl: e.target.value }))} placeholder="http://192.168.1.100/ISAPI/Streaming/channels/101/picture" className="bg-muted border-border font-mono text-xs" />
+                <p className="text-[10px] text-muted-foreground mt-1">Endpoint HTTP da câmera que retorna uma imagem JPEG. Necessário para análise automática em background.</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
