@@ -50,23 +50,23 @@ const MediaServerSettings = () => {
   return (
     <Card className="bg-card border-border">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
+      <CardTitle className="text-base flex items-center gap-2">
           <Wifi className="w-4 h-4 text-primary" />
           Servidor de Mídia (MediaMTX)
         </CardTitle>
         <CardDescription className="text-xs">
-          Configure o IP do servidor MediaMTX para gerar os links HLS das câmeras automaticamente.
-          Os links de streaming só serão gerados após configurar o IP.
+          Configure o IP ou domínio do servidor MediaMTX para gerar os links RTMP/HLS das câmeras automaticamente.
+          Os links de streaming só serão gerados após configurar o endereço.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">IP / Hostname do Servidor MediaMTX</Label>
+          <Label className="text-xs text-muted-foreground">IP ou Domínio do Servidor MediaMTX</Label>
           <div className="flex gap-2">
             <Input
               value={ip}
               onChange={e => setIp(e.target.value)}
-              placeholder="192.168.1.100"
+              placeholder="192.168.1.100 ou streaming.meudominio.com"
               className="bg-muted border-border font-mono"
             />
             <Button onClick={handleSave} disabled={saving} className="gap-2 shrink-0">
@@ -81,7 +81,7 @@ const MediaServerSettings = () => {
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-[10px]">RTMP (Envio)</Badge>
-                <code className="text-[11px] font-mono text-muted-foreground">rtmp://{ip}:1935/&lt;stream_key&gt;</code>
+                <code className="text-[11px] font-mono text-muted-foreground">rtmp://{ip}/live/&lt;stream_key&gt;</code>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-[10px]">HLS (Visualização)</Badge>
@@ -94,7 +94,7 @@ const MediaServerSettings = () => {
         {!ip && (
           <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
             <p className="text-xs text-destructive">
-              ⚠️ Nenhum IP configurado. Os links de streaming das câmeras não serão gerados até que o IP do servidor seja definido.
+              ⚠️ Nenhum endereço configurado. Os links de streaming das câmeras não serão gerados até que o IP ou domínio do servidor seja definido.
             </p>
           </div>
         )}
