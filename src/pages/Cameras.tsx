@@ -124,7 +124,7 @@ const Cameras = () => {
       resolution: camera.resolution || '1920x1080',
       clientId: camera.client_id || '',
       storagePath: camera.storage_path || '',
-      retentionDays: String(camera.retention_days || 30),
+      retentionDays: String(camera.retention_days ?? 30),
       analytics: camera.analytics || [],
       videoEncoding: camera.video_encoding || 'H.264',
       maxBitrate: String(camera.max_bitrate || 4096),
@@ -153,7 +153,7 @@ const Cameras = () => {
       location: c.location || '',
       resolution: c.resolution || '',
       storagePath: c.storage_path || '',
-      retentionDays: c.retention_days || 30,
+      retentionDays: c.retention_days ?? 30,
       analytics: c.analytics || [],
     };
   };
