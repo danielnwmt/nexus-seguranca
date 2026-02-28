@@ -202,8 +202,8 @@ const Cameras = () => {
                     <div className="space-y-1 pt-1">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px] shrink-0">RTMP</Badge>
-                        <code className="text-[11px] font-mono text-muted-foreground truncate">rtmp://{mediaServerIp}:1935/{editingStreamKey}</code>
-                        <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => { navigator.clipboard.writeText(`rtmp://${mediaServerIp}:1935/${editingStreamKey}`); toast({ title: 'URL RTMP copiada!' }); }}>
+                        <code className="text-[11px] font-mono text-muted-foreground truncate">rtmp://{mediaServerIp}/live/{editingStreamKey}</code>
+                        <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => { navigator.clipboard.writeText(`rtmp://${mediaServerIp}/live/${editingStreamKey}`); toast({ title: 'URL RTMP copiada!' }); }}>
                           <Copy className="w-3 h-3" />
                         </Button>
                       </div>
