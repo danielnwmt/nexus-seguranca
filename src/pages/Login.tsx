@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Lock, Mail, AlertCircle } from 'lucide-react';
-import bravoLogo from '@/assets/bravo-logo.webp';
+import nexusLogo from '@/assets/nexus-logo.png';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 
 const Login = () => {
@@ -34,9 +34,9 @@ const Login = () => {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <img src={company?.logo_url || bravoLogo} alt={company?.name || 'Bravo'} className="w-16 h-16 object-contain mb-4" />
-          <h1 className="text-xl font-bold text-foreground tracking-wide">{company?.name?.toUpperCase() || 'PROTENEXUS'}</h1>
-          <p className="text-[10px] font-mono text-muted-foreground tracking-widest">MONITORAMENTO</p>
+          <img src={company?.logo_url || nexusLogo} alt={company?.name || 'Nexus Segurança'} className="w-20 h-20 object-contain mb-4 rounded-lg" />
+          <h1 className="text-xl font-bold text-foreground tracking-wide">{company?.name?.toUpperCase() || 'NEXUS'}</h1>
+          <p className="text-[10px] font-mono text-muted-foreground tracking-widest">SEGURANÇA</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-border bg-card p-6">

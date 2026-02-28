@@ -23,9 +23,9 @@ export default defineConfig(({ mode }) => ({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}'],
       },
       manifest: {
-        name: 'Bravo Monitoramento',
-        short_name: 'Bravo',
-        description: 'Sistema de monitoramento de câmeras',
+        name: 'Nexus Segurança',
+        short_name: 'Nexus',
+        description: 'Sistema de monitoramento e segurança',
         theme_color: '#0a0f14',
         background_color: '#0a0f14',
         display: 'standalone',

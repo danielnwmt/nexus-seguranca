@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store, Server, HardDrive, Bot, Globe } from 'lucide-react';
+import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store, Server, HardDrive, Bot, Globe, Palette } from 'lucide-react';
 import CompanySettings from '@/components/settings/CompanySettings';
 import StorageServers from '@/components/settings/StorageServers';
 import SystemUpdate from '@/components/settings/SystemUpdate';
 import BackupSettings from '@/components/settings/BackupSettings';
 import ChatbotSettings from '@/components/settings/ChatbotSettings';
 import DomainSSL from '@/components/settings/DomainSSL';
+import ThemeSettings from '@/components/settings/ThemeSettings';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -183,6 +184,7 @@ const Settings = () => {
           <TabsTrigger value="domain" className="gap-2"><Globe className="w-4 h-4" />Domínio</TabsTrigger>
           <TabsTrigger value="system" className="gap-2"><RefreshCw className="w-4 h-4" />Sistema</TabsTrigger>
           <TabsTrigger value="mobile" className="gap-2"><Smartphone className="w-4 h-4" />App Mobile</TabsTrigger>
+          <TabsTrigger value="theme" className="gap-2"><Palette className="w-4 h-4" />Aparência</TabsTrigger>
         </TabsList>
 
         {/* ===== EMPRESA ===== */}
@@ -460,6 +462,11 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ===== APARÊNCIA ===== */}
+        <TabsContent value="theme" className="space-y-4">
+          <ThemeSettings />
         </TabsContent>
       </Tabs>
 
