@@ -256,6 +256,28 @@ if [ -f "$MEDIAMTX_CFG_SRC" ]; then
 fi
 
 # ----------------------------------------------------------
+# 8.2 Instalar ffmpeg (para captura de frames IA)
+# ----------------------------------------------------------
+step "Instalando ffmpeg (analise de video IA)..."
+apt-get install -y -qq ffmpeg > /dev/null 2>&1
+ok "ffmpeg instalado"
+
+# ----------------------------------------------------------
+# 8.3 Configurar servico de Analytics IA
+# ----------------------------------------------------------
+step "Configurando servico de Analytics IA..."
+
+ANALYTICS_DIR="$INSTALL_DIR/analytics"
+mkdir -p "$ANALYTICS_DIR/snapshots"
+
+ANALYTICS_SRC="$SCRIPT_DIR/installer/analytics-service.js"
+[ ! -f "$ANALYTICS_SRC" ] && ANALYTICS_SRC="$INSTALL_DIR/installer/analytics-service.js"
+if [ -f "$ANALYTICS_SRC" ]; then
+  cp "$ANALYTICS_SRC" "$ANALYTICS_DIR/analytics-service.js"
+  ok "Servico de Analytics copiado"
+fi
+
+# ----------------------------------------------------------
 # 9. Preparar frontend
 # ----------------------------------------------------------
 step "Preparando frontend..."
@@ -435,13 +457,43 @@ LimitNOFILE=65536
 WantedBy=multi-user.target
 EOF
 
+# Analytics IA
+cat > /etc/systemd/system/nexus-analytics.service << EOF
+[Unit]
+Description=Nexus - Analytics IA (Analise de Video em Tempo Real)
+After=postgresql.service nexus-mediamtx.service
+
+[Service]
+Type=simple
+WorkingDirectory=$ANALYTICS_DIR
+ExecStart=$(which node) $ANALYTICS_DIR/analytics-service.js
+Restart=always
+RestartSec=10
+User=nobody
+Environment=NODE_ENV=production
+Environment=SUPABASE_URL=http://localhost:$API_PORT
+Environment=SUPABASE_KEY=local
+Environment=PG_HOST=localhost
+Environment=PG_PORT=5432
+Environment=PG_DB=nexus
+Environment=PG_USER=postgres
+Environment=PG_PASS=$PG_PASSWORD
+Environment=MEDIAMTX_API=http://127.0.0.1:9997
+Environment=MEDIAMTX_HLS=http://127.0.0.1:8888
+Environment=TEMP_DIR=$ANALYTICS_DIR/snapshots
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 # Recarregar e ativar
 systemctl daemon-reload
-systemctl enable nexus-postgrest nexus-auth nexus-mediamtx > /dev/null 2>&1
+systemctl enable nexus-postgrest nexus-auth nexus-mediamtx nexus-analytics > /dev/null 2>&1
 systemctl start nexus-postgrest
 systemctl start nexus-auth
 systemctl start nexus-mediamtx
-ok "3 servicos criados e iniciados (inicio automatico)"
+systemctl start nexus-analytics
+ok "4 servicos criados e iniciados (inicio automatico)"
 
 # ----------------------------------------------------------
 # 15. Scripts de controle
@@ -455,18 +507,21 @@ sudo systemctl start postgresql
 sudo systemctl start nexus-postgrest
 sudo systemctl start nexus-auth
 sudo systemctl start nexus-mediamtx
+sudo systemctl start nexus-analytics
 sudo systemctl start nginx
 echo "Todos os servicos iniciados!"
 echo ""
-echo "Frontend:  http://localhost:PORT_PLACEHOLDER"
-echo "RTMP:      rtmp://localhost:1935/{camera}"
-echo "HLS:       http://localhost:8888/{camera}/"
+echo "Frontend:    http://localhost:PORT_PLACEHOLDER"
+echo "RTMP:        rtmp://localhost:1935/{camera}"
+echo "HLS:         http://localhost:8888/{camera}/"
+echo "Analytics IA: ATIVO (analise em tempo real)"
 SCRIPT
 sed -i "s|PORT_PLACEHOLDER|$PORT|" "$INSTALL_DIR/iniciar-nexus.sh"
 
 cat > "$INSTALL_DIR/parar-nexus.sh" << 'SCRIPT'
 #!/bin/bash
 echo "Parando Nexus Monitoramento..."
+sudo systemctl stop nexus-analytics
 sudo systemctl stop nexus-mediamtx
 sudo systemctl stop nexus-auth
 sudo systemctl stop nexus-postgrest
@@ -477,7 +532,7 @@ cat > "$INSTALL_DIR/status-nexus.sh" << 'SCRIPT'
 #!/bin/bash
 echo "========== STATUS NEXUS MONITORAMENTO =========="
 echo ""
-for svc in postgresql nginx nexus-postgrest nexus-auth nexus-mediamtx; do
+for svc in postgresql nginx nexus-postgrest nexus-auth nexus-mediamtx nexus-analytics; do
   STATUS=$(systemctl is-active "$svc" 2>/dev/null)
   if [ "$STATUS" = "active" ]; then
     echo -e "  \033[0;32m● $svc\033[0m"

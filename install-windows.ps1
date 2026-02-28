@@ -414,6 +414,77 @@ if (Test-Path $mediamtxCfgSrc) {
 }
 
 # ----------------------------------------------------------
+# 9.2 Instalar ffmpeg (para captura de frames IA)
+# ----------------------------------------------------------
+Write-Step "Instalando ffmpeg (analise de video IA)..."
+
+$ffmpegPath = $null
+try { $ffmpegPath = (Get-Command ffmpeg -ErrorAction SilentlyContinue).Source } catch {}
+
+if ($ffmpegPath) {
+    Write-Ok "ffmpeg ja instalado: $ffmpegPath"
+} else {
+    $ffmpegDir = "$InstallDir\ffmpeg"
+    New-Item -ItemType Directory -Path $ffmpegDir -Force | Out-Null
+    $ffmpegUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+    $ffmpegZip = "$env:TEMP\ffmpeg.zip"
+    Write-Host "  Baixando ffmpeg..." -ForegroundColor Gray
+    try {
+        Invoke-WebRequest -Uri $ffmpegUrl -OutFile $ffmpegZip -UseBasicParsing
+        Expand-Archive -Path $ffmpegZip -DestinationPath "$env:TEMP\ffmpeg-extract" -Force
+        $ffBin = Get-ChildItem -Path "$env:TEMP\ffmpeg-extract" -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
+        if ($ffBin) {
+            Copy-Item $ffBin.FullName "$ffmpegDir\ffmpeg.exe" -Force
+            # Adicionar ao PATH do sistema
+            $currentPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+            if ($currentPath -notlike "*$ffmpegDir*") {
+                [Environment]::SetEnvironmentVariable("Path", "$currentPath;$ffmpegDir", "Machine")
+                $env:Path = "$env:Path;$ffmpegDir"
+            }
+            Write-Ok "ffmpeg instalado em $ffmpegDir"
+        } else {
+            Write-Warn "ffmpeg nao encontrado no pacote"
+        }
+        Remove-Item $ffmpegZip -Force -ErrorAction SilentlyContinue
+        Remove-Item "$env:TEMP\ffmpeg-extract" -Recurse -Force -ErrorAction SilentlyContinue
+    } catch {
+        Write-Warn "Falha ao baixar ffmpeg: $($_.Exception.Message)"
+        Write-Host "  Instale manualmente: https://ffmpeg.org/download.html" -ForegroundColor Gray
+    }
+}
+
+# ----------------------------------------------------------
+# 9.3 Configurar servico de Analytics IA
+# ----------------------------------------------------------
+Write-Step "Configurando servico de Analytics IA..."
+
+$analyticsDir = "$InstallDir\analytics"
+New-Item -ItemType Directory -Path $analyticsDir -Force | Out-Null
+
+$analyticsSrc = Join-Path $scriptDir "installer\analytics-service.js"
+if (Test-Path $analyticsSrc) {
+    Copy-Item $analyticsSrc "$analyticsDir\analytics-service.js" -Force
+    Write-Ok "Servico de Analytics copiado"
+}
+
+# Criar arquivo .env para o serviço de analytics
+$analyticsEnv = @"
+SUPABASE_URL=$env:VITE_SUPABASE_URL
+SUPABASE_KEY=$env:VITE_SUPABASE_PUBLISHABLE_KEY
+PG_HOST=localhost
+PG_PORT=5432
+PG_DB=nexus
+PG_USER=postgres
+PG_PASS=$PgPassword
+MEDIAMTX_API=http://127.0.0.1:9997
+MEDIAMTX_HLS=http://127.0.0.1:8888
+TEMP_DIR=$analyticsDir\snapshots
+ANALYZE_INTERVAL=15
+"@
+Set-Content -Path "$analyticsDir\.env" -Value $analyticsEnv -Encoding UTF8
+Write-Ok "Configuracao do Analytics IA criada"
+
+# ----------------------------------------------------------
 # 10. Scripts de inicializacao
 # ----------------------------------------------------------
 Write-Step "Criando scripts de inicializacao..."
@@ -427,20 +498,24 @@ echo   NEXUS MONITORAMENTO - Iniciando...
 echo =============================================
 echo.
 
-echo [1/4] Verificando PostgreSQL...
+echo [1/5] Verificando PostgreSQL...
 net start postgresql-x64-16 2>nul
 timeout /t 2 /nobreak >nul
 
-echo [2/4] Iniciando PostgREST (API REST)...
+echo [2/5] Iniciando PostgREST (API REST)...
 start /min "PostgREST" "$postgrestExe" "$postgrestDir\postgrest.conf"
 timeout /t 2 /nobreak >nul
 
-echo [3/4] Iniciando Auth Server...
+echo [3/5] Iniciando Auth Server...
 start /min "AuthServer" node "$authServerDir\server.js"
 timeout /t 2 /nobreak >nul
 
-echo [4/4] Iniciando MediaMTX (Servidor de Midia)...
+echo [4/5] Iniciando MediaMTX (Servidor de Midia)...
 start /min "MediaMTX" "$mediamtxExe" "$mediamtxDir\mediamtx.yml"
+timeout /t 2 /nobreak >nul
+
+echo [5/5] Iniciando Analytics IA...
+start /min "AnalyticsIA" node "$analyticsDir\analytics-service.js"
 timeout /t 2 /nobreak >nul
 
 echo.
@@ -451,6 +526,8 @@ echo ============ SERVIDOR DE MIDIA ============
 echo RTMP: rtmp://localhost:1935/{nome_camera}
 echo RTSP: rtsp://localhost:8554/{nome_camera}
 echo HLS:  http://localhost:8888/{nome_camera}/
+echo ============ ANALYTICS IA =================
+echo Analise de video em tempo real ATIVA
 echo ============================================
 echo.
 echo Pressione Ctrl+C para parar.
@@ -465,6 +542,7 @@ echo Parando Nexus Monitoramento...
 taskkill /f /im postgrest.exe 2>nul
 taskkill /f /im mediamtx.exe 2>nul
 taskkill /f /fi "WINDOWTITLE eq AuthServer*" 2>nul
+taskkill /f /fi "WINDOWTITLE eq AnalyticsIA*" 2>nul
 echo Servidor parado.
 pause
 "@
@@ -551,6 +629,16 @@ if ($nssmPath) {
     nssm set NexusMediaMTX Start SERVICE_AUTO_START
     nssm start NexusMediaMTX
 
+    # Analytics IA como servico
+    nssm stop NexusAnalytics 2>$null
+    nssm remove NexusAnalytics confirm 2>$null
+    nssm install NexusAnalytics $nodePath "$analyticsDir\analytics-service.js"
+    nssm set NexusAnalytics AppDirectory $analyticsDir
+    nssm set NexusAnalytics DisplayName "Nexus - Analytics IA"
+    nssm set NexusAnalytics AppEnvironmentExtra "SUPABASE_URL=$env:VITE_SUPABASE_URL" "SUPABASE_KEY=$env:VITE_SUPABASE_PUBLISHABLE_KEY" "PG_PASS=$PgPassword"
+    nssm set NexusAnalytics Start SERVICE_AUTO_START
+    nssm start NexusAnalytics
+
     # Frontend como servico
     $servePath = (Get-Command serve).Source
     nssm stop NexusFrontend 2>$null
@@ -561,7 +649,7 @@ if ($nssmPath) {
     nssm set NexusFrontend Start SERVICE_AUTO_START
     nssm start NexusFrontend
 
-    Write-Ok "4 servicos Windows criados (inicio automatico)"
+    Write-Ok "5 servicos Windows criados (inicio automatico)"
 } else {
     Write-Warn "NSSM nao encontrado — use 'iniciar-nexus.bat' para iniciar manualmente"
     Write-Host "  Para servico automatico, instale NSSM: https://nssm.cc/download" -ForegroundColor Gray
@@ -602,6 +690,7 @@ Write-Host "  - PostgREST (API)...: localhost:$PostgRESTPort" -ForegroundColor W
 Write-Host "  - Auth Server.......: localhost:$ApiPort" -ForegroundColor White
 Write-Host "  - MediaMTX (Midia)..: RTMP :1935 | RTSP :8554 | HLS :8888" -ForegroundColor White
 Write-Host "  - Frontend..........: localhost:$Port" -ForegroundColor White
+Write-Host "  - Analytics IA......: Analise em tempo real (ffmpeg + Gemini)" -ForegroundColor White
 Write-Host ""
 Write-Host "  SERVIDOR DE MIDIA (MediaMTX):" -ForegroundColor Cyan
 Write-Host "  Para enviar stream RTMP:" -ForegroundColor Gray
