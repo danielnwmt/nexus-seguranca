@@ -184,7 +184,7 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium text-foreground truncate">{camera.name}</p>
-            <p className="text-[10px] text-muted-foreground font-mono">{camera.protocol} • {camera.resolution} • {camera.retentionDays}d</p>
+            <p className="text-[10px] text-muted-foreground font-mono">{camera.protocol} • {camera.resolution} • {camera.retentionDays === 0 ? 'Tempo Real' : `${camera.retentionDays}d`}</p>
             <p className="text-[10px] text-muted-foreground truncate">{camera.clientName}</p>
           </div>
           {(onEdit || onDelete) && (
