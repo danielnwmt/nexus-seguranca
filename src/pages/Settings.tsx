@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store, Server, HardDrive, Bot, Globe, Palette } from 'lucide-react';
 import CompanySettings from '@/components/settings/CompanySettings';
 import StorageServers from '@/components/settings/StorageServers';
+import MediaServerSettings from '@/components/settings/MediaServerSettings';
 import SystemUpdate from '@/components/settings/SystemUpdate';
 import BackupSettings from '@/components/settings/BackupSettings';
 import ChatbotSettings from '@/components/settings/ChatbotSettings';
@@ -266,6 +267,7 @@ const Settings = () => {
 
         {/* ===== SERVIDORES ===== */}
         <TabsContent value="storage" className="space-y-4">
+          <MediaServerSettings />
           <StorageServers />
         </TabsContent>
 

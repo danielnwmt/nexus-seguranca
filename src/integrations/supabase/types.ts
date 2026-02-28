@@ -118,6 +118,7 @@ export type Database = {
           retention_days: number
           status: string
           storage_path: string | null
+          stream_key: string
           stream_url: string | null
           updated_at: string
           video_encoding: string | null
@@ -136,6 +137,7 @@ export type Database = {
           retention_days?: number
           status?: string
           storage_path?: string | null
+          stream_key?: string
           stream_url?: string | null
           updated_at?: string
           video_encoding?: string | null
@@ -154,6 +156,7 @@ export type Database = {
           retention_days?: number
           status?: string
           storage_path?: string | null
+          stream_key?: string
           stream_url?: string | null
           updated_at?: string
           video_encoding?: string | null
@@ -232,6 +235,7 @@ export type Database = {
           email: string | null
           id: string
           logo_url: string | null
+          media_server_ip: string | null
           name: string
           phone: string | null
           razao_social: string | null
@@ -244,6 +248,7 @@ export type Database = {
           email?: string | null
           id?: string
           logo_url?: string | null
+          media_server_ip?: string | null
           name?: string
           phone?: string | null
           razao_social?: string | null
@@ -256,6 +261,7 @@ export type Database = {
           email?: string | null
           id?: string
           logo_url?: string | null
+          media_server_ip?: string | null
           name?: string
           phone?: string | null
           razao_social?: string | null
