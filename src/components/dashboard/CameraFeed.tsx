@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Camera as CameraType, ANALYTIC_LABELS } from '@/types/monitoring';
-import { Video, VideoOff, Circle, Pencil, Trash2, Play, Square, Eye, Brain } from 'lucide-react';
+import { Video, VideoOff, Circle, Pencil, Trash2, Play, Square, Eye, Brain, Film } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import HlsPlayer from './HlsPlayer';
+import RecordingsViewer from '@/components/cameras/RecordingsViewer';
 
 interface CameraFeedProps {
   camera: CameraType;
@@ -22,6 +23,7 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
   const status = statusConfig[camera.status];
   const [isRecording, setIsRecording] = useState(camera.status === 'recording');
   const [isViewing, setIsViewing] = useState(false);
+  const [showRecordings, setShowRecordings] = useState(false);
 
   // Build HLS URL from stream info
   // MediaMTX serves HLS at http://<server>:8888/<path>/
@@ -90,6 +92,17 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
+                  onClick={() => setShowRecordings(true)}
+                  className="w-7 h-7 rounded flex items-center justify-center transition-colors bg-background/80 text-muted-foreground hover:text-foreground"
+                >
+                  <Film className="w-3 h-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Gravações</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
                   onClick={() => setIsRecording(!isRecording)}
                   className={`w-7 h-7 rounded flex items-center justify-center transition-colors ${isRecording ? 'bg-destructive/80 text-destructive-foreground' : 'bg-background/80 text-muted-foreground hover:text-foreground'}`}
                 >
@@ -148,6 +161,12 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
           </div>
         )}
       </div>
+
+      <RecordingsViewer
+        open={showRecordings}
+        onOpenChange={setShowRecordings}
+        camera={{ id: camera.id, name: camera.name, clientName: camera.clientName }}
+      />
     </div>
   );
 };

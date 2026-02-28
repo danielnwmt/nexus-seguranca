@@ -517,6 +517,66 @@ export type Database = {
           },
         ]
       }
+      recordings: {
+        Row: {
+          camera_id: string | null
+          camera_name: string | null
+          client_id: string | null
+          client_name: string | null
+          created_at: string
+          duration_seconds: number
+          end_time: string | null
+          file_path: string
+          file_size_mb: number
+          id: string
+          start_time: string
+          status: string
+        }
+        Insert: {
+          camera_id?: string | null
+          camera_name?: string | null
+          client_id?: string | null
+          client_name?: string | null
+          created_at?: string
+          duration_seconds?: number
+          end_time?: string | null
+          file_path?: string
+          file_size_mb?: number
+          id?: string
+          start_time?: string
+          status?: string
+        }
+        Update: {
+          camera_id?: string | null
+          camera_name?: string | null
+          client_id?: string | null
+          client_name?: string | null
+          created_at?: string
+          duration_seconds?: number
+          end_time?: string | null
+          file_path?: string
+          file_size_mb?: number
+          id?: string
+          start_time?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recordings_camera_id_fkey"
+            columns: ["camera_id"]
+            isOneToOne: false
+            referencedRelation: "cameras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recordings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_orders: {
         Row: {
           client_id: string | null
