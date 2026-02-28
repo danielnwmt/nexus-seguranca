@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Camera, Plus, Search, HardDrive, Calendar, Brain, Video } from 'lucide-react';
+import { Camera, Plus, Search, HardDrive, Calendar, Brain, Video, Key, Copy } from 'lucide-react';
 import CameraFeed from '@/components/dashboard/CameraFeed';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -7,9 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 import type { AnalyticType } from '@/types/monitoring';
 import { ANALYTIC_LABELS } from '@/types/monitoring';
 import { useTableQuery, usePaginatedQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
 
 const RETENTION_OPTIONS = [5, 10, 15, 20, 25, 30] as const;
 const ALL_ANALYTICS: AnalyticType[] = ['lpr', 'weapon_detection', 'line_crossing', 'area_intrusion', 'loitering', 'human_car_classification', 'fallen_person', 'people_counting', 'tampering'];
@@ -35,7 +38,10 @@ interface CameraForm {
 const emptyForm: CameraForm = { name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30', analytics: [], videoEncoding: 'H.264', maxBitrate: '4096', brand: '' };
 
 const Cameras = () => {
+  const { toast } = useToast();
   const { data: clients = [] } = useTableQuery('clients');
+  const { data: companySettings } = useCompanySettings();
+  const mediaServerIp = (companySettings as any)?.media_server_ip || '';
   const insertMutation = useInsertMutation('cameras');
   const updateMutation = useUpdateMutation('cameras');
   const deleteMutation = useDeleteMutation('cameras');
@@ -46,6 +52,7 @@ const Cameras = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newCamera, setNewCamera] = useState<CameraForm>({ ...emptyForm });
+  const [editingStreamKey, setEditingStreamKey] = useState<string>('');
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
 
@@ -66,6 +73,7 @@ const Cameras = () => {
   const resetForm = () => {
     setNewCamera({ ...emptyForm });
     setEditingId(null);
+    setEditingStreamKey('');
     setDialogOpen(false);
   };
 
@@ -103,6 +111,7 @@ const Cameras = () => {
 
   const handleEdit = (camera: any) => {
     setEditingId(camera.id);
+    setEditingStreamKey(camera.stream_key || '');
     setNewCamera({
       name: camera.name,
       streamUrl: camera.stream_url || '',
@@ -125,12 +134,16 @@ const Cameras = () => {
   // Map DB rows to CameraFeed expected format
   const mapCamera = (c: any) => {
     const client = clients.find((cl: any) => cl.id === c.client_id);
+    // Generate stream URL from media server IP + stream_key
+    const streamUrl = mediaServerIp && c.stream_key
+      ? `http://${mediaServerIp}:8888/${c.stream_key}/`
+      : c.stream_url || '';
     return {
       id: c.id,
       name: c.name,
       clientId: c.client_id || '',
       clientName: client?.name || 'Sem Cliente',
-      streamUrl: c.stream_url || '',
+      streamUrl,
       protocol: c.protocol || 'RTSP',
       status: c.status || 'online',
       location: c.location || '',
@@ -174,8 +187,47 @@ const Cameras = () => {
                 <Label className="text-xs text-muted-foreground">Nome</Label>
                 <Input value={newCamera.name} onChange={e => setNewCamera(p => ({ ...p, name: e.target.value }))} placeholder="CAM-10 Recepção" className="bg-muted border-border" />
               </div>
+              {/* Stream Key - auto-generated, shown after save */}
+              {editingId && editingStreamKey && (
+                <div className="bg-muted/50 rounded-lg p-3 border border-border space-y-2">
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1"><Key className="w-3 h-3" /> Stream Key (gerada automaticamente)</Label>
+                  <div className="flex gap-2">
+                    <Input value={editingStreamKey} readOnly className="bg-muted border-border font-mono text-xs" />
+                    <Button variant="outline" size="icon" className="shrink-0" onClick={() => { navigator.clipboard.writeText(editingStreamKey); toast({ title: 'Stream Key copiada!' }); }}>
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                  {mediaServerIp ? (
+                    <div className="space-y-1 pt-1">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px] shrink-0">RTMP</Badge>
+                        <code className="text-[11px] font-mono text-muted-foreground truncate">rtmp://{mediaServerIp}:1935/{editingStreamKey}</code>
+                        <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => { navigator.clipboard.writeText(`rtmp://${mediaServerIp}:1935/${editingStreamKey}`); toast({ title: 'URL RTMP copiada!' }); }}>
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px] shrink-0">HLS</Badge>
+                        <code className="text-[11px] font-mono text-muted-foreground truncate">http://{mediaServerIp}:8888/{editingStreamKey}/</code>
+                        <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => { navigator.clipboard.writeText(`http://${mediaServerIp}:8888/${editingStreamKey}/`); toast({ title: 'URL HLS copiada!' }); }}>
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-destructive">⚠️ Configure o IP do servidor de mídia em Configurações → Servidores para gerar os links.</p>
+                  )}
+                </div>
+              )}
+              {!editingId && (
+                <div className="bg-muted/30 rounded-lg p-3 border border-dashed border-border">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Key className="w-3 h-3" /> A Stream Key será gerada automaticamente ao salvar a câmera.
+                  </p>
+                </div>
+              )}
               <div>
-                <Label className="text-xs text-muted-foreground">URL do Stream</Label>
+                <Label className="text-xs text-muted-foreground">URL do Stream (opcional, override manual)</Label>
                 <Input value={newCamera.streamUrl} onChange={e => setNewCamera(p => ({ ...p, streamUrl: e.target.value }))} placeholder="rtsp://192.168.1.100:554/stream1" className="bg-muted border-border font-mono text-xs" />
               </div>
               <div className="grid grid-cols-2 gap-3">

@@ -9,6 +9,7 @@ export interface CompanySettings {
   phone: string | null;
   email: string | null;
   logo_url: string | null;
+  media_server_ip: string | null;
 }
 
 export function useCompanySettings() {
