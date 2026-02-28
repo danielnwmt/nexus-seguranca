@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Camera as CameraType, ANALYTIC_LABELS } from '@/types/monitoring';
-import { Video, VideoOff, Circle, Pencil, Trash2, Play, Square, Eye, Brain, Film } from 'lucide-react';
+import { Video, VideoOff, Circle, Pencil, Trash2, Play, Square, Eye, Brain, Film, ScanEye, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import HlsPlayer from './HlsPlayer';
 import RecordingsViewer from '@/components/cameras/RecordingsViewer';
+import { useAnalyzeCamera } from '@/hooks/useAnalyzeCamera';
 
 interface CameraFeedProps {
   camera: CameraType;
@@ -24,6 +25,22 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
   const [isRecording, setIsRecording] = useState(camera.status === 'recording');
   const [isViewing, setIsViewing] = useState(false);
   const [showRecordings, setShowRecordings] = useState(false);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const { analyzing, analyzeFromCanvas } = useAnalyzeCamera();
+  const isAnalyzing = analyzing === camera.id;
+
+  const handleAnalyze = async () => {
+    if (!videoContainerRef.current) return;
+    const videoEl = videoContainerRef.current.querySelector('video');
+    if (!videoEl) return;
+    await analyzeFromCanvas(videoEl, {
+      id: camera.id,
+      name: camera.name,
+      clientId: camera.clientId,
+      clientName: camera.clientName,
+      analytics: camera.analytics || [],
+    });
+  };
 
   // Build HLS URL from stream info
   // MediaMTX serves HLS at http://<server>:8888/<path>/
@@ -52,7 +69,7 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
   return (
     <div className="rounded-lg border border-camera-border bg-camera-bg overflow-hidden group">
       {/* Video feed */}
-      <div className={`relative bg-camera-bg flex items-center justify-center ${compact ? 'h-32' : 'h-48'}`}>
+      <div ref={videoContainerRef} className={`relative bg-camera-bg flex items-center justify-center ${compact ? 'h-32' : 'h-48'}`}>
         {camera.status === 'offline' ? (
           <div className="flex flex-col items-center gap-2 text-muted-foreground">
             <VideoOff className="w-8 h-8" />
@@ -89,6 +106,21 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
         {/* Control buttons */}
         {camera.status !== 'offline' && (
           <div className="absolute bottom-2 right-2 flex items-center gap-1">
+            {/* AI Analyze - only if analytics enabled and viewing */}
+            {isViewing && camera.analytics && camera.analytics.length > 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleAnalyze}
+                    disabled={isAnalyzing}
+                    className={`w-7 h-7 rounded flex items-center justify-center transition-colors ${isAnalyzing ? 'bg-primary/80 text-primary-foreground animate-pulse' : 'bg-background/80 text-muted-foreground hover:text-primary'}`}
+                  >
+                    {isAnalyzing ? <Loader2 className="w-3 h-3 animate-spin" /> : <ScanEye className="w-3 h-3" />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{isAnalyzing ? 'Analisando...' : 'Analisar com IA'}</TooltipContent>
+              </Tooltip>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
