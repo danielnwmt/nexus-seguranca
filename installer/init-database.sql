@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS public.bills (
 
 CREATE TABLE IF NOT EXISTS public.company_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT DEFAULT 'Protenexus Monitoramento',
+  name TEXT DEFAULT 'Nexus Segurança',
   razao_social TEXT,
   cnpj TEXT,
   email TEXT,
@@ -307,7 +307,7 @@ GRANT SELECT ON auth.users TO authenticated;
 
 -- 9. Dados iniciais
 INSERT INTO public.company_settings (name) 
-VALUES ('Protenexus Monitoramento')
+VALUES ('Nexus Segurança')
 ON CONFLICT DO NOTHING;
 
 -- 10. Usuario administrador padrao (admin@protenexus.com / 1234)
