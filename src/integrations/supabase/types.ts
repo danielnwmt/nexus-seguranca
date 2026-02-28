@@ -170,6 +170,7 @@ export type Database = {
           protocol: string
           resolution: string | null
           retention_days: number
+          snapshot_url: string | null
           status: string
           storage_path: string | null
           stream_key: string
@@ -189,6 +190,7 @@ export type Database = {
           protocol?: string
           resolution?: string | null
           retention_days?: number
+          snapshot_url?: string | null
           status?: string
           storage_path?: string | null
           stream_key?: string
@@ -208,6 +210,7 @@ export type Database = {
           protocol?: string
           resolution?: string | null
           retention_days?: number
+          snapshot_url?: string | null
           status?: string
           storage_path?: string | null
           stream_key?: string
