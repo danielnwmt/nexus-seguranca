@@ -1,5 +1,5 @@
 # ============================================================
-#  Bravo Monitoramento — Instalador Online Windows (One-Liner)
+#  Nexus Monitoramento — Instalador Online Windows (One-Liner)
 #
 #  USO (PowerShell como Administrador):
 #    Set-ExecutionPolicy Bypass -Scope Process -Force; iwr -useb https://raw.githubusercontent.com/danielnwmt/bravo-seguran-a/main/installer/install-online.ps1 | iex
@@ -12,11 +12,11 @@ $ProgressPreference = "SilentlyContinue"
 
 $RepoUrl = if ($env:REPO_URL) { $env:REPO_URL } else { "https://github.com/danielnwmt/bravo-seguran-a" }
 $Branch = if ($env:BRANCH) { $env:BRANCH } else { "main" }
-$InstallDir = if ($env:INSTALL_DIR) { $env:INSTALL_DIR } else { "C:\BravoMonitoramento" }
+$InstallDir = if ($env:INSTALL_DIR) { $env:INSTALL_DIR } else { "C:\NexusMonitoramento" }
 
 Write-Host ""
 Write-Host "=============================================" -ForegroundColor DarkCyan
-Write-Host "   BRAVO MONITORAMENTO — Instalador Online" -ForegroundColor White
+Write-Host "   NEXUS MONITORAMENTO — Instalador Online" -ForegroundColor White
 Write-Host "   Instalacao automatica via GitHub" -ForegroundColor Gray
 Write-Host "=============================================" -ForegroundColor DarkCyan
 Write-Host ""

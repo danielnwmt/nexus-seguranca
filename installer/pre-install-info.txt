@@ -1,9 +1,9 @@
-BRAVO MONITORAMENTO - Informacoes de Instalacao
+NEXUS MONITORAMENTO - Informacoes de Instalacao
 ================================================
 
 Este instalador ira configurar o sistema completo SEM DOCKER:
 
-  1. Copiar arquivos do sistema para C:\BravoMonitoramento
+  1. Copiar arquivos do sistema para C:\NexusMonitoramento
   2. Executar o script de configuracao automatica que:
      - Instala Node.js (se necessario)
      - Instala PostgreSQL 16 (se necessario)
@@ -26,8 +26,8 @@ PORTAS UTILIZADAS:
   - 8001  : Auth Server
 
 ATUALIZACOES:
-  - Conecte ao GitHub e execute atualizar-bravo.bat
+  - Conecte ao GitHub e execute atualizar-nexus.bat
   - Ou substitua os arquivos e execute npm run build
 
 Apos a instalacao, acesse: http://localhost
-Login padrao: admin@bravo.com / admin123
+Login padrao: admin@protenexus.com / 1234

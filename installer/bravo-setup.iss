@@ -1,20 +1,20 @@
 ; ============================================================
-;  Bravo Monitoramento - Inno Setup Installer Script
+;  Nexus Monitoramento - Inno Setup Installer Script
 ;  PostgreSQL + PostgREST + Auth Server + Frontend
 ;  Inno Setup 6.x
 ; ============================================================
 
 [Setup]
 AppId={{B7A4C3E1-9F2D-4A8B-B5C6-1D3E5F7A9B2C}
-AppName=Bravo Monitoramento
+AppName=Nexus Monitoramento
 AppVersion=1.0.0
-AppPublisher=Bravo Seguranca
+AppPublisher=Nexus Seguranca
 AppPublisherURL=http://localhost
-DefaultDirName=C:\BravoMonitoramento
-DefaultGroupName=Bravo Monitoramento
+DefaultDirName=C:\NexusMonitoramento
+DefaultGroupName=Nexus Monitoramento
 DisableProgramGroupPage=yes
 OutputDir=output
-OutputBaseFilename=BravoMonitoramento-Setup
+OutputBaseFilename=NexusMonitoramento-Setup
 Compression=lzma
 SolidCompression=yes
 PrivilegesRequired=admin
@@ -24,18 +24,18 @@ InfoBeforeFile=pre-install-info.txt
 Source: "..\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "node_modules,\.git,dist,\.lovable,postgrest,auth-server"
 
 [Icons]
-Name: "{group}\Bravo Monitoramento"; Filename: "http://localhost:80"
-Name: "{group}\Iniciar Servidor"; Filename: "{app}\iniciar-bravo.bat"
-Name: "{group}\Atualizar Sistema"; Filename: "{app}\atualizar-bravo.bat"
-Name: "{commondesktop}\Bravo Monitoramento"; Filename: "http://localhost:80"; Tasks: desktopicon
-Name: "{commondesktop}\Iniciar Bravo"; Filename: "{app}\iniciar-bravo.bat"; Tasks: desktopicon
+Name: "{group}\Nexus Monitoramento"; Filename: "http://localhost:80"
+Name: "{group}\Iniciar Servidor"; Filename: "{app}\iniciar-nexus.bat"
+Name: "{group}\Atualizar Sistema"; Filename: "{app}\atualizar-nexus.bat"
+Name: "{commondesktop}\Nexus Monitoramento"; Filename: "http://localhost:80"; Tasks: desktopicon
+Name: "{commondesktop}\Iniciar Nexus"; Filename: "{app}\iniciar-nexus.bat"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "Criar atalho na Area de Trabalho"; Flags: unchecked
 
 [Run]
 Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\install-windows.ps1"""; Description: "Instalar e configurar sistema (PostgreSQL + PostgREST)"; Flags: postinstall runascurrentuser waituntilterminated
-Filename: "http://localhost:80"; Description: "Abrir Bravo Monitoramento"; Flags: postinstall nowait shellexec skipifsilent
+Filename: "http://localhost:80"; Description: "Abrir Nexus Monitoramento"; Flags: postinstall nowait shellexec skipifsilent
 
 [UninstallRun]
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\desinstalar-bravo.ps1"""; Flags: runascurrentuser waituntilterminated
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{app}\desinstalar-nexus.ps1"""; Flags: runascurrentuser waituntilterminated

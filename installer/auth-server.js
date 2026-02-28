@@ -1,5 +1,5 @@
 /**
- * Bravo Monitoramento - Auth Server
+ * Nexus Monitoramento - Auth Server
  * Servidor de autenticação compatível com Supabase JS Client
  * Roda junto com PostgREST para fornecer auth + REST API
  */
@@ -10,13 +10,13 @@ const crypto = require('crypto');
 
 // Configuração
 const PORT = 8001;
-const JWT_SECRET = 'bravo-monitoramento-jwt-secret-key-2024-super-seguro';
+const JWT_SECRET = 'nexus-monitoramento-jwt-secret-key-2024-super-seguro';
 const POSTGREST_URL = 'http://127.0.0.1:3000';
 
 const pool = new Pool({
   host: 'localhost',
   port: 5432,
-  database: 'bravo',
+  database: 'nexus',
   user: 'postgres',
   password: '' // Definido pelo instalador
 });
@@ -224,7 +224,7 @@ const server = http.createServer(async (req, res) => {
       if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
 
       const { execSync } = require('child_process');
-      const INSTALL_DIR = process.env.INSTALL_DIR || '/opt/bravo-monitoramento';
+      const INSTALL_DIR = process.env.INSTALL_DIR || '/opt/nexus-monitoramento';
 
       try {
         // Git pull
@@ -262,7 +262,7 @@ const server = http.createServer(async (req, res) => {
     // GET /api/system/version
     if (path === '/api/system/version' && req.method === 'GET') {
       const { execSync } = require('child_process');
-      const INSTALL_DIR = process.env.INSTALL_DIR || '/opt/bravo-monitoramento';
+      const INSTALL_DIR = process.env.INSTALL_DIR || '/opt/nexus-monitoramento';
       
       try {
         const commitHash = execSync(`cd ${INSTALL_DIR} && git rev-parse --short HEAD 2>/dev/null`).toString().trim();
@@ -298,6 +298,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Bravo Auth + API Gateway rodando em http://localhost:${PORT}`);
+  console.log(`Nexus Auth + API Gateway rodando em http://localhost:${PORT}`);
   console.log(`PostgREST em ${POSTGREST_URL}`);
 });

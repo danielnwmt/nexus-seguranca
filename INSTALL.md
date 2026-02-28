@@ -1,4 +1,4 @@
-# Manual de Instalação — Bravo Monitoramento
+# Manual de Instalação — Nexus Monitoramento
 
 ## 🚀 Instalação Rápida (Ubuntu - Uma Linha!)
 
@@ -24,7 +24,7 @@ curl -fsSL URL_DO_SCRIPT | sudo REPO_URL="https://github.com/user/repo" bash
 
 ### Pelo terminal:
 ```bash
-bash /opt/bravo-monitoramento/atualizar-bravo.sh
+bash /opt/nexus-monitoramento/atualizar-nexus.sh
 ```
 
 ---
@@ -61,11 +61,11 @@ bash /opt/bravo-monitoramento/atualizar-bravo.sh
 
 ```powershell
 # Opção A — Via Git (recomendado para atualizações futuras)
-git clone https://github.com/seu-usuario/bravo-monitoramento.git C:\BravoMonitoramento
-cd C:\BravoMonitoramento
+git clone https://github.com/seu-usuario/nexus-monitoramento.git C:\NexusMonitoramento
+cd C:\NexusMonitoramento
 
 # Opção B — Baixar ZIP
-# Extraia o ZIP em C:\BravoMonitoramento
+# Extraia o ZIP em C:\NexusMonitoramento
 ```
 
 ### 2️⃣ Executar o Instalador Automático
@@ -73,7 +73,7 @@ cd C:\BravoMonitoramento
 Abra o **PowerShell como Administrador** e execute:
 
 ```powershell
-cd C:\BravoMonitoramento
+cd C:\NexusMonitoramento
 powershell -ExecutionPolicy Bypass -File install-windows.ps1
 ```
 
@@ -81,7 +81,7 @@ O script faz **tudo automaticamente**:
 
 1. ✅ Instala **Node.js** (se não encontrado)
 2. ✅ Instala **PostgreSQL 16** silenciosamente (se não encontrado)
-3. ✅ Cria o banco de dados `bravo` com todas as tabelas
+3. ✅ Cria o banco de dados `nexus` com todas as tabelas
 4. ✅ Baixa e configura o **PostgREST** (API REST)
 5. ✅ Configura o **Auth Server** (autenticação JWT)
 6. ✅ Instala dependências e faz o **build do frontend**
@@ -94,8 +94,8 @@ Após a instalação, acesse: **http://localhost**
 
 | Campo | Valor |
 |-------|-------|
-| Email | `admin@bravo.com` |
-| Senha | `admin123` |
+| Email | `admin@protenexus.com` |
+| Senha | `1234` |
 
 > ⚠️ **Troque a senha do admin imediatamente após o primeiro login!**
 
@@ -105,7 +105,7 @@ Após a instalação, acesse: **http://localhost**
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File install-windows.ps1 `
-  -InstallDir "D:\BravoMonitoramento" `
+  -InstallDir "D:\NexusMonitoramento" `
   -Port 8080 `
   -ApiPort 8001 `
   -PostgRESTPort 3000 `
@@ -121,9 +121,9 @@ powershell -ExecutionPolicy Bypass -File install-windows.ps1 `
 Para gerar o instalador `.exe`:
 
 1. Instale o [Inno Setup 6](https://jrsoftware.org/isdl.php)
-2. Abra `installer/bravo-setup.iss`
+2. Abra `installer/nexus-setup.iss`
 3. Compile (Ctrl+F9)
-4. O arquivo `BravoMonitoramento-Setup.exe` será gerado em `installer/output/`
+4. O arquivo `NexusMonitoramento-Setup.exe` será gerado em `installer/output/`
 
 ---
 
@@ -132,9 +132,9 @@ Para gerar o instalador `.exe`:
 ### Via Script (recomendado)
 
 ```powershell
-# Clique duplo em "atualizar-bravo.bat" ou execute:
-cd C:\BravoMonitoramento
-atualizar-bravo.bat
+# Clique duplo em "atualizar-nexus.bat" ou execute:
+cd C:\NexusMonitoramento
+atualizar-nexus.bat
 ```
 
 O script faz:
@@ -148,7 +148,7 @@ O script faz:
 
 1. Conecte ao GitHub em **Configurações → Git**
 2. Faça push do código do Lovable
-3. Na máquina Windows, execute `atualizar-bravo.bat`
+3. Na máquina Windows, execute `atualizar-nexus.bat`
 
 ---
 
@@ -157,7 +157,7 @@ O script faz:
 ### Configuração Automática
 
 O instalador cria automaticamente:
-- 📁 Pasta `C:\BravoMonitoramento\Gravacoes`
+- 📁 Pasta `C:\NexusMonitoramento\Gravacoes`
 - 🖥️ Servidor local registrado no banco com o IP da máquina
 - 📂 Estrutura modelo de subpastas
 
@@ -177,7 +177,7 @@ O instalador cria automaticamente:
 O sistema organiza as gravações automaticamente:
 
 ```
-C:\BravoMonitoramento\Gravacoes\
+C:\NexusMonitoramento\Gravacoes\
 ├── cliente-joao\
 │   ├── CAM01\
 │   │   ├── 2026-02-26\
@@ -197,7 +197,7 @@ C:\BravoMonitoramento\Gravacoes\
 Para usar outro disco (ex: `D:\`), passe o parâmetro na instalação:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File install-windows.ps1 -InstallDir "D:\BravoMonitoramento"
+powershell -ExecutionPolicy Bypass -File install-windows.ps1 -InstallDir "D:\NexusMonitoramento"
 ```
 
 Ou altere manualmente em **Configurações → Servidores** após a instalação.
@@ -210,36 +210,36 @@ Ou altere manualmente em **Configurações → Servidores** após a instalação
 
 ```powershell
 # Iniciar tudo
-C:\BravoMonitoramento\iniciar-bravo.bat
+C:\NexusMonitoramento\iniciar-nexus.bat
 
 # Parar tudo
-C:\BravoMonitoramento\parar-bravo.bat
+C:\NexusMonitoramento\parar-nexus.bat
 ```
 
 ### Via Serviços Windows (se NSSM instalado)
 
 ```powershell
 # Ver status
-Get-Service Bravo*
+Get-Service Nexus*
 
 # Reiniciar
-Restart-Service BravoPostgREST
-Restart-Service BravoAuthServer
-Restart-Service BravoFrontend
+Restart-Service NexusPostgREST
+Restart-Service NexusAuthServer
+Restart-Service NexusFrontend
 ```
 
 ### Backup do Banco
 
 ```powershell
 $pgBin = "C:\Program Files\PostgreSQL\16\bin"
-$env:PGPASSWORD = "BravoDb2024!"
-& "$pgBin\pg_dump.exe" -h localhost -U postgres bravo > "backup_$(Get-Date -Format 'yyyy-MM-dd').sql"
+$env:PGPASSWORD = "NexusDb2024!"
+& "$pgBin\pg_dump.exe" -h localhost -U postgres nexus > "backup_$(Get-Date -Format 'yyyy-MM-dd').sql"
 ```
 
 ### Restaurar Backup
 
 ```powershell
-& "$pgBin\psql.exe" -h localhost -U postgres -d bravo -f "backup_2026-02-26.sql"
+& "$pgBin\psql.exe" -h localhost -U postgres -d nexus -f "backup_2026-02-26.sql"
 ```
 
 ---
@@ -259,8 +259,8 @@ $env:PGPASSWORD = "BravoDb2024!"
 
 ```bash
 # 1. Baixar o projeto
-git clone https://github.com/seu-usuario/bravo-monitoramento.git /opt/bravo-monitoramento
-cd /opt/bravo-monitoramento
+git clone https://github.com/seu-usuario/nexus-monitoramento.git /opt/nexus-monitoramento
+cd /opt/nexus-monitoramento
 
 # 2. Executar o instalador
 sudo bash install-ubuntu.sh
@@ -271,7 +271,7 @@ O script instala **tudo automaticamente**: PostgreSQL 16, Node.js 20, PostgREST,
 ### Parâmetros Opcionais
 
 ```bash
-sudo INSTALL_DIR="/srv/bravo" \
+sudo INSTALL_DIR="/srv/nexus" \
      PORT=8080 \
      API_PORT=8001 \
      PG_PASSWORD="SenhaForte123!" \
@@ -284,12 +284,12 @@ sudo INSTALL_DIR="/srv/bravo" \
 
 ```bash
 # Ver status de tudo
-sudo bash /opt/bravo-monitoramento/status-bravo.sh
+sudo bash /opt/nexus-monitoramento/status-nexus.sh
 
 # Controle individual
-sudo systemctl status bravo-postgrest
-sudo systemctl status bravo-auth
-sudo systemctl status bravo-mediamtx
+sudo systemctl status nexus-postgrest
+sudo systemctl status nexus-auth
+sudo systemctl status nexus-mediamtx
 sudo systemctl restart nginx
 ```
 
@@ -306,7 +306,7 @@ ffmpeg -re -i video.mp4 -c copy -f flv rtmp://localhost:1935/cam01
 ### Desinstalar
 
 ```bash
-sudo bash desinstalar-bravo.sh
+sudo bash desinstalar-nexus.sh
 ```
 
 ---
@@ -327,7 +327,7 @@ sudo bash desinstalar-bravo.sh
 ## 🗑️ Desinstalar
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File desinstalar-bravo.ps1
+powershell -ExecutionPolicy Bypass -File desinstalar-nexus.ps1
 ```
 
 Remove serviços, atalhos e arquivos do sistema.

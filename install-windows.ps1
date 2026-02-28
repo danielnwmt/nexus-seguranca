@@ -1,6 +1,6 @@
 #Requires -RunAsAdministrator
 # ============================================================
-#  Bravo Monitoramento — Instalador Completo Windows
+#  Nexus Monitoramento — Instalador Completo Windows
 #  Instala: PostgreSQL + PostgREST + Auth Server + Frontend
 #  SEM Docker! Tudo nativo.
 #  Execute como Administrador:
@@ -8,14 +8,14 @@
 # ============================================================
 
 param(
-    [string]$InstallDir = "C:\BravoMonitoramento",
+    [string]$InstallDir = "C:\NexusMonitoramento",
     [int]$Port = 80,
     [int]$ApiPort = 8001,
     [int]$PostgRESTPort = 3000,
-    [string]$PgPassword = "BravoDb2024!",
-    [string]$JwtSecret = "bravo-monitoramento-jwt-secret-key-2024-super-seguro",
-    [string]$AdminEmail = "admin@bravo.com",
-    [string]$AdminPassword = "admin123"
+    [string]$PgPassword = "NexusDb2024!",
+    [string]$JwtSecret = "nexus-monitoramento-jwt-secret-key-2024-super-seguro",
+    [string]$AdminEmail = "admin@protenexus.com",
+    [string]$AdminPassword = "1234"
 )
 
 $ErrorActionPreference = "Stop"
@@ -29,7 +29,7 @@ function Write-Err($msg)  { Write-Host "  [X] $msg" -ForegroundColor Red }
 
 Write-Host ""
 Write-Host "=============================================" -ForegroundColor DarkCyan
-Write-Host "   BRAVO MONITORAMENTO — Instalador Windows" -ForegroundColor White
+Write-Host "   NEXUS MONITORAMENTO — Instalador Windows" -ForegroundColor White
 Write-Host "   PostgreSQL + PostgREST + Frontend" -ForegroundColor Gray
 Write-Host "   (Sem Docker!)" -ForegroundColor Gray
 Write-Host "=============================================" -ForegroundColor DarkCyan
@@ -157,12 +157,12 @@ Write-Step "Configurando banco de dados..."
 $env:PGPASSWORD = $PgPassword
 
 # Criar banco
-$dbExists = & $psqlPath -h localhost -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='bravo'" 2>$null
+$dbExists = & $psqlPath -h localhost -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='nexus'" 2>$null
 if ($dbExists -match "1") {
-    Write-Ok "Banco 'bravo' ja existe"
+    Write-Ok "Banco 'nexus' ja existe"
 } else {
-    & $psqlPath -h localhost -U postgres -c "CREATE DATABASE bravo;" 2>$null
-    Write-Ok "Banco 'bravo' criado"
+    & $psqlPath -h localhost -U postgres -c "CREATE DATABASE nexus;" 2>$null
+    Write-Ok "Banco 'nexus' criado"
 }
 
 # Executar script de inicializacao
@@ -174,7 +174,7 @@ if (!(Test-Path $sqlFile)) {
 
 if (Test-Path $sqlFile) {
     Write-Host "  Executando script de inicializacao..." -ForegroundColor Gray
-    & $psqlPath -h localhost -U postgres -d bravo -f $sqlFile 2>&1 | Out-Null
+    & $psqlPath -h localhost -U postgres -d nexus -f $sqlFile 2>&1 | Out-Null
     Write-Ok "Tabelas e funcoes criadas"
 } else {
     Write-Err "Arquivo init-database.sql nao encontrado em: $sqlFile"
@@ -188,7 +188,7 @@ INSERT INTO auth.users (email, encrypted_password)
 VALUES ('$AdminEmail', crypt('$AdminPassword', gen_salt('bf')))
 ON CONFLICT (email) DO NOTHING;
 "@
-& $psqlPath -h localhost -U postgres -d bravo -c $createAdmin 2>&1 | Out-Null
+& $psqlPath -h localhost -U postgres -d nexus -c $createAdmin 2>&1 | Out-Null
 Write-Ok "Usuario admin criado: $AdminEmail"
 
 # ----------------------------------------------------------
@@ -215,7 +215,7 @@ VALUES ('Servidor Local', '$localIP', '$($storagePath -replace "\\", "\\")',
 ON CONFLICT DO NOTHING;
 "@
 try {
-    & $psqlPath -h localhost -U postgres -d bravo -c $createServer 2>&1 | Out-Null
+    & $psqlPath -h localhost -U postgres -d nexus -c $createServer 2>&1 | Out-Null
     Write-Ok "Servidor de gravacao registrado no banco (IP: $localIP)"
 } catch {
     Write-Warn "Nao foi possivel registrar servidor automaticamente"
@@ -264,7 +264,7 @@ if (Test-Path $postgrestExe) {
 
 # Criar config do PostgREST
 $postgrestConf = @"
-db-uri = "postgres://authenticator:bravo_auth_2024@localhost:5432/bravo"
+db-uri = "postgres://authenticator:nexus_auth_2024@localhost:5432/nexus"
 db-schemas = "public"
 db-anon-role = "anon"
 db-pool = 10
@@ -276,7 +276,7 @@ Set-Content -Path "$postgrestDir\postgrest.conf" -Value $postgrestConf -Encoding
 Write-Ok "Configuracao PostgREST criada"
 
 # Definir senha do role authenticator
-& $psqlPath -h localhost -U postgres -d bravo -c "ALTER ROLE authenticator WITH PASSWORD 'bravo_auth_2024';" 2>&1 | Out-Null
+& $psqlPath -h localhost -U postgres -d nexus -c "ALTER ROLE authenticator WITH PASSWORD 'nexus_auth_2024';" 2>&1 | Out-Null
 
 # ----------------------------------------------------------
 # 5. Configurar Auth Server (Node.js)
@@ -420,10 +420,10 @@ Write-Step "Criando scripts de inicializacao..."
 
 $startAll = @"
 @echo off
-title Bravo Monitoramento
+title Nexus Monitoramento
 echo.
 echo =============================================
-echo   BRAVO MONITORAMENTO - Iniciando...
+echo   NEXUS MONITORAMENTO - Iniciando...
 echo =============================================
 echo.
 
@@ -461,7 +461,7 @@ serve -s dist -l $Port
 
 $stopAll = @"
 @echo off
-echo Parando Bravo Monitoramento...
+echo Parando Nexus Monitoramento...
 taskkill /f /im postgrest.exe 2>nul
 taskkill /f /im mediamtx.exe 2>nul
 taskkill /f /fi "WINDOWTITLE eq AuthServer*" 2>nul
@@ -469,9 +469,9 @@ echo Servidor parado.
 pause
 "@
 
-Set-Content -Path "$InstallDir\iniciar-bravo.bat" -Value $startAll -Encoding ASCII
-Set-Content -Path "$InstallDir\parar-bravo.bat" -Value $stopAll -Encoding ASCII
-Write-Ok "Scripts criados: iniciar-bravo.bat / parar-bravo.bat"
+Set-Content -Path "$InstallDir\iniciar-nexus.bat" -Value $startAll -Encoding ASCII
+Set-Content -Path "$InstallDir\parar-nexus.bat" -Value $stopAll -Encoding ASCII
+Write-Ok "Scripts criados: iniciar-nexus.bat / parar-nexus.bat"
 
 # ----------------------------------------------------------
 # 11. Script de atualizacao
@@ -480,10 +480,10 @@ Write-Step "Criando script de atualizacao..."
 
 $updateScript = @"
 @echo off
-title Bravo Monitoramento - Atualizacao
+title Nexus Monitoramento - Atualizacao
 echo.
 echo =============================================
-echo   BRAVO MONITORAMENTO - Atualizacao
+echo   NEXUS MONITORAMENTO - Atualizacao
 echo =============================================
 echo.
 echo Parando servicos...
@@ -507,13 +507,13 @@ call npm run build
 echo.
 echo =============================================
 echo   ATUALIZACAO CONCLUIDA!
-echo   Execute iniciar-bravo.bat para iniciar.
+echo   Execute iniciar-nexus.bat para iniciar.
 echo =============================================
 pause
 "@
 
-Set-Content -Path "$InstallDir\atualizar-bravo.bat" -Value $updateScript -Encoding ASCII
-Write-Ok "Script de atualizacao criado: atualizar-bravo.bat"
+Set-Content -Path "$InstallDir\atualizar-nexus.bat" -Value $updateScript -Encoding ASCII
+Write-Ok "Script de atualizacao criado: atualizar-nexus.bat"
 
 # ----------------------------------------------------------
 # 12. Servico Windows (NSSM)
@@ -525,45 +525,45 @@ try { $nssmPath = (Get-Command nssm -ErrorAction SilentlyContinue).Source } catc
 
 if ($nssmPath) {
     # PostgREST como servico
-    nssm stop BravoPostgREST 2>$null
-    nssm remove BravoPostgREST confirm 2>$null
-    nssm install BravoPostgREST $postgrestExe "$postgrestDir\postgrest.conf"
-    nssm set BravoPostgREST DisplayName "Bravo - PostgREST"
-    nssm set BravoPostgREST Start SERVICE_AUTO_START
-    nssm start BravoPostgREST
+    nssm stop NexusPostgREST 2>$null
+    nssm remove NexusPostgREST confirm 2>$null
+    nssm install NexusPostgREST $postgrestExe "$postgrestDir\postgrest.conf"
+    nssm set NexusPostgREST DisplayName "Nexus - PostgREST"
+    nssm set NexusPostgREST Start SERVICE_AUTO_START
+    nssm start NexusPostgREST
 
     # Auth Server como servico
     $nodePath = (Get-Command node).Source
-    nssm stop BravoAuthServer 2>$null
-    nssm remove BravoAuthServer confirm 2>$null
-    nssm install BravoAuthServer $nodePath "$authServerDir\server.js"
-    nssm set BravoAuthServer AppDirectory $authServerDir
-    nssm set BravoAuthServer DisplayName "Bravo - Auth Server"
-    nssm set BravoAuthServer Start SERVICE_AUTO_START
-    nssm start BravoAuthServer
+    nssm stop NexusAuthServer 2>$null
+    nssm remove NexusAuthServer confirm 2>$null
+    nssm install NexusAuthServer $nodePath "$authServerDir\server.js"
+    nssm set NexusAuthServer AppDirectory $authServerDir
+    nssm set NexusAuthServer DisplayName "Nexus - Auth Server"
+    nssm set NexusAuthServer Start SERVICE_AUTO_START
+    nssm start NexusAuthServer
 
     # MediaMTX como servico
-    nssm stop BravoMediaMTX 2>$null
-    nssm remove BravoMediaMTX confirm 2>$null
-    nssm install BravoMediaMTX $mediamtxExe "$mediamtxDir\mediamtx.yml"
-    nssm set BravoMediaMTX AppDirectory $mediamtxDir
-    nssm set BravoMediaMTX DisplayName "Bravo - MediaMTX (Servidor de Midia)"
-    nssm set BravoMediaMTX Start SERVICE_AUTO_START
-    nssm start BravoMediaMTX
+    nssm stop NexusMediaMTX 2>$null
+    nssm remove NexusMediaMTX confirm 2>$null
+    nssm install NexusMediaMTX $mediamtxExe "$mediamtxDir\mediamtx.yml"
+    nssm set NexusMediaMTX AppDirectory $mediamtxDir
+    nssm set NexusMediaMTX DisplayName "Nexus - MediaMTX (Servidor de Midia)"
+    nssm set NexusMediaMTX Start SERVICE_AUTO_START
+    nssm start NexusMediaMTX
 
     # Frontend como servico
     $servePath = (Get-Command serve).Source
-    nssm stop BravoFrontend 2>$null
-    nssm remove BravoFrontend confirm 2>$null
-    nssm install BravoFrontend $servePath "-s dist -l $Port"
-    nssm set BravoFrontend AppDirectory $InstallDir
-    nssm set BravoFrontend DisplayName "Bravo - Frontend"
-    nssm set BravoFrontend Start SERVICE_AUTO_START
-    nssm start BravoFrontend
+    nssm stop NexusFrontend 2>$null
+    nssm remove NexusFrontend confirm 2>$null
+    nssm install NexusFrontend $servePath "-s dist -l $Port"
+    nssm set NexusFrontend AppDirectory $InstallDir
+    nssm set NexusFrontend DisplayName "Nexus - Frontend"
+    nssm set NexusFrontend Start SERVICE_AUTO_START
+    nssm start NexusFrontend
 
     Write-Ok "4 servicos Windows criados (inicio automatico)"
 } else {
-    Write-Warn "NSSM nao encontrado — use 'iniciar-bravo.bat' para iniciar manualmente"
+    Write-Warn "NSSM nao encontrado — use 'iniciar-nexus.bat' para iniciar manualmente"
     Write-Host "  Para servico automatico, instale NSSM: https://nssm.cc/download" -ForegroundColor Gray
 }
 
@@ -575,15 +575,15 @@ Write-Step "Criando atalhos..."
 $desktopPath = [Environment]::GetFolderPath("Desktop")
 
 $shell = New-Object -ComObject WScript.Shell
-$shortcut = $shell.CreateShortcut("$desktopPath\Bravo Monitoramento.lnk")
+$shortcut = $shell.CreateShortcut("$desktopPath\Nexus Monitoramento.lnk")
 $shortcut.TargetPath = "http://localhost:$Port"
-$shortcut.Description = "Abrir Bravo Monitoramento"
+$shortcut.Description = "Abrir Nexus Monitoramento"
 $shortcut.Save()
 
-$shortcut2 = $shell.CreateShortcut("$desktopPath\Iniciar Bravo.lnk")
-$shortcut2.TargetPath = "$InstallDir\iniciar-bravo.bat"
+$shortcut2 = $shell.CreateShortcut("$desktopPath\Iniciar Nexus.lnk")
+$shortcut2.TargetPath = "$InstallDir\iniciar-nexus.bat"
 $shortcut2.WorkingDirectory = $InstallDir
-$shortcut2.Description = "Iniciar todos os servicos do Bravo"
+$shortcut2.Description = "Iniciar todos os servicos do Nexus"
 $shortcut2.Save()
 
 Write-Ok "Atalhos criados na Area de Trabalho"
@@ -617,13 +617,13 @@ Write-Host "  Email:  $AdminEmail" -ForegroundColor White
 Write-Host "  Senha:  $AdminPassword" -ForegroundColor White
 Write-Host ""
 Write-Host "  SCRIPTS:" -ForegroundColor Cyan
-Write-Host "  Iniciar:    iniciar-bravo.bat" -ForegroundColor Gray
-Write-Host "  Parar:      parar-bravo.bat" -ForegroundColor Gray
-Write-Host "  Atualizar:  atualizar-bravo.bat" -ForegroundColor Gray
+Write-Host "  Iniciar:    iniciar-nexus.bat" -ForegroundColor Gray
+Write-Host "  Parar:      parar-nexus.bat" -ForegroundColor Gray
+Write-Host "  Atualizar:  atualizar-nexus.bat" -ForegroundColor Gray
 Write-Host ""
 Write-Host "  ATUALIZACOES:" -ForegroundColor Cyan
 Write-Host "  1. Conecte ao GitHub: git remote add origin <URL>" -ForegroundColor Gray
-Write-Host "  2. Execute: atualizar-bravo.bat" -ForegroundColor Gray
+Write-Host "  2. Execute: atualizar-nexus.bat" -ForegroundColor Gray
 Write-Host ""
 
 Start-Process "http://localhost:$Port"

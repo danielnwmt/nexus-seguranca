@@ -1,9 +1,9 @@
 #!/bin/bash
 # ============================================================
-#  Bravo Monitoramento — Instalador Online (One-Liner)
+#  Nexus Monitoramento — Instalador Online (One-Liner)
 #  
 #  USO:
-#    curl -fsSL https://raw.githubusercontent.com/SEU_USUARIO/bravo-monitoramento/main/installer/install-online.sh | sudo bash
+#    curl -fsSL https://raw.githubusercontent.com/danielnwmt/bravo-seguran-a/main/installer/install-online.sh | sudo bash
 #
 #  OU com repositorio customizado:
 #    curl -fsSL URL_DO_SCRIPT | sudo REPO_URL="https://github.com/user/repo" bash
@@ -14,7 +14,7 @@ set -e
 
 REPO_URL="${REPO_URL:-https://github.com/danielnwmt/bravo-seguran-a}"
 BRANCH="${BRANCH:-main}"
-INSTALL_DIR="${INSTALL_DIR:-/opt/bravo-monitoramento}"
+INSTALL_DIR="${INSTALL_DIR:-/opt/nexus-monitoramento}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -24,7 +24,7 @@ NC='\033[0m'
 
 echo ""
 echo -e "${CYAN}=============================================${NC}"
-echo -e "   BRAVO MONITORAMENTO — Instalador Online"
+echo -e "   NEXUS MONITORAMENTO — Instalador Online"
 echo -e "   Instalacao automatica via GitHub"
 echo -e "${CYAN}=============================================${NC}"
 echo ""
@@ -65,6 +65,6 @@ echo -e "${GREEN}=============================================${NC}"
 echo -e "   Instalacao online concluida!"
 echo -e "   Para atualizar no futuro, use o botao"
 echo -e "   'Atualizar Sistema' nas Configuracoes"
-echo -e "   ou execute: bash $INSTALL_DIR/atualizar-bravo.sh"
+echo -e "   ou execute: bash $INSTALL_DIR/atualizar-nexus.sh"
 echo -e "${GREEN}=============================================${NC}"
 echo ""
