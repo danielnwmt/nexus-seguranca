@@ -1,12 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarIcon, Film, Play, Clock, HardDrive, Download } from 'lucide-react';
+import { CalendarIcon, Film, Play, Clock, HardDrive, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
@@ -17,14 +16,6 @@ interface RecordingsViewerProps {
   onOpenChange: (open: boolean) => void;
   camera: { id: string; name: string; clientName?: string } | null;
 }
-
-const VIDEO_SIZES = [
-  { label: 'Todos', value: 'all' },
-  { label: '< 100 MB', value: 'small' },
-  { label: '100 - 500 MB', value: 'medium' },
-  { label: '500 MB - 1 GB', value: 'large' },
-  { label: '> 1 GB', value: 'xlarge' },
-];
 
 const formatDuration = (seconds: number) => {
   const h = Math.floor(seconds / 3600);
@@ -40,12 +31,17 @@ const formatFileSize = (mb: number) => {
   return `${mb.toFixed(0)} MB`;
 };
 
+// Timeline hours for display
+const TIMELINE_HOURS = Array.from({ length: 25 }, (_, i) => i); // 0-24
+
 const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps) => {
   const [date, setDate] = useState<Date>(new Date());
-  const [sizeFilter, setSizeFilter] = useState('all');
   const [recordings, setRecordings] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [cursorMinutes, setCursorMinutes] = useState<number>(0); // 0..1440
+  const [isDragging, setIsDragging] = useState(false);
+  const timelineRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open || !camera) return;
@@ -56,39 +52,97 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
 
-      let query = supabase
+      const { data } = await supabase
         .from('recordings')
         .select('*')
         .eq('camera_id', camera.id)
         .gte('start_time', startOfDay.toISOString())
         .lte('start_time', endOfDay.toISOString())
-        .order('start_time', { ascending: false });
+        .order('start_time', { ascending: true });
 
-      const { data } = await query;
       setRecordings(data || []);
       setLoading(false);
     };
     fetchRecordings();
   }, [open, camera, date]);
 
-  const filteredRecordings = recordings.filter(r => {
-    if (sizeFilter === 'all') return true;
-    const mb = Number(r.file_size_mb) || 0;
-    if (sizeFilter === 'small') return mb < 100;
-    if (sizeFilter === 'medium') return mb >= 100 && mb < 500;
-    if (sizeFilter === 'large') return mb >= 500 && mb < 1024;
-    if (sizeFilter === 'xlarge') return mb >= 1024;
-    return true;
-  });
+  // Convert minutes to HH:mm:ss
+  const minutesToTime = (mins: number) => {
+    const h = Math.floor(mins / 60);
+    const m = Math.floor(mins % 60);
+    const s = Math.floor((mins % 1) * 60);
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
 
-  const totalSize = filteredRecordings.reduce((acc, r) => acc + (Number(r.file_size_mb) || 0), 0);
-  const totalDuration = filteredRecordings.reduce((acc, r) => acc + (r.duration_seconds || 0), 0);
+  // Get recording segments as percentage ranges on the timeline
+  const getSegments = () => {
+    return recordings.map(rec => {
+      const start = new Date(rec.start_time);
+      const startMin = start.getHours() * 60 + start.getMinutes() + start.getSeconds() / 60;
+      const durationMin = (rec.duration_seconds || 0) / 60;
+      const endMin = Math.min(startMin + durationMin, 1440);
+      return {
+        id: rec.id,
+        startPct: (startMin / 1440) * 100,
+        widthPct: ((endMin - startMin) / 1440) * 100,
+        startMin,
+        endMin,
+      };
+    });
+  };
+
+  const handleTimelineClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!timelineRef.current) return;
+    const rect = timelineRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const mins = (x / rect.width) * 1440;
+    setCursorMinutes(mins);
+
+    // Find recording at this position and select it
+    const segments = getSegments();
+    const seg = segments.find(s => mins >= s.startMin && mins <= s.endMin);
+    if (seg) setPlayingId(seg.id);
+  }, [recordings]);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging || !timelineRef.current) return;
+    const rect = timelineRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    setCursorMinutes((x / rect.width) * 1440);
+  }, [isDragging]);
+
+  const handleMouseUp = useCallback(() => setIsDragging(false), []);
+
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+
+  const nudgeCursor = (dir: number) => {
+    setCursorMinutes(prev => Math.max(0, Math.min(1440, prev + dir * 5)));
+  };
+
+  const segments = getSegments();
+  const cursorPct = (cursorMinutes / 1440) * 100;
+  const cursorDate = new Date(date);
+  cursorDate.setHours(0, 0, 0, 0);
+  cursorDate.setMinutes(Math.floor(cursorMinutes));
+  cursorDate.setSeconds(Math.floor((cursorMinutes % 1) * 60));
+
+  const totalSize = recordings.reduce((acc, r) => acc + (Number(r.file_size_mb) || 0), 0);
+  const totalDuration = recordings.reduce((acc, r) => acc + (r.duration_seconds || 0), 0);
 
   if (!camera) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-border max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-card border-border max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-foreground flex items-center gap-2">
             <Film className="w-5 h-5 text-primary" />
@@ -96,7 +150,7 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
           </DialogTitle>
         </DialogHeader>
 
-        {/* Filters */}
+        {/* Date picker + stats */}
         <div className="flex flex-wrap items-center gap-3">
           <Popover>
             <PopoverTrigger asChild>
@@ -117,22 +171,10 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
             </PopoverContent>
           </Popover>
 
-          <Select value={sizeFilter} onValueChange={setSizeFilter}>
-            <SelectTrigger className="w-44 bg-muted border-border">
-              <HardDrive className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-              <SelectValue placeholder="Tamanho" />
-            </SelectTrigger>
-            <SelectContent>
-              {VIDEO_SIZES.map(s => (
-                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
           <div className="flex items-center gap-3 ml-auto text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <Film className="w-3.5 h-3.5" />
-              {filteredRecordings.length} vídeos
+              {recordings.length} vídeos
             </span>
             <span className="flex items-center gap-1">
               <Clock className="w-3.5 h-3.5" />
@@ -163,6 +205,100 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
           </div>
         )}
 
+        {/* Timeline Bar */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground font-medium">Linha do Tempo</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono text-foreground bg-muted px-2 py-0.5 rounded">
+                {minutesToTime(cursorMinutes)} – {format(date, 'dd/MM/yyyy')}
+              </span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
+                    <CalendarIcon className="w-3 h-3" />
+                    {format(date, 'dd/MM/yyyy')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(d) => d && setDate(d)}
+                    disabled={(d) => d > new Date()}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          {/* Timeline container */}
+          <div className="relative select-none">
+            {/* Hour labels */}
+            <div className="flex justify-between px-0 mb-0.5">
+              {[0, 3, 6, 9, 12, 15, 18, 21, 24].map(h => (
+                <span key={h} className="text-[9px] font-mono text-muted-foreground w-0 text-center">
+                  {String(h).padStart(2, '0')}:00
+                </span>
+              ))}
+            </div>
+
+            {/* Bar */}
+            <div
+              ref={timelineRef}
+              className="relative h-10 bg-muted/80 rounded cursor-crosshair border border-border overflow-hidden"
+              onClick={handleTimelineClick}
+              onMouseDown={(e) => {
+                handleTimelineClick(e);
+                setIsDragging(true);
+              }}
+            >
+              {/* Recording segments */}
+              {segments.map(seg => (
+                <div
+                  key={seg.id}
+                  className={cn(
+                    "absolute top-0 bottom-0 transition-colors",
+                    playingId === seg.id ? "bg-primary" : "bg-primary/50 hover:bg-primary/70"
+                  )}
+                  style={{ left: `${seg.startPct}%`, width: `${Math.max(seg.widthPct, 0.3)}%` }}
+                />
+              ))}
+
+              {/* Cursor / playhead */}
+              <div
+                className="absolute top-0 bottom-0 w-0.5 z-10 pointer-events-none"
+                style={{ left: `${cursorPct}%` }}
+              >
+                {/* Top handle */}
+                <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-3 h-2 bg-yellow-400 rounded-t-sm border border-yellow-500" />
+                {/* Line */}
+                <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-0.5 bg-yellow-400" />
+                {/* Bottom handle */}
+                <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-3 h-2 bg-yellow-400 rounded-b-sm border border-yellow-500" />
+              </div>
+            </div>
+
+            {/* Navigation arrows */}
+            <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 flex justify-between pointer-events-none px-1" style={{ marginTop: '8px' }}>
+              <button
+                className="pointer-events-auto w-5 h-5 rounded bg-background/80 border border-border flex items-center justify-center hover:bg-muted transition-colors"
+                onClick={(e) => { e.stopPropagation(); nudgeCursor(-1); }}
+              >
+                <ChevronLeft className="w-3 h-3 text-yellow-400" />
+              </button>
+              <button
+                className="pointer-events-auto w-5 h-5 rounded bg-background/80 border border-border flex items-center justify-center hover:bg-muted transition-colors"
+                onClick={(e) => { e.stopPropagation(); nudgeCursor(1); }}
+              >
+                <ChevronRight className="w-3 h-3 text-yellow-400" />
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Recordings table */}
         <Table>
           <TableHeader>
@@ -182,7 +318,7 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
                   Carregando...
                 </TableCell>
               </TableRow>
-            ) : filteredRecordings.length === 0 ? (
+            ) : recordings.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                   <Film className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -190,7 +326,7 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
                 </TableCell>
               </TableRow>
             ) : (
-              filteredRecordings.map((rec) => (
+              recordings.map((rec) => (
                 <TableRow
                   key={rec.id}
                   className={cn("cursor-pointer transition-colors", playingId === rec.id && "bg-primary/10")}
