@@ -14,7 +14,7 @@ import { ANALYTIC_LABELS } from '@/types/monitoring';
 import { useTableQuery, usePaginatedQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 
-const RETENTION_OPTIONS = [5, 10, 15, 20, 25, 30] as const;
+const RETENTION_OPTIONS = [0, 5, 10, 15, 20, 25, 30] as const;
 const ALL_ANALYTICS: AnalyticType[] = ['lpr', 'weapon_detection', 'line_crossing', 'area_intrusion', 'loitering', 'human_car_classification', 'fallen_person', 'people_counting', 'tampering'];
 const VIDEO_ENCODINGS = ['H.264', 'H.264+', 'H.265'] as const;
 const BITRATE_OPTIONS = [256, 512, 1024, 2048, 3072, 4096, 6144, 8192] as const;
@@ -303,7 +303,7 @@ const Cameras = () => {
                   <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
                     {RETENTION_OPTIONS.map(d => (
-                      <SelectItem key={d} value={String(d)}>{d} dias</SelectItem>
+                      <SelectItem key={d} value={String(d)}>{d === 0 ? 'Tempo Real (sem retenção)' : `${d} dias`}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
