@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera as CameraType, ANALYTIC_LABELS } from '@/types/monitoring';
 import { Video, VideoOff, Circle, Pencil, Trash2, Play, Square, Eye, Brain, Film, ScanEye, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -28,11 +28,12 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const { analyzing, analyzeFromCanvas } = useAnalyzeCamera();
   const isAnalyzing = analyzing === camera.id;
+  const AUTO_ANALYZE_INTERVAL = 30000; // 30 seconds
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = useCallback(async () => {
     if (!videoContainerRef.current) return;
     const videoEl = videoContainerRef.current.querySelector('video');
-    if (!videoEl) return;
+    if (!videoEl || videoEl.readyState < 2) return;
     await analyzeFromCanvas(videoEl, {
       id: camera.id,
       name: camera.name,
@@ -40,7 +41,27 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
       clientName: camera.clientName,
       analytics: camera.analytics || [],
     });
-  };
+  }, [analyzeFromCanvas, camera]);
+
+  // Auto-analyze when viewing a camera with analytics enabled
+  useEffect(() => {
+    if (!isViewing || !camera.analytics || camera.analytics.length === 0) return;
+    
+    // Initial analysis after 5 seconds (give HLS time to load)
+    const initialTimeout = setTimeout(() => {
+      handleAnalyze();
+    }, 5000);
+
+    // Then analyze every 30 seconds
+    const interval = setInterval(() => {
+      if (!analyzing) handleAnalyze();
+    }, AUTO_ANALYZE_INTERVAL);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
+  }, [isViewing, camera.analytics, handleAnalyze, analyzing]);
 
   // Build HLS URL from stream info
   // MediaMTX serves HLS at http://<server>:8888/<path>/
