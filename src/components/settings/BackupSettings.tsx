@@ -136,10 +136,32 @@ const BackupSettings = () => {
     setRestoring(true);
     try {
       const text = await restoreFile.text();
-      const data: Record<string, any[]> = JSON.parse(text);
 
-      const validTables = tables.map(t => t.key);
-      const tablesToRestore = Object.keys(data).filter(k => validTables.includes(k));
+      // Limit file size (10MB max)
+      if (restoreFile.size > 10 * 1024 * 1024) {
+        toast({ title: 'Arquivo muito grande', description: 'O backup deve ter no máximo 10MB.', variant: 'destructive' });
+        setRestoring(false);
+        return;
+      }
+
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        toast({ title: 'JSON inválido', description: 'O arquivo não contém JSON válido.', variant: 'destructive' });
+        setRestoring(false);
+        return;
+      }
+
+      if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+        toast({ title: 'Formato inválido', description: 'O backup deve ser um objeto JSON.', variant: 'destructive' });
+        setRestoring(false);
+        return;
+      }
+
+      // Only allow safe tables (exclude user_roles to prevent privilege escalation)
+      const safeTables = tables.map(t => t.key);
+      const tablesToRestore = Object.keys(data).filter(k => safeTables.includes(k));
 
       if (tablesToRestore.length === 0) {
         toast({ title: 'Backup vazio ou inválido', description: 'Nenhuma tabela reconhecida no arquivo.', variant: 'destructive' });
@@ -155,7 +177,27 @@ const BackupSettings = () => {
         if (!Array.isArray(rows) || rows.length === 0) continue;
 
         for (const row of rows) {
-          const { error } = await supabase.from(table as any).upsert(row as any, { onConflict: 'id' });
+          // Validate each row is a plain object with an id
+          if (typeof row !== 'object' || row === null || Array.isArray(row)) {
+            errors++;
+            continue;
+          }
+          const record = row as Record<string, unknown>;
+          if (typeof record.id !== 'string') {
+            errors++;
+            continue;
+          }
+          // Sanitize: only allow string, number, boolean, null values
+          const sanitized: Record<string, unknown> = {};
+          for (const [key, val] of Object.entries(record)) {
+            if (val === null || typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
+              sanitized[key] = val;
+            } else if (Array.isArray(val)) {
+              sanitized[key] = val;
+            }
+            // Skip objects/functions/etc
+          }
+          const { error } = await supabase.from(table as any).upsert(sanitized as any, { onConflict: 'id' });
           if (error) errors++;
           else restored++;
         }
