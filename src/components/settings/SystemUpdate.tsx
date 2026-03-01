@@ -14,7 +14,17 @@ const SystemUpdate = () => {
   const [updateMessage, setUpdateMessage] = useState('');
   const [versionInfo, setVersionInfo] = useState<{ version: string; date: string; branch: string } | null>(null);
 
-  const apiUrl = import.meta.env.VITE_API_URL || '';
+  const apiUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
+  const isPreviewEnv = host.includes('lovable.app');
+  const isMixedContentBlocked = protocol === 'https:' && apiUrl.startsWith('http://');
+  const updateAvailable = !isPreviewEnv && !isMixedContentBlocked;
+  const blockedReason = isPreviewEnv
+    ? 'Atualização por botão disponível apenas no servidor local.'
+    : isMixedContentBlocked
+      ? 'Bloqueado por segurança do navegador (HTTPS x HTTP). Acesse pelo IP local do servidor.'
+      : '';
 
   useEffect(() => {
     fetchVersion();
@@ -38,6 +48,17 @@ const SystemUpdate = () => {
     setUpdateMessage('Verificando atualizações no GitHub...');
 
     try {
+      if (!updateAvailable) {
+        setStatus('error');
+        setUpdateMessage(blockedReason || 'Atualização por botão indisponível neste ambiente.');
+        toast({
+          title: 'Atualização indisponível',
+          description: blockedReason || 'Use o terminal no servidor local.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       const accessToken = session?.access_token || '';
 
@@ -134,6 +155,13 @@ const SystemUpdate = () => {
             </div>
           )}
 
+          {blockedReason && (
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+              <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+              <p className="text-sm text-destructive">{blockedReason}</p>
+            </div>
+          )}
+
           {/* Status da atualização */}
           {status !== 'idle' && (
             <div className="flex items-start gap-3 p-3 rounded-lg bg-muted border border-border">
@@ -146,7 +174,7 @@ const SystemUpdate = () => {
           <div className="flex flex-col sm:flex-row gap-3">
             <Button 
               onClick={handleUpdate} 
-              disabled={updating}
+              disabled={updating || !updateAvailable}
               className="gap-2"
               size="lg"
             >
