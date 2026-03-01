@@ -87,8 +87,12 @@ const CompanySettings = () => {
       return;
     }
 
-    const { data: urlData } = supabase.storage.from('client-cameras').getPublicUrl(filePath);
-    const logoUrl = urlData.publicUrl;
+    const { data: urlData, error: urlError } = await supabase.storage.from('client-cameras').createSignedUrl(filePath, 60 * 60 * 24 * 365);
+    if (urlError || !urlData?.signedUrl) {
+      toast({ title: 'Erro ao gerar URL do logo', variant: 'destructive' });
+      return;
+    }
+    const logoUrl = urlData.signedUrl;
     setLogoPreview(logoUrl);
     setForm(p => ({ ...p, logo_url: logoUrl }));
     queryClient.invalidateQueries({ queryKey: ['company_settings'] });
