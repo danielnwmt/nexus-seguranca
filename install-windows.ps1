@@ -12,7 +12,7 @@ param(
     [int]$Port = 80,
     [int]$ApiPort = 8001,
     [int]$PostgRESTPort = 3000,
-    [string]$PgPassword = "NexusDb2024!",
+    [string]$PgPassword = "NexusDb2024",
     [string]$JwtSecret = "nexus-monitoramento-jwt-secret-key-2024-super-seguro",
     [string]$AdminEmail = "admin@protenexus.com",
     [string]$AdminPassword = "1234"
