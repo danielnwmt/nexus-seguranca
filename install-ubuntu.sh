@@ -255,6 +255,14 @@ if [ -f "$MEDIAMTX_CFG_SRC" ]; then
   ok "Configuracao MediaMTX copiada"
 fi
 
+# Registrar servidor de midia no banco automaticamente
+sudo -u postgres psql -d nexus -c "
+  INSERT INTO public.media_servers (name, ip_address, instances, rtmp_base_port, hls_base_port, webrtc_base_port, status)
+  VALUES ('Servidor Local', '$LOCAL_IP', 1, 1935, 8888, 8889, 'active')
+  ON CONFLICT DO NOTHING;
+" > /dev/null 2>&1 || warn "Nao foi possivel registrar servidor de midia automaticamente"
+ok "Servidor de midia registrado (IP: $LOCAL_IP)"
+
 # ----------------------------------------------------------
 # 8.2 Instalar ffmpeg (para captura de frames IA)
 # ----------------------------------------------------------
