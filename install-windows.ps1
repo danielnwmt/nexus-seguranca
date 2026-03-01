@@ -98,34 +98,85 @@ if (Test-Path $psqlPath) {
 if (!$pgOk) {
     Write-Warn "PostgreSQL nao encontrado. Instalando automaticamente..."
 
-    $pgInstaller = "$env:TEMP\postgresql-installer.exe"
-    $pgDownloadUrl = "https://get.enterprisedb.com/postgresql/postgresql-16.4-1-windows-x64.exe"
+    $installedByWinget = $false
+    $wingetOk = $false
+    try { if (winget --version 2>$null) { $wingetOk = $true } } catch {}
 
-    Write-Host "  Baixando PostgreSQL 16 (~300MB, aguarde)..." -ForegroundColor Gray
-    Invoke-WebRequest -Uri $pgDownloadUrl -OutFile $pgInstaller -UseBasicParsing
+    if ($wingetOk) {
+        Write-Host "  Tentando instalar PostgreSQL 16 via winget..." -ForegroundColor Gray
+        try {
+            $wg = Start-Process -FilePath "winget" -ArgumentList @(
+                "install",
+                "--id", "PostgreSQL.PostgreSQL.16",
+                "-e",
+                "--accept-source-agreements",
+                "--accept-package-agreements",
+                "--silent"
+            ) -Wait -NoNewWindow -PassThru
 
-    Write-Host "  Instalando PostgreSQL (modo silencioso)..." -ForegroundColor Gray
-    $pgArgs = @(
-        "--mode", "unattended",
-        "--unattendedmodeui", "none",
-        "--superpassword", $PgPassword,
-        "--serverport", "5432",
-        "--prefix", $pgInstallPath,
-        "--datadir", "$pgInstallPath\data",
-        "--install_runtimes", "0"
-    )
-    Start-Process -FilePath $pgInstaller -ArgumentList $pgArgs -Wait -NoNewWindow
-    Remove-Item $pgInstaller -Force -ErrorAction SilentlyContinue
+            if ($wg.ExitCode -eq 0) {
+                $installedByWinget = $true
+                Write-Ok "PostgreSQL instalado via winget"
+            } else {
+                Write-Warn "Winget retornou codigo $($wg.ExitCode). Tentando instalador oficial..."
+            }
+        } catch {
+            Write-Warn "Falha no winget: $($_.Exception.Message)"
+        }
+    }
 
-    # Atualizar PATH
-    $env:Path = "$pgInstallPath\bin;$env:Path"
-    [System.Environment]::SetEnvironmentVariable("Path", "$pgInstallPath\bin;" + [System.Environment]::GetEnvironmentVariable("Path","Machine"), "Machine")
+    if (-not $installedByWinget) {
+        $pgInstaller = "$env:TEMP\postgresql-installer.exe"
+        $pgDownloadUrl = "https://get.enterprisedb.com/postgresql/postgresql-16.4-1-windows-x64.exe"
 
-    if (Test-Path $psqlPath) {
+        Write-Host "  Baixando PostgreSQL 16 (~300MB, aguarde)..." -ForegroundColor Gray
+        Invoke-WebRequest -Uri $pgDownloadUrl -OutFile $pgInstaller -UseBasicParsing
+
+        Write-Host "  Instalando PostgreSQL (modo silencioso)..." -ForegroundColor Gray
+        $pgArgs = @(
+            "--mode", "unattended",
+            "--unattendedmodeui", "none",
+            "--superpassword", $PgPassword,
+            "--serverport", "5432",
+            "--prefix", $pgInstallPath,
+            "--datadir", "$pgInstallPath\data",
+            "--install_runtimes", "0"
+        )
+
+        $pgProc = Start-Process -FilePath $pgInstaller -ArgumentList $pgArgs -Wait -NoNewWindow -PassThru
+        Remove-Item $pgInstaller -Force -ErrorAction SilentlyContinue
+
+        if ($pgProc.ExitCode -ne 0) {
+            Write-Warn "Instalador oficial retornou codigo $($pgProc.ExitCode)"
+        }
+    }
+
+    Start-Sleep -Seconds 3
+
+    # Redetectar psql em versoes comuns
+    $pgVersionsAfterInstall = @("17", "16", "15", "14")
+    foreach ($v in $pgVersionsAfterInstall) {
+        $testPath = "C:\Program Files\PostgreSQL\$v\bin\psql.exe"
+        if (Test-Path $testPath) {
+            $psqlPath = $testPath
+            $pgInstallPath = "C:\Program Files\PostgreSQL\$v"
+            $pgOk = $true
+            break
+        }
+    }
+
+    if ($pgOk) {
+        # Atualizar PATH
+        $pgBinPath = "$pgInstallPath\bin"
+        $env:Path = "$pgBinPath;$env:Path"
+        $machinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+        if ($machinePath -notlike "*$pgBinPath*") {
+            [System.Environment]::SetEnvironmentVariable("Path", "$pgBinPath;$machinePath", "Machine")
+        }
         Write-Ok "PostgreSQL instalado com sucesso"
-        $pgOk = $true
     } else {
-        Write-Err "Falha ao instalar PostgreSQL"
+        Write-Err "Falha ao instalar PostgreSQL automaticamente"
+        Write-Host "  Instale manualmente: https://www.enterprisedb.com/downloads/postgres-postgresql-downloads" -ForegroundColor Gray
         exit 1
     }
 }
