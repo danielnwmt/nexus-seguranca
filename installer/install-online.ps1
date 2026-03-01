@@ -1,5 +1,5 @@
 # ============================================================
-#  Nexus Monitoramento — Instalador Online Windows (One-Liner)
+#  Nexus Monitoramento - Instalador Online Windows (One-Liner)
 #
 #  USO (PowerShell como Administrador):
 #    Set-ExecutionPolicy Bypass -Scope Process -Force; iwr -useb https://raw.githubusercontent.com/danielnwmt/nexus-seguranca/main/installer/install-online.ps1 | iex
@@ -16,7 +16,7 @@ $InstallDir = if ($env:INSTALL_DIR) { $env:INSTALL_DIR } else { "C:\NexusMonitor
 
 Write-Host ""
 Write-Host "=============================================" -ForegroundColor DarkCyan
-Write-Host "   NEXUS MONITORAMENTO — Instalador Online" -ForegroundColor White
+Write-Host "   NEXUS MONITORAMENTO - Instalador Online" -ForegroundColor White
 Write-Host "   Instalacao automatica via GitHub" -ForegroundColor Gray
 Write-Host "=============================================" -ForegroundColor DarkCyan
 Write-Host ""
