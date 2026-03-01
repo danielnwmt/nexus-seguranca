@@ -93,7 +93,7 @@ const ChatbotSettings = () => {
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'teste', source: 'bravo-test' }),
+        body: JSON.stringify({ message: 'teste', source: 'nexus-test' }),
       });
       if (res.ok) {
         toast({ title: 'Webhook conectado!', description: 'O n8n respondeu com sucesso.' });
@@ -125,9 +125,9 @@ const ChatbotSettings = () => {
       }
     }
     // Save to localStorage for the chat widget to use
-    localStorage.setItem('bravo_n8n_webhook', n8nWebhookUrl);
-    localStorage.setItem('bravo_bot_actions', JSON.stringify(actions.filter(a => a.active)));
-    localStorage.setItem('bravo_bot_enabled', String(botEnabled));
+    localStorage.setItem('nexus_n8n_webhook', n8nWebhookUrl);
+    localStorage.setItem('nexus_bot_actions', JSON.stringify(actions.filter(a => a.active)));
+    localStorage.setItem('nexus_bot_enabled', String(botEnabled));
     toast({ title: 'Configurações do Chatbot salvas', description: 'Webhook n8n e ações atualizados.' });
   };
 

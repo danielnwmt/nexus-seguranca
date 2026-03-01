@@ -32,7 +32,7 @@ sudo apt update
 sudo apt install -y certbot python3-certbot-nginx
 
 # 2. Configurar Nginx para o domínio
-sudo tee /etc/nginx/sites-available/${domain || 'bravo'} > /dev/null <<EOF
+sudo tee /etc/nginx/sites-available/${domain || 'nexus'} > /dev/null <<EOF
 server {
     listen 80;
     server_name ${domain || 'seudominio.com.br'} www.${domain || 'seudominio.com.br'};
@@ -48,7 +48,7 @@ server {
 }
 EOF
 
-sudo ln -sf /etc/nginx/sites-available/${domain || 'bravo'} /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/${domain || 'nexus'} /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 
 # 3. Gerar certificado SSL
