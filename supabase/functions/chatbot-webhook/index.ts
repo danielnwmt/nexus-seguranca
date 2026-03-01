@@ -11,8 +11,19 @@ serve(async (req) => {
   }
 
   try {
+    // Limit payload size
+    const contentLength = parseInt(req.headers.get("content-length") || "0", 10);
+    if (contentLength > 50_000) {
+      return new Response(
+        JSON.stringify({ error: 'Payload too large' }),
+        { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const body = await req.json();
-    const { message, source, phone } = body;
+    const message = typeof body.message === "string" ? body.message.slice(0, 1000).trim() : "";
+    const source = typeof body.source === "string" ? body.source.slice(0, 50) : "webhook";
+    const phone = typeof body.phone === "string" ? body.phone.replace(/[^0-9+\-() ]/g, "").slice(0, 20) : null;
 
     if (!message) {
       return new Response(
@@ -21,7 +32,6 @@ serve(async (req) => {
       );
     }
 
-    // Process message based on source
     let reply = '';
     const lowerMsg = message.toLowerCase();
 
@@ -40,18 +50,13 @@ serve(async (req) => {
     } else if (lowerMsg.includes('ajuda') || lowerMsg.includes('help')) {
       reply = 'Posso ajudar com: 📹 Câmeras, 🚨 Alarmes, 💰 Financeiro, 👮 Vigilantes, 👥 Clientes, 💾 Backup. Sobre o que deseja saber?';
     } else {
-      reply = `Recebi sua mensagem: "${message}". Para ajuda específica, pergunte sobre: câmeras, alarmes, financeiro, vigilantes, clientes ou backup.`;
+      reply = 'Para ajuda específica, pergunte sobre: câmeras, alarmes, financeiro, vigilantes, clientes ou backup.';
     }
 
-    // Log for webhook integrations (WhatsApp, etc)
-    console.log(`[Chatbot] Source: ${source || 'unknown'} | Phone: ${phone || 'N/A'} | Message: ${message}`);
+    console.log(`[Chatbot] Source: ${source} | Phone: ${phone || 'N/A'}`);
 
     return new Response(
-      JSON.stringify({ 
-        reply, 
-        source: source || 'webhook',
-        timestamp: new Date().toISOString() 
-      }),
+      JSON.stringify({ reply, source, timestamp: new Date().toISOString() }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

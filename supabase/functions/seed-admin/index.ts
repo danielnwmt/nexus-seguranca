@@ -11,7 +11,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Require authorization header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -20,7 +19,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify calling user is admin
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
@@ -49,7 +47,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Proceed with admin operations using service role
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -57,7 +54,6 @@ Deno.serve(async (req) => {
     );
 
     const email = "admin@protenexus.com";
-    const password = "1234";
 
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const exists = existingUsers?.users?.some((u) => u.email === email);
@@ -69,22 +65,31 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Generate a secure random password
+    const tempPassword = crypto.randomUUID() + crypto.randomUUID().slice(0, 8);
+
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password,
+      password: tempPassword,
       email_confirm: true,
-      user_metadata: { email_verified: true },
+      user_metadata: { email_verified: true, force_password_change: true },
     });
 
     if (error) throw error;
 
+    // Send password reset so admin sets their own password
+    await supabaseAdmin.auth.resetPasswordForEmail(email);
+
     return new Response(
-      JSON.stringify({ message: "Usuário admin@protenexus.com criado com sucesso!", user_id: data.user.id }),
+      JSON.stringify({ 
+        message: "Usuário admin@protenexus.com criado. Um e-mail de redefinição de senha foi enviado.", 
+        user_id: data.user.id 
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
   } catch (error) {
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: "Internal error" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }

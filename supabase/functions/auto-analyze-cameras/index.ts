@@ -10,11 +10,25 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // --- Authentication ---
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    const authClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get all cameras with analytics enabled and a snapshot_url configured
     const { data: cameras, error: camError } = await supabase
       .from("cameras")
       .select("id, name, client_id, snapshot_url, analytics, status")
@@ -30,32 +44,21 @@ serve(async (req) => {
       });
     }
 
-    // Get client names
     const clientIds = [...new Set(cameras.filter(c => c.client_id).map(c => c.client_id))];
     let clientMap: Record<string, string> = {};
     if (clientIds.length > 0) {
-      const { data: clientsData } = await supabase
-        .from("clients")
-        .select("id, name")
-        .in("id", clientIds);
-      if (clientsData) {
-        clientMap = Object.fromEntries(clientsData.map(c => [c.id, c.name]));
-      }
+      const { data: clientsData } = await supabase.from("clients").select("id, name").in("id", clientIds);
+      if (clientsData) clientMap = Object.fromEntries(clientsData.map(c => [c.id, c.name]));
     }
 
     const results: any[] = [];
 
-    // Analyze each camera (sequentially to avoid rate limits)
     for (const cam of cameras) {
       try {
-        // Call the analyze-camera function
         const analyzeUrl = `${supabaseUrl}/functions/v1/analyze-camera`;
         const resp = await fetch(analyzeUrl, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${supabaseKey}`,
-          },
+          headers: { "Content-Type": "application/json", Authorization: authHeader },
           body: JSON.stringify({
             image_url: cam.snapshot_url,
             camera_id: cam.id,
@@ -69,27 +72,20 @@ serve(async (req) => {
         const data = await resp.json();
         results.push({ camera: cam.name, status: resp.ok ? "ok" : "error", detections: data?.detections_count || 0 });
 
-        // Small delay between cameras to avoid rate limits
         if (cameras.indexOf(cam) < cameras.length - 1) {
           await new Promise(r => setTimeout(r, 2000));
         }
       } catch (e) {
         console.error(`Error analyzing camera ${cam.name}:`, e);
-        results.push({ camera: cam.name, status: "error", error: e instanceof Error ? e.message : "Unknown" });
+        results.push({ camera: cam.name, status: "error", error: "Analysis failed" });
       }
     }
 
-    return new Response(JSON.stringify({
-      analyzed: results.length,
-      results,
-    }), {
+    return new Response(JSON.stringify({ analyzed: results.length, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("auto-analyze error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ error: "Internal error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
