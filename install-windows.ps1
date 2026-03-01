@@ -71,8 +71,11 @@ host    all             all             ::1/128                 trust
 
         if ($pgSvc) { Restart-Service $pgSvc.Name -Force; Start-Sleep -Seconds 3 }
 
-        & $psqlPath -h localhost -U postgres -d postgres -c "ALTER USER postgres PASSWORD '$PgPassword';" 2>&1 | Out-Null
+        $oldEAP2 = $ErrorActionPreference
+        $ErrorActionPreference = "SilentlyContinue"
+        $result2 = & $psqlPath -h localhost -U postgres -d postgres -c "ALTER USER postgres PASSWORD '$PgPassword';" 2>&1
         $alterOk = ($LASTEXITCODE -eq 0)
+        $ErrorActionPreference = $oldEAP2
     } catch {
         Write-Warn "Falha ao redefinir senha do PostgreSQL: $($_.Exception.Message)"
     } finally {
@@ -93,8 +96,16 @@ host    all             all             ::1/128                 trust
 
 function Test-PostgresAccess([string]$psqlPath, [string]$PgPassword) {
     $env:PGPASSWORD = $PgPassword
-    & $psqlPath -h localhost -U postgres -d postgres -tAc "SELECT 1;" 2>&1 | Out-Null
-    return ($LASTEXITCODE -eq 0)
+    $oldEAP = $ErrorActionPreference
+    $ErrorActionPreference = "SilentlyContinue"
+    try {
+        $result = & $psqlPath -h localhost -U postgres -d postgres -tAc "SELECT 1;" 2>&1
+        $code = $LASTEXITCODE
+    } catch {
+        $code = 1
+    }
+    $ErrorActionPreference = $oldEAP
+    return ($code -eq 0)
 }
 
 Write-Host ""
