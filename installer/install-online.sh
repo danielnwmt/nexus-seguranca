@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-#  Nexus Monitoramento — Instalador Online (One-Liner)
+#  Nexus Monitoramento - Instalador Online (One-Liner)
 #  
 #  USO:
 #    curl -fsSL https://raw.githubusercontent.com/danielnwmt/nexus-seguranca/main/installer/install-online.sh | sudo bash
@@ -24,7 +24,7 @@ NC='\033[0m'
 
 echo ""
 echo -e "${CYAN}=============================================${NC}"
-echo -e "   NEXUS MONITORAMENTO — Instalador Online"
+echo -e "   NEXUS MONITORAMENTO - Instalador Online"
 echo -e "   Instalacao automatica via GitHub"
 echo -e "${CYAN}=============================================${NC}"
 echo ""

@@ -1,6 +1,6 @@
 #Requires -RunAsAdministrator
 # ============================================================
-#  Nexus Monitoramento — Instalador Completo Windows
+#  Nexus Monitoramento - Instalador Completo Windows
 #  Instala: PostgreSQL + PostgREST + Auth Server + Frontend
 #  SEM Docker! Tudo nativo.
 #  Execute como Administrador:
@@ -29,7 +29,7 @@ function Write-Err($msg)  { Write-Host "  [X] $msg" -ForegroundColor Red }
 
 Write-Host ""
 Write-Host "=============================================" -ForegroundColor DarkCyan
-Write-Host "   NEXUS MONITORAMENTO — Instalador Windows" -ForegroundColor White
+Write-Host "   NEXUS MONITORAMENTO - Instalador Windows" -ForegroundColor White
 Write-Host "   PostgreSQL + PostgREST + Frontend" -ForegroundColor Gray
 Write-Host "   (Sem Docker!)" -ForegroundColor Gray
 Write-Host "=============================================" -ForegroundColor DarkCyan
@@ -470,7 +470,7 @@ if (Test-Path $analyticsSrc) {
     Write-Ok "Servico de Analytics copiado"
 }
 
-# Criar arquivo .env para o serviço de analytics
+# Criar arquivo .env para o servico de analytics
 $analyticsEnv = @"
 SUPABASE_URL=$env:VITE_SUPABASE_URL
 SUPABASE_KEY=$env:VITE_SUPABASE_PUBLISHABLE_KEY
@@ -654,7 +654,7 @@ if ($nssmPath) {
 
     Write-Ok "5 servicos Windows criados (inicio automatico)"
 } else {
-    Write-Warn "NSSM nao encontrado — use 'iniciar-nexus.bat' para iniciar manualmente"
+    Write-Warn "NSSM nao encontrado - use 'iniciar-nexus.bat' para iniciar manualmente"
     Write-Host "  Para servico automatico, instale NSSM: https://nssm.cc/download" -ForegroundColor Gray
 }
 
