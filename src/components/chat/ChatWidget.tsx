@@ -62,7 +62,11 @@ const ChatWidget = () => {
 
       let replyText = '';
 
-      if (webhookUrl && botEnabled) {
+      const isValidHttpsUrl = (url: string) => {
+        try { return new URL(url).protocol === 'https:'; } catch { return false; }
+      };
+
+      if (webhookUrl && botEnabled && isValidHttpsUrl(webhookUrl)) {
         // Try n8n webhook first
         try {
           const res = await fetch(webhookUrl, {

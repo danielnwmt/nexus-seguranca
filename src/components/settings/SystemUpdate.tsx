@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { RefreshCw, CheckCircle2, AlertCircle, Loader2, GitBranch, Clock } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -37,16 +38,8 @@ const SystemUpdate = () => {
     setUpdateMessage('Verificando atualizações no GitHub...');
 
     try {
-      const token = localStorage.getItem('sb-prmblhpsmuiugwpadyee-auth-token');
-      let accessToken = '';
-      if (token) {
-        try {
-          const parsed = JSON.parse(token);
-          accessToken = parsed.access_token || '';
-        } catch {
-          accessToken = token;
-        }
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token || '';
 
       const res = await fetch(`${apiUrl}/api/system/update`, {
         method: 'POST',

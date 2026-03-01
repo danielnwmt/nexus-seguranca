@@ -16,15 +16,32 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (lockoutUntil && Date.now() < lockoutUntil) {
+      const remaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
+      setError(`Aguarde ${remaining}s antes de tentar novamente.`);
+      return;
+    }
+
     setError('');
     setLoading(true);
     const { error } = await signIn(email, password);
     if (error) {
+      const attempts = loginAttempts + 1;
+      setLoginAttempts(attempts);
+      if (attempts >= 5) {
+        const lockout = Math.min(30000 * Math.pow(2, attempts - 5), 300000);
+        setLockoutUntil(Date.now() + lockout);
+      }
       setError('Email ou senha inválidos');
     } else {
+      setLoginAttempts(0);
+      setLockoutUntil(null);
       navigate('/');
     }
     setLoading(false);
