@@ -1,0 +1,1 @@
+ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS login_bg_url TEXT DEFAULT NULL;

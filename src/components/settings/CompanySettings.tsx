@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Building2, Upload, Save } from 'lucide-react';
+import { Building2, Upload, Save, ImageIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,6 +35,7 @@ const CompanySettings = () => {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [loginBgPreview, setLoginBgPreview] = useState<string | null>(null);
   const [form, setForm] = useState({
     id: '',
     name: 'Bravo Monitoramento',
@@ -44,6 +45,7 @@ const CompanySettings = () => {
     phone: '',
     email: '',
     logo_url: '',
+    login_bg_url: '',
   });
 
   useEffect(() => {
@@ -66,8 +68,10 @@ const CompanySettings = () => {
         phone: data.phone || '',
         email: data.email || '',
         logo_url: data.logo_url || '',
+        login_bg_url: (data as any).login_bg_url || '',
       });
       if (data.logo_url) setLogoPreview(data.logo_url);
+      if ((data as any).login_bg_url) setLoginBgPreview((data as any).login_bg_url);
     }
   };
 
@@ -99,6 +103,38 @@ const CompanySettings = () => {
     toast({ title: 'Logo enviado com sucesso' });
   };
 
+  const handleLoginBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'Arquivo muito grande', description: 'Máximo permitido: 5MB', variant: 'destructive' });
+      return;
+    }
+
+    const fileExt = file.name.split('.').pop();
+    const filePath = `company/login-bg.${fileExt}`;
+
+    const { error } = await supabase.storage
+      .from('client-cameras')
+      .upload(filePath, file, { upsert: true });
+
+    if (error) {
+      toast({ title: 'Erro ao enviar imagem de fundo', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    const { data: urlData, error: urlError } = await supabase.storage.from('client-cameras').createSignedUrl(filePath, 60 * 60 * 24 * 365);
+    if (urlError || !urlData?.signedUrl) {
+      toast({ title: 'Erro ao gerar URL da imagem', variant: 'destructive' });
+      return;
+    }
+    const bgUrl = urlData.signedUrl;
+    setLoginBgPreview(bgUrl);
+    setForm(p => ({ ...p, login_bg_url: bgUrl }));
+    toast({ title: 'Imagem de fundo enviada com sucesso' });
+  };
+
   const handleSave = async () => {
     setLoading(true);
     const { error } = await supabase
@@ -111,6 +147,7 @@ const CompanySettings = () => {
         phone: form.phone,
         email: form.email,
         logo_url: form.logo_url,
+        login_bg_url: form.login_bg_url,
         updated_at: new Date().toISOString(),
       } as any)
       .eq('id', form.id);
@@ -156,6 +193,33 @@ const CompanySettings = () => {
               <input id="logo-upload" type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
             </div>
             <p className="text-[10px] text-muted-foreground">PNG, JPG ou WebP. Máx 2MB.</p>
+          </div>
+        </div>
+
+        {/* Login Background */}
+        <div className="flex items-center gap-4">
+          <div className="w-32 h-20 rounded-lg border border-border bg-muted flex items-center justify-center overflow-hidden">
+            {loginBgPreview ? (
+              <img src={loginBgPreview} alt="Fundo Login" className="w-full h-full object-cover" />
+            ) : (
+              <ImageIcon className="w-8 h-8 text-muted-foreground/50" />
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Imagem de Fundo do Login</Label>
+            <div>
+              <label htmlFor="login-bg-upload">
+                <Button variant="outline" size="sm" className="gap-2 cursor-pointer" asChild>
+                  <span>
+                    <Upload className="w-3.5 h-3.5" /> Enviar Imagem
+                  </span>
+                </Button>
+              </label>
+              <input id="login-bg-upload" type="file" accept="image/*" className="hidden" onChange={handleLoginBgUpload} />
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Tamanho recomendado: <strong>1920×1080px</strong> (Full HD). PNG ou JPG. Máx 5MB.
+            </p>
           </div>
         </div>
 

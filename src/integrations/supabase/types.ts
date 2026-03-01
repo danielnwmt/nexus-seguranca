@@ -360,6 +360,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          login_bg_url: string | null
           logo_url: string | null
           media_server_ip: string | null
           name: string
@@ -373,6 +374,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          login_bg_url?: string | null
           logo_url?: string | null
           media_server_ip?: string | null
           name?: string
@@ -386,6 +388,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          login_bg_url?: string | null
           logo_url?: string | null
           media_server_ip?: string | null
           name?: string
