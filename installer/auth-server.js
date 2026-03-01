@@ -227,6 +227,8 @@ const server = http.createServer(async (req, res) => {
       const INSTALL_DIR = process.env.INSTALL_DIR || '/opt/nexus-monitoramento';
 
       try {
+        // Descartar alteracoes locais feitas pelo instalador antes do pull
+        execSync(`cd ${INSTALL_DIR} && git checkout -- . 2>&1`, { timeout: 15000 });
         // Git pull
         const gitOutput = execSync(`cd ${INSTALL_DIR} && git pull origin main 2>&1`, { timeout: 60000 }).toString();
         
