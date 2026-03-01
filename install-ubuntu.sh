@@ -297,10 +297,10 @@ cd "$INSTALL_DIR"
 step "Configurando variaveis de ambiente..."
 
 cat > "$INSTALL_DIR/.env" << EOF
-VITE_SUPABASE_URL="http://localhost:$API_PORT"
+VITE_SUPABASE_URL="http://$LOCAL_IP:$API_PORT"
 VITE_SUPABASE_PUBLISHABLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTcwMDAwMDAwMH0.local"
 VITE_SUPABASE_PROJECT_ID="local"
-VITE_API_URL="http://localhost:$API_PORT"
+VITE_API_URL="http://$LOCAL_IP:$API_PORT"
 EOF
 ok "Arquivo .env criado"
 
@@ -390,11 +390,12 @@ ok "Nginx configurado na porta $PORT"
 step "Configurando firewall..."
 
 ufw allow $PORT/tcp > /dev/null 2>&1
+ufw allow $API_PORT/tcp comment "Auth API" > /dev/null 2>&1
 ufw allow 1935/tcp comment "RTMP MediaMTX" > /dev/null 2>&1
 ufw allow 8554/tcp comment "RTSP MediaMTX" > /dev/null 2>&1
 ufw allow 8888/tcp comment "HLS MediaMTX" > /dev/null 2>&1
 ufw allow 8889/tcp comment "WebRTC MediaMTX" > /dev/null 2>&1
-ok "Portas liberadas: $PORT, 1935, 8554, 8888, 8889"
+ok "Portas liberadas: $PORT, $API_PORT, 1935, 8554, 8888, 8889"
 
 # ----------------------------------------------------------
 # 14. Criar servicos systemd
