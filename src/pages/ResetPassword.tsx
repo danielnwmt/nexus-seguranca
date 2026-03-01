@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Lock, AlertCircle, CheckCircle } from 'lucide-react';
+import { Lock, AlertCircle, CheckCircle, ShieldAlert, Loader2 } from 'lucide-react';
 import nexusLogo from '@/assets/nexus-logo.png';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { toast } from 'sonner';
@@ -17,6 +17,8 @@ const ResetPassword = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRecovery, setIsRecovery] = useState(false);
+  const [leakedWarning, setLeakedWarning] = useState('');
+  const [checkingLeak, setCheckingLeak] = useState(false);
 
   useEffect(() => {
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -42,9 +44,32 @@ const ResetPassword = () => {
     return null;
   };
 
+  const checkLeakedPassword = async (pass: string): Promise<boolean> => {
+    try {
+      setCheckingLeak(true);
+      const { data, error } = await supabase.functions.invoke('check-password', {
+        body: { password: pass },
+      });
+      if (error) return false; // Don't block if service is down
+      if (data?.leaked) {
+        setLeakedWarning(
+          `Esta senha foi encontrada em ${data.count.toLocaleString()} vazamentos de dados. Escolha outra senha.`
+        );
+        return true;
+      }
+      setLeakedWarning('');
+      return false;
+    } catch {
+      return false;
+    } finally {
+      setCheckingLeak(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLeakedWarning('');
 
     const validationError = validatePassword(password);
     if (validationError) {
@@ -56,6 +81,10 @@ const ResetPassword = () => {
       setError('As senhas não coincidem');
       return;
     }
+
+    // Check leaked password
+    const isLeaked = await checkLeakedPassword(password);
+    if (isLeaked) return;
 
     setLoading(true);
     const { error: updateError } = await supabase.auth.updateUser({
@@ -97,7 +126,7 @@ const ResetPassword = () => {
               <Input
                 type="password"
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={e => { setPassword(e.target.value); setLeakedWarning(''); }}
                 placeholder="••••••••"
                 className="pl-9 bg-muted border-border"
                 required
@@ -141,6 +170,13 @@ const ResetPassword = () => {
             </div>
           </div>
 
+          {leakedWarning && (
+            <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/10 p-3 rounded-md">
+              <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{leakedWarning}</span>
+            </div>
+          )}
+
           {error && (
             <div className="flex items-center gap-2 text-xs text-destructive">
               <AlertCircle className="w-3.5 h-3.5" />
@@ -148,8 +184,10 @@ const ResetPassword = () => {
             </div>
           )}
 
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Salvando...' : 'Definir Senha'}
+          <Button type="submit" className="w-full" disabled={loading || checkingLeak}>
+            {checkingLeak ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verificando segurança...</>
+            ) : loading ? 'Salvando...' : 'Definir Senha'}
           </Button>
         </form>
       </div>
