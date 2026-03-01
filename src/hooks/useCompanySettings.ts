@@ -10,6 +10,7 @@ export interface CompanySettings {
   email: string | null;
   logo_url: string | null;
   media_server_ip: string | null;
+  login_bg_url: string | null;
 }
 
 export function useCompanySettings() {

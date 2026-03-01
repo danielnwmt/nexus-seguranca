@@ -48,11 +48,13 @@ const Login = () => {
     setLoading(false);
   };
 
+  const loginBg = company?.login_bg_url || '/images/login-bg.png';
+
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-end pb-12 p-4 relative"
       style={{
-        backgroundImage: 'url(/images/login-bg.png)',
+        backgroundImage: `url(${loginBg})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center top',
         backgroundRepeat: 'no-repeat',
