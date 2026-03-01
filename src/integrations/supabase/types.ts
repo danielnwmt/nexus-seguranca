@@ -466,6 +466,45 @@ export type Database = {
           },
         ]
       }
+      media_servers: {
+        Row: {
+          created_at: string
+          hls_base_port: number
+          id: string
+          instances: number
+          ip_address: string
+          name: string
+          rtmp_base_port: number
+          status: string
+          updated_at: string
+          webrtc_base_port: number
+        }
+        Insert: {
+          created_at?: string
+          hls_base_port?: number
+          id?: string
+          instances?: number
+          ip_address?: string
+          name?: string
+          rtmp_base_port?: number
+          status?: string
+          updated_at?: string
+          webrtc_base_port?: number
+        }
+        Update: {
+          created_at?: string
+          hls_base_port?: number
+          id?: string
+          instances?: number
+          ip_address?: string
+          name?: string
+          rtmp_base_port?: number
+          status?: string
+          updated_at?: string
+          webrtc_base_port?: number
+        }
+        Relationships: []
+      }
       patrol_routes: {
         Row: {
           active: boolean
