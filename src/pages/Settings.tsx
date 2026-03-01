@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store, Server, HardDrive, Bot, Globe, Palette } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store, Server, HardDrive, Bot, Globe, Palette, Loader2 } from 'lucide-react';
 import CompanySettings from '@/components/settings/CompanySettings';
 import StorageServers from '@/components/settings/StorageServers';
 import MediaServerSettings from '@/components/settings/MediaServerSettings';
@@ -19,15 +19,18 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+
+// ---- Types ----
 
 interface BankConfig {
   id: string;
-  bank: 'sicredi' | 'caixa' | 'banco_do_brasil' | 'inter';
+  bank: string;
   label: string;
   agencia: string;
   conta: string;
   convenio: string;
-  apiKey: string;
+  has_api_key: boolean;
   active: boolean;
 }
 
@@ -35,22 +38,16 @@ interface SystemUser {
   id: string;
   name: string;
   email: string;
-  password: string;
-  level: 'N1' | 'N2' | 'N3' | 'admin';
+  level: string;
   active: boolean;
 }
 
-const bankLabels: Record<string, string> = {
-  sicredi: 'Sicredi',
-  caixa: 'Caixa Econômica',
-  banco_do_brasil: 'Banco do Brasil',
-  inter: 'Banco Inter',
-};
+// ---- Constants ----
 
 const levelDescriptions: Record<string, string> = {
-  N1: 'Apenas visualização de câmeras e dashboard',
-  N2: 'Visualização, adiciona vigilante, câmera e edita. Sem acesso financeiro.',
-  N3: 'Operador avançado. Acesso a tudo exceto configurações e gerenciamento de usuários.',
+  n1: 'Apenas visualização de câmeras e dashboard',
+  n2: 'Visualização, adiciona vigilante, câmera e edita. Sem acesso financeiro.',
+  n3: 'Operador avançado. Acesso a tudo exceto configurações e gerenciamento de usuários.',
   admin: 'Acesso total ao sistema',
 };
 
@@ -71,15 +68,15 @@ const permissionModules = [
 ];
 
 const defaultPermissions: Record<string, Record<string, boolean>> = {
-  N1: {
+  n1: {
     dashboard: true, cameras_view: true, cameras_edit: false, clients_view: false, clients_edit: false,
     guards: false, installers: false, service_orders: false, financial: false, alarms: true, support: false, settings: false, users: false,
   },
-  N2: {
+  n2: {
     dashboard: true, cameras_view: true, cameras_edit: true, clients_view: true, clients_edit: false,
     guards: true, installers: false, service_orders: false, financial: false, alarms: true, support: true, settings: false, users: false,
   },
-  N3: {
+  n3: {
     dashboard: true, cameras_view: true, cameras_edit: true, clients_view: true, clients_edit: true,
     guards: true, installers: true, service_orders: true, financial: true, alarms: true, support: true, settings: false, users: false,
   },
@@ -92,23 +89,89 @@ const defaultPermissions: Record<string, Record<string, boolean>> = {
 const Settings = () => {
   const { toast } = useToast();
 
-  const [banks, setBanks] = useState<BankConfig[]>([
-    { id: '1', bank: 'sicredi', label: 'Sicredi', agencia: '', conta: '', convenio: '', apiKey: '', active: false },
-    { id: '2', bank: 'caixa', label: 'Caixa Econômica', agencia: '', conta: '', convenio: '', apiKey: '', active: false },
-    { id: '3', bank: 'banco_do_brasil', label: 'Banco do Brasil', agencia: '', conta: '', convenio: '', apiKey: '', active: false },
-    { id: '4', bank: 'inter', label: 'Banco Inter', agencia: '', conta: '', convenio: '', apiKey: '', active: false },
-  ]);
+  // ---- Bank Configs (server-side) ----
+  const [banks, setBanks] = useState<BankConfig[]>([]);
+  const [banksLoading, setBanksLoading] = useState(true);
+  const [bankApiKeys, setBankApiKeys] = useState<Record<string, string>>({});
+  const [banksSaving, setBanksSaving] = useState(false);
 
-  const [users, setUsers] = useState<SystemUser[]>([
-    { id: '1', name: 'Administrador', email: 'admin@protenexus.com', password: '1234', level: 'admin', active: true },
-  ]);
+  const fetchBanks = useCallback(async () => {
+    setBanksLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-bank-config', { method: 'GET' });
+      if (error) throw error;
+      setBanks(data || []);
+    } catch {
+      toast({ title: 'Erro ao carregar configurações bancárias', variant: 'destructive' });
+    } finally {
+      setBanksLoading(false);
+    }
+  }, [toast]);
 
+  useEffect(() => { fetchBanks(); }, [fetchBanks]);
+
+  const handleBankFieldChange = (bankId: string, field: string, value: string | boolean) => {
+    setBanks(prev => prev.map(b => b.id === bankId ? { ...b, [field]: value } : b));
+  };
+
+  const handleSaveBanks = async () => {
+    setBanksSaving(true);
+    try {
+      for (const bank of banks) {
+        const payload: Record<string, any> = {
+          id: bank.id,
+          agencia: bank.agencia,
+          conta: bank.conta,
+          convenio: bank.convenio,
+          active: bank.active,
+        };
+        // Only send API key if user entered a new one
+        const newKey = bankApiKeys[bank.id];
+        if (newKey !== undefined && newKey !== '') {
+          payload.api_key = newKey;
+        }
+        await supabase.functions.invoke('manage-bank-config', {
+          method: 'PUT',
+          body: payload,
+        });
+      }
+      setBankApiKeys({});
+      toast({ title: 'Configurações bancárias salvas', description: 'As chaves de API são armazenadas de forma segura no servidor.' });
+      fetchBanks();
+    } catch {
+      toast({ title: 'Erro ao salvar configurações', variant: 'destructive' });
+    } finally {
+      setBanksSaving(false);
+    }
+  };
+
+  // ---- Users (server-side) ----
+  const [users, setUsers] = useState<SystemUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [usersSaving, setUsersSaving] = useState(false);
+
+  const fetchUsers = useCallback(async () => {
+    setUsersLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-users', { method: 'GET' });
+      if (error) throw error;
+      setUsers(data || []);
+    } catch {
+      toast({ title: 'Erro ao carregar usuários', variant: 'destructive' });
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+
+  // ---- Permissions (client-side UI only) ----
   const [permissions, setPermissions] = useState<Record<string, Record<string, boolean>>>(
     JSON.parse(JSON.stringify(defaultPermissions))
   );
 
   const handleTogglePermission = (level: string, key: string) => {
-    if (level === 'admin') return; // Admin sempre tem tudo
+    if (level === 'admin') return;
     setPermissions(prev => ({
       ...prev,
       [level]: { ...prev[level], [key]: !prev[level][key] },
@@ -119,50 +182,88 @@ const Settings = () => {
     toast({ title: 'Permissões salvas', description: 'As permissões foram atualizadas com sucesso.' });
   };
 
+  // ---- PWA ----
   const [pwaEnabled, setPwaEnabled] = useState(true);
   const systemUrl = window.location.origin;
 
+  // ---- User Dialog ----
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
-  const [userForm, setUserForm] = useState<Omit<SystemUser, 'id'>>({ name: '', email: '', password: '', level: 'N1', active: true });
-
-  const handleBankChange = (bankId: string, field: keyof BankConfig, value: string | boolean) => {
-    setBanks(prev => prev.map(b => b.id === bankId ? { ...b, [field]: value } : b));
-  };
-
-  const handleSaveBanks = () => {
-    toast({ title: 'Configurações bancárias salvas', description: 'As integrações foram atualizadas com sucesso.' });
-  };
+  const [userForm, setUserForm] = useState({ name: '', email: '', password: '', level: 'n1', active: true });
 
   const openAddUser = () => {
     setEditingUser(null);
-    setUserForm({ name: '', email: '', password: '', level: 'N1', active: true });
+    setUserForm({ name: '', email: '', password: '', level: 'n1', active: true });
     setUserDialogOpen(true);
   };
 
   const openEditUser = (user: SystemUser) => {
     setEditingUser(user);
-    setUserForm({ name: user.name, email: user.email, password: user.password, level: user.level, active: user.active });
+    setUserForm({ name: user.name, email: user.email, password: '', level: user.level, active: user.active });
     setUserDialogOpen(true);
   };
 
-  const handleSaveUser = () => {
-    if (!userForm.name || !userForm.email) return;
-    if (editingUser) {
-      setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...userForm } : u));
-    } else {
-      setUsers(prev => [...prev, { ...userForm, id: Date.now().toString() }]);
+  const handleSaveUser = async () => {
+    if (!userForm.email) return;
+    setUsersSaving(true);
+    try {
+      if (editingUser) {
+        await supabase.functions.invoke('manage-users', {
+          body: {
+            action: 'update',
+            user_id: editingUser.id,
+            name: userForm.name,
+            level: userForm.level,
+            active: userForm.active,
+          },
+        });
+        toast({ title: 'Usuário atualizado' });
+      } else {
+        if (!userForm.password || userForm.password.length < 8) {
+          toast({ title: 'Senha deve ter pelo menos 8 caracteres', variant: 'destructive' });
+          setUsersSaving(false);
+          return;
+        }
+        const { data, error } = await supabase.functions.invoke('manage-users', {
+          body: {
+            action: 'create',
+            email: userForm.email,
+            password: userForm.password,
+            name: userForm.name,
+            level: userForm.level,
+          },
+        });
+        if (error || data?.error) {
+          toast({ title: data?.error || 'Erro ao criar usuário', variant: 'destructive' });
+          setUsersSaving(false);
+          return;
+        }
+        toast({ title: 'Usuário criado', description: 'O usuário deverá redefinir a senha no primeiro acesso.' });
+      }
+      setUserDialogOpen(false);
+      fetchUsers();
+    } catch {
+      toast({ title: 'Erro ao salvar usuário', variant: 'destructive' });
+    } finally {
+      setUsersSaving(false);
     }
-    setUserDialogOpen(false);
-    toast({ title: editingUser ? 'Usuário atualizado' : 'Usuário adicionado' });
   };
 
-  const handleDeleteUser = (id: string) => {
-    setUsers(prev => prev.filter(u => u.id !== id));
-    toast({ title: 'Usuário removido', variant: 'destructive' });
+  const handleDeleteUser = async (id: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-users', {
+        body: { action: 'delete', user_id: id },
+      });
+      if (error || data?.error) {
+        toast({ title: data?.error || 'Erro ao remover', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Usuário removido', variant: 'destructive' });
+      fetchUsers();
+    } catch {
+      toast({ title: 'Erro ao remover usuário', variant: 'destructive' });
+    }
   };
-
-  // handleCheckUpdate removido - agora usa SystemUpdate component
 
   return (
     <div className="space-y-6">
@@ -195,74 +296,89 @@ const Settings = () => {
 
         {/* ===== BANCOS ===== */}
         <TabsContent value="banks" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {banks.map(bank => (
-              <Card key={bank.id} className="bg-card border-border">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">{bank.label}</CardTitle>
-                    <Switch
-                      checked={bank.active}
-                      onCheckedChange={(v) => handleBankChange(bank.id, 'active', v)}
-                    />
-                  </div>
-                  <CardDescription className="text-xs">
-                    {bank.active ? 'Integração ativa' : 'Integração desativada'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Agência</Label>
-                      <Input
-                        value={bank.agencia}
-                        onChange={e => handleBankChange(bank.id, 'agencia', e.target.value)}
-                        placeholder="0000"
-                        className="h-8 text-sm bg-muted border-border"
-                        disabled={!bank.active}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Conta</Label>
-                      <Input
-                        value={bank.conta}
-                        onChange={e => handleBankChange(bank.id, 'conta', e.target.value)}
-                        placeholder="00000-0"
-                        className="h-8 text-sm bg-muted border-border"
-                        disabled={!bank.active}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Convênio / Beneficiário</Label>
-                    <Input
-                      value={bank.convenio}
-                      onChange={e => handleBankChange(bank.id, 'convenio', e.target.value)}
-                      placeholder="Número do convênio"
-                      className="h-8 text-sm bg-muted border-border"
-                      disabled={!bank.active}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Chave API / Token</Label>
-                    <Input
-                      type="password"
-                      value={bank.apiKey}
-                      onChange={e => handleBankChange(bank.id, 'apiKey', e.target.value)}
-                      placeholder="••••••••"
-                      className="h-8 text-sm bg-muted border-border"
-                      disabled={!bank.active}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          <div className="flex justify-end">
-            <Button onClick={handleSaveBanks} className="gap-2">
-              <Save className="w-4 h-4" /> Salvar Configurações Bancárias
-            </Button>
-          </div>
+          {banksLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {banks.map(bank => (
+                  <Card key={bank.id} className="bg-card border-border">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base">{bank.label}</CardTitle>
+                        <Switch
+                          checked={bank.active}
+                          onCheckedChange={(v) => handleBankFieldChange(bank.id, 'active', v)}
+                        />
+                      </div>
+                      <CardDescription className="text-xs">
+                        {bank.active ? 'Integração ativa' : 'Integração desativada'}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Agência</Label>
+                          <Input
+                            value={bank.agencia}
+                            onChange={e => handleBankFieldChange(bank.id, 'agencia', e.target.value)}
+                            placeholder="0000"
+                            className="h-8 text-sm bg-muted border-border"
+                            disabled={!bank.active}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Conta</Label>
+                          <Input
+                            value={bank.conta}
+                            onChange={e => handleBankFieldChange(bank.id, 'conta', e.target.value)}
+                            placeholder="00000-0"
+                            className="h-8 text-sm bg-muted border-border"
+                            disabled={!bank.active}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Convênio / Beneficiário</Label>
+                        <Input
+                          value={bank.convenio}
+                          onChange={e => handleBankFieldChange(bank.id, 'convenio', e.target.value)}
+                          placeholder="Número do convênio"
+                          className="h-8 text-sm bg-muted border-border"
+                          disabled={!bank.active}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">
+                          Chave API / Token
+                          {bank.has_api_key && (
+                            <Badge variant="secondary" className="ml-2 text-[10px]">Configurada</Badge>
+                          )}
+                        </Label>
+                        <Input
+                          type="password"
+                          value={bankApiKeys[bank.id] || ''}
+                          onChange={e => setBankApiKeys(prev => ({ ...prev, [bank.id]: e.target.value }))}
+                          placeholder={bank.has_api_key ? '••••••••  (deixe vazio para manter)' : 'Insira a chave API'}
+                          className="h-8 text-sm bg-muted border-border"
+                          disabled={!bank.active}
+                        />
+                        <p className="text-[10px] text-muted-foreground">🔒 Armazenada de forma segura no servidor</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={handleSaveBanks} className="gap-2" disabled={banksSaving}>
+                  {banksSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Salvar Configurações Bancárias
+                </Button>
+              </div>
+            </>
+          )}
         </TabsContent>
 
         {/* ===== SERVIDORES ===== */}
@@ -285,10 +401,10 @@ const Settings = () => {
         <TabsContent value="permissions" className="space-y-4">
           {/* Legend */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            {(['N1', 'N2', 'N3', 'admin'] as const).map(level => (
+            {(['n1', 'n2', 'n3', 'admin'] as const).map(level => (
               <Card key={level} className="bg-card border-border">
                 <CardContent className="p-4">
-                  <Badge variant={level === 'admin' ? 'default' : 'secondary'} className="mb-2">{level === 'admin' ? 'Admin' : level}</Badge>
+                  <Badge variant={level === 'admin' ? 'default' : 'secondary'} className="mb-2">{level === 'admin' ? 'Admin' : level.toUpperCase()}</Badge>
                   <p className="text-xs text-muted-foreground">{levelDescriptions[level]}</p>
                 </CardContent>
               </Card>
@@ -321,7 +437,7 @@ const Settings = () => {
                   {permissionModules.map(mod => (
                     <TableRow key={mod.key}>
                       <TableCell className="font-medium text-sm">{mod.label}</TableCell>
-                      {(['N1', 'N2', 'N3', 'admin'] as const).map(level => (
+                      {(['n1', 'n2', 'n3', 'admin'] as const).map(level => (
                         <TableCell key={level} className="text-center">
                           <Switch
                             checked={permissions[level][mod.key]}
@@ -347,45 +463,51 @@ const Settings = () => {
               </Button>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Nível</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-[100px]">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map(user => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.name}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{user.email}</TableCell>
-                      <TableCell>
-                        <Badge variant={user.level === 'admin' ? 'default' : 'secondary'}>
-                          {user.level === 'admin' ? 'Admin' : user.level}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className={`text-xs font-mono ${user.active ? 'text-success' : 'text-destructive'}`}>
-                          {user.active ? 'Ativo' : 'Inativo'}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditUser(user)}>
-                            <Edit className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteUser(user.id)}>
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
+              {usersLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Nível</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-[100px]">Ações</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map(user => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{user.email}</TableCell>
+                        <TableCell>
+                          <Badge variant={user.level === 'admin' ? 'default' : 'secondary'}>
+                            {user.level === 'admin' ? 'Admin' : user.level.toUpperCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`text-xs font-mono ${user.active ? 'text-success' : 'text-destructive'}`}>
+                            {user.active ? 'Ativo' : 'Inativo'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditUser(user)}>
+                              <Edit className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteUser(user.id)}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -484,35 +606,55 @@ const Settings = () => {
               <Input value={userForm.name} onChange={e => setUserForm(p => ({ ...p, name: e.target.value }))} className="bg-muted border-border" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Senha</Label>
-              <Input type="password" value={userForm.password} onChange={e => setUserForm(p => ({ ...p, password: e.target.value }))} className="bg-muted border-border" placeholder="••••" />
-            </div>
-            <div className="space-y-1">
               <Label className="text-xs">Email</Label>
-              <Input type="email" value={userForm.email} onChange={e => setUserForm(p => ({ ...p, email: e.target.value }))} className="bg-muted border-border" />
+              <Input 
+                type="email" 
+                value={userForm.email} 
+                onChange={e => setUserForm(p => ({ ...p, email: e.target.value }))} 
+                className="bg-muted border-border"
+                disabled={!!editingUser}
+              />
             </div>
+            {!editingUser && (
+              <div className="space-y-1">
+                <Label className="text-xs">Senha temporária</Label>
+                <Input 
+                  type="password" 
+                  value={userForm.password} 
+                  onChange={e => setUserForm(p => ({ ...p, password: e.target.value }))} 
+                  className="bg-muted border-border" 
+                  placeholder="Mínimo 8 caracteres"
+                />
+                <p className="text-[10px] text-muted-foreground">O usuário será solicitado a redefinir no primeiro acesso</p>
+              </div>
+            )}
             <div className="space-y-1">
               <Label className="text-xs">Nível de Permissão</Label>
-              <Select value={userForm.level} onValueChange={v => setUserForm(p => ({ ...p, level: v as SystemUser['level'] }))}>
+              <Select value={userForm.level} onValueChange={v => setUserForm(p => ({ ...p, level: v }))}>
                 <SelectTrigger className="bg-muted border-border">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="N1">N1 — Apenas Visualização</SelectItem>
-                  <SelectItem value="N2">N2 — Operador (sem financeiro)</SelectItem>
-                  <SelectItem value="N3">N3 — Operador Avançado</SelectItem>
+                  <SelectItem value="n1">N1 — Apenas Visualização</SelectItem>
+                  <SelectItem value="n2">N2 — Operador (sem financeiro)</SelectItem>
+                  <SelectItem value="n3">N3 — Operador Avançado</SelectItem>
                   <SelectItem value="admin">Admin — Acesso Total</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-2">
-              <Switch checked={userForm.active} onCheckedChange={v => setUserForm(p => ({ ...p, active: v }))} />
-              <Label className="text-xs">Ativo</Label>
-            </div>
+            {editingUser && (
+              <div className="flex items-center gap-2">
+                <Switch checked={userForm.active} onCheckedChange={v => setUserForm(p => ({ ...p, active: v }))} />
+                <Label className="text-xs">Ativo</Label>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setUserDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSaveUser}>Salvar</Button>
+            <Button onClick={handleSaveUser} disabled={usersSaving}>
+              {usersSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Salvar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

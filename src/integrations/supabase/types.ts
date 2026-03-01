@@ -115,6 +115,45 @@ export type Database = {
           },
         ]
       }
+      bank_configs: {
+        Row: {
+          active: boolean | null
+          agencia: string | null
+          api_key_encrypted: string | null
+          bank: string
+          conta: string | null
+          convenio: string | null
+          created_at: string | null
+          id: string
+          label: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          agencia?: string | null
+          api_key_encrypted?: string | null
+          bank: string
+          conta?: string | null
+          convenio?: string | null
+          created_at?: string | null
+          id?: string
+          label: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          agencia?: string | null
+          api_key_encrypted?: string | null
+          bank?: string
+          conta?: string | null
+          convenio?: string | null
+          created_at?: string | null
+          id?: string
+          label?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       bills: {
         Row: {
           amount: number
