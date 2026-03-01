@@ -14,17 +14,14 @@ const SystemUpdate = () => {
   const [updateMessage, setUpdateMessage] = useState('');
   const [versionInfo, setVersionInfo] = useState<{ version: string; date: string; branch: string } | null>(null);
 
-  const apiUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
   const host = typeof window !== 'undefined' ? window.location.hostname : '';
-  const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
-  const isPreviewEnv = host.includes('lovable.app');
-  const isMixedContentBlocked = protocol === 'https:' && apiUrl.startsWith('http://');
-  const updateAvailable = !isPreviewEnv && !isMixedContentBlocked;
+  const isPreviewEnv = host.includes('lovable.app') || host.includes('lovableproject.com');
+  const updateAvailable = !isPreviewEnv;
   const blockedReason = isPreviewEnv
     ? 'Atualização por botão disponível apenas no servidor local.'
-    : isMixedContentBlocked
-      ? 'Bloqueado por segurança do navegador (HTTPS x HTTP). Acesse pelo IP local do servidor.'
-      : '';
+    : '';
+  const apiBase = typeof window !== 'undefined' ? window.location.origin.replace(/\/$/, '') : '';
+  const systemApiBase = `${apiBase}/auth/api/system`;
 
   useEffect(() => {
     fetchVersion();
@@ -32,7 +29,7 @@ const SystemUpdate = () => {
 
   const fetchVersion = async () => {
     try {
-      const res = await fetch(`${apiUrl}/api/system/version`);
+      const res = await fetch(`${systemApiBase}/version`);
       if (res.ok) {
         const data = await res.json();
         setVersionInfo(data);
@@ -62,7 +59,7 @@ const SystemUpdate = () => {
       const { data: { session } } = await supabase.auth.getSession();
       const accessToken = session?.access_token || '';
 
-      const res = await fetch(`${apiUrl}/api/system/update`, {
+      const res = await fetch(`${systemApiBase}/update`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
