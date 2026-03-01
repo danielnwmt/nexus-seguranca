@@ -232,7 +232,7 @@ Restart-Service NexusFrontend
 
 ```powershell
 $pgBin = "C:\Program Files\PostgreSQL\16\bin"
-$env:PGPASSWORD = "NexusDb2024!"
+$env:PGPASSWORD = "NexusDb2024"
 & "$pgBin\pg_dump.exe" -h localhost -U postgres nexus > "backup_$(Get-Date -Format 'yyyy-MM-dd').sql"
 ```
 
