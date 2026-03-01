@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Lock, Mail, AlertCircle } from 'lucide-react';
+import { Lock, Mail, AlertCircle, ShieldAlert } from 'lucide-react';
 import nexusLogo from '@/assets/nexus-logo.png';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 
@@ -17,32 +17,28 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [loginAttempts, setLoginAttempts] = useState(0);
-  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+  const [isRateLimited, setIsRateLimited] = useState(false);
+  const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (lockoutUntil && Date.now() < lockoutUntil) {
-      const remaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
-      setError(`Aguarde ${remaining}s antes de tentar novamente.`);
-      return;
-    }
-
     setError('');
     setLoading(true);
-    const { error } = await signIn(email, password);
-    if (error) {
-      const attempts = loginAttempts + 1;
-      setLoginAttempts(attempts);
-      if (attempts >= 5) {
-        const lockout = Math.min(30000 * Math.pow(2, attempts - 5), 300000);
-        setLockoutUntil(Date.now() + lockout);
+
+    const result = await signIn(email, password);
+
+    if (result.error) {
+      if (result.rateLimited) {
+        setIsRateLimited(true);
+        setError(result.error.message);
+      } else {
+        setIsRateLimited(false);
+        setRemainingAttempts(result.remainingAttempts ?? null);
+        setError(result.error.message);
       }
-      setError('Email ou senha inválidos');
     } else {
-      setLoginAttempts(0);
-      setLockoutUntil(null);
+      setIsRateLimited(false);
+      setRemainingAttempts(null);
       // Check if user needs to set password on first access
       const { data: { user } } = await supabase.auth.getUser();
       if (user?.user_metadata?.force_password_change) {
@@ -75,6 +71,7 @@ const Login = () => {
                 placeholder="seu@email.com"
                 className="pl-9 bg-muted border-border"
                 required
+                disabled={isRateLimited}
               />
             </div>
           </div>
@@ -89,22 +86,35 @@ const Login = () => {
                 placeholder="••••••••"
                 className="pl-9 bg-muted border-border"
                 required
+                disabled={isRateLimited}
               />
             </div>
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 text-xs text-destructive">
-              <AlertCircle className="w-3.5 h-3.5" />
-              {error}
+            <div className={`flex items-center gap-2 text-xs ${isRateLimited ? 'text-warning' : 'text-destructive'}`}>
+              {isRateLimited ? <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />}
+              <div>
+                <span>{error}</span>
+                {remainingAttempts !== null && remainingAttempts > 0 && (
+                  <span className="block text-muted-foreground mt-0.5">
+                    {remainingAttempts} tentativa{remainingAttempts !== 1 ? 's' : ''} restante{remainingAttempts !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
             </div>
           )}
 
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Entrando...' : 'Entrar'}
+          <Button type="submit" className="w-full" disabled={loading || isRateLimited}>
+            {loading ? 'Entrando...' : isRateLimited ? 'Bloqueado temporariamente' : 'Entrar'}
           </Button>
-        </form>
 
+          {isRateLimited && (
+            <p className="text-[10px] text-center text-muted-foreground">
+              🔒 Proteção contra força bruta ativada no servidor
+            </p>
+          )}
+        </form>
       </div>
     </div>
   );
