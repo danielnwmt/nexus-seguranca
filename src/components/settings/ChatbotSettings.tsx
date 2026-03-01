@@ -52,10 +52,27 @@ const ChatbotSettings = () => {
     setActions(prev => prev.map(a => a.id === id ? { ...a, active: !a.active } : a));
   };
 
+  const validateWebhookUrl = (url: string): string | null => {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'https:') {
+        return 'Apenas URLs HTTPS são permitidas por segurança.';
+      }
+      return null;
+    } catch {
+      return 'URL inválida. Verifique o formato.';
+    }
+  };
+
   const handleTestWebhook = async () => {
     const url = n8nWebhookTest || n8nWebhookUrl;
     if (!url) {
       toast({ title: 'Informe a URL do webhook n8n', variant: 'destructive' });
+      return;
+    }
+    const validationError = validateWebhookUrl(url);
+    if (validationError) {
+      toast({ title: 'URL inválida', description: validationError, variant: 'destructive' });
       return;
     }
     setTestLoading(true);
@@ -81,6 +98,18 @@ const ChatbotSettings = () => {
     if (!n8nWebhookUrl) {
       toast({ title: 'Informe a URL do webhook de produção', variant: 'destructive' });
       return;
+    }
+    const validationError = validateWebhookUrl(n8nWebhookUrl);
+    if (validationError) {
+      toast({ title: 'URL de produção inválida', description: validationError, variant: 'destructive' });
+      return;
+    }
+    if (n8nWebhookTest) {
+      const testValidation = validateWebhookUrl(n8nWebhookTest);
+      if (testValidation) {
+        toast({ title: 'URL de teste inválida', description: testValidation, variant: 'destructive' });
+        return;
+      }
     }
     // Save to localStorage for the chat widget to use
     localStorage.setItem('bravo_n8n_webhook', n8nWebhookUrl);
