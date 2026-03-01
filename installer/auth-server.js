@@ -12,6 +12,8 @@ const crypto = require('crypto');
 const PORT = 8001;
 const JWT_SECRET = 'nexus-monitoramento-jwt-secret-key-2024-super-seguro';
 const POSTGREST_URL = 'http://127.0.0.1:3000';
+const CORS_HEADERS = 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version';
+const CORS_METHODS = 'GET,POST,PUT,PATCH,DELETE,OPTIONS';
 
 const pool = new Pool({
   host: 'localhost',
@@ -69,8 +71,8 @@ function sendJSON(res, status, data) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': '*',
-    'Access-Control-Allow-Methods': '*'
+    'Access-Control-Allow-Headers': CORS_HEADERS,
+    'Access-Control-Allow-Methods': CORS_METHODS
   });
   res.end(JSON.stringify(data));
 }
@@ -114,8 +116,8 @@ function proxyToPostgREST(req, res, path) {
     // Add CORS headers
     const headers = { ...proxyRes.headers };
     headers['access-control-allow-origin'] = '*';
-    headers['access-control-allow-headers'] = '*';
-    headers['access-control-allow-methods'] = '*';
+    headers['access-control-allow-headers'] = CORS_HEADERS;
+    headers['access-control-allow-methods'] = CORS_METHODS;
     
     res.writeHead(proxyRes.statusCode, headers);
     proxyRes.pipe(res);
@@ -131,8 +133,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': '*',
-      'Access-Control-Allow-Methods': '*'
+      'Access-Control-Allow-Headers': CORS_HEADERS,
+      'Access-Control-Allow-Methods': CORS_METHODS
     });
     return res.end();
   }
