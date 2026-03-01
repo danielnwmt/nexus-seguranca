@@ -3,7 +3,7 @@
 #  Nexus Monitoramento — Instalador Online (One-Liner)
 #  
 #  USO:
-#    curl -fsSL https://raw.githubusercontent.com/danielnwmt/bravo-seguran-a/main/installer/install-online.sh | sudo bash
+#    curl -fsSL https://raw.githubusercontent.com/danielnwmt/nexus-seguranca/main/installer/install-online.sh | sudo bash
 #
 #  OU com repositorio customizado:
 #    curl -fsSL URL_DO_SCRIPT | sudo REPO_URL="https://github.com/user/repo" bash
@@ -12,7 +12,7 @@
 
 set -e
 
-REPO_URL="${REPO_URL:-https://github.com/danielnwmt/bravo-seguran-a}"
+REPO_URL="${REPO_URL:-https://github.com/danielnwmt/nexus-seguranca}"
 BRANCH="${BRANCH:-main}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/nexus-monitoramento}"
 

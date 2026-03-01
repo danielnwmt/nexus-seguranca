@@ -11,7 +11,7 @@ set -e
 
 # ---------- Parametros (editaveis) ----------
 INSTALL_DIR="${INSTALL_DIR:-/opt/nexus-monitoramento}"
-REPO_URL="${REPO_URL:-https://github.com/danielnwmt/bravo-seguran-a}"
+REPO_URL="${REPO_URL:-https://github.com/danielnwmt/nexus-seguranca}"
 PORT="${PORT:-80}"
 API_PORT="${API_PORT:-8001}"
 POSTGREST_PORT="${POSTGREST_PORT:-3000}"

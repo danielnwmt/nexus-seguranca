@@ -2,7 +2,7 @@
 #  Nexus Monitoramento — Instalador Online Windows (One-Liner)
 #
 #  USO (PowerShell como Administrador):
-#    Set-ExecutionPolicy Bypass -Scope Process -Force; iwr -useb https://raw.githubusercontent.com/danielnwmt/bravo-seguran-a/main/installer/install-online.ps1 | iex
+#    Set-ExecutionPolicy Bypass -Scope Process -Force; iwr -useb https://raw.githubusercontent.com/danielnwmt/nexus-seguranca/main/installer/install-online.ps1 | iex
 #
 # ============================================================
 
@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$RepoUrl = if ($env:REPO_URL) { $env:REPO_URL } else { "https://github.com/danielnwmt/bravo-seguran-a" }
+$RepoUrl = if ($env:REPO_URL) { $env:REPO_URL } else { "https://github.com/danielnwmt/nexus-seguranca" }
 $Branch = if ($env:BRANCH) { $env:BRANCH } else { "main" }
 $InstallDir = if ($env:INSTALL_DIR) { $env:INSTALL_DIR } else { "C:\NexusMonitoramento" }
 

@@ -3,7 +3,7 @@
 ## 🚀 Instalação Rápida (Ubuntu - Uma Linha!)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/danielnwmt/bravo-seguran-a/main/installer/install-online.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/danielnwmt/nexus-seguranca/main/installer/install-online.sh | sudo bash
 ```
 
 > Substitua `SEU_USUARIO` pelo seu usuário do GitHub. O comando baixa e instala tudo automaticamente!
@@ -61,7 +61,7 @@ bash /opt/nexus-monitoramento/atualizar-nexus.sh
 
 ```powershell
 # Opção A — Via Git (recomendado para atualizações futuras)
-git clone https://github.com/seu-usuario/nexus-monitoramento.git C:\NexusMonitoramento
+git clone https://github.com/danielnwmt/nexus-seguranca.git C:\NexusMonitoramento
 cd C:\NexusMonitoramento
 
 # Opção B — Baixar ZIP
@@ -259,7 +259,7 @@ $env:PGPASSWORD = "NexusDb2024!"
 
 ```bash
 # 1. Baixar o projeto
-git clone https://github.com/seu-usuario/nexus-monitoramento.git /opt/nexus-monitoramento
+git clone https://github.com/danielnwmt/nexus-seguranca.git /opt/nexus-monitoramento
 cd /opt/nexus-monitoramento
 
 # 2. Executar o instalador
