@@ -33,9 +33,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
+  const isLocalServer = !import.meta.env.VITE_SUPABASE_URL?.includes('supabase.co');
+
   const signIn = async (email: string, password: string) => {
     try {
-      // Use server-side rate-limited auth endpoint
+      // Local server: use direct Supabase auth (compatible with local auth-server)
+      if (isLocalServer) {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          return { error: new Error(error.message === 'Invalid login credentials' ? 'Email ou senha inválidos' : error.message) };
+        }
+        return { error: null };
+      }
+
+      // Cloud: use server-side rate-limited auth endpoint
       const { data, error } = await supabase.functions.invoke('auth-login', {
         body: { email, password },
       });
@@ -44,7 +55,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { error: new Error('Erro de conexão com o servidor') };
       }
 
-      // Rate limited
       if (data?.error === 'rate_limited') {
         return {
           error: new Error(data.message),
@@ -53,7 +63,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
       }
 
-      // Invalid credentials
       if (data?.error === 'invalid_credentials') {
         return {
           error: new Error(data.message || 'Email ou senha inválidos'),
@@ -61,12 +70,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
       }
 
-      // Other errors
       if (data?.error) {
         return { error: new Error(data.message || data.error) };
       }
 
-      // Success - set session from the response
       if (data?.session) {
         await supabase.auth.setSession({
           access_token: data.session.access_token,
