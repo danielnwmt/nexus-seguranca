@@ -62,6 +62,15 @@ if (Test-Path "$InstallDir\.git") {
 
 Set-Location $InstallDir
 
+# Corrigir finais de linha (LF -> CRLF) para PowerShell
+Write-Host ">> Corrigindo encoding dos scripts..." -ForegroundColor Gray
+Get-ChildItem -Path $InstallDir -Filter "*.ps1" -Recurse | ForEach-Object {
+    $content = [IO.File]::ReadAllText($_.FullName)
+    if ($content -match "(?<!\r)\n") {
+        [IO.File]::WriteAllText($_.FullName, ($content -replace "(?<!\r)\n", "`r`n"))
+    }
+}
+
 # Executar instalador principal
 Write-Host ""
 Write-Host ">> Executando instalador principal..." -ForegroundColor Cyan
