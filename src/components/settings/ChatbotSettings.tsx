@@ -52,11 +52,24 @@ const ChatbotSettings = () => {
     setActions(prev => prev.map(a => a.id === id ? { ...a, active: !a.active } : a));
   };
 
+  const ALLOWED_WEBHOOK_DOMAINS = [
+    'hooks.n8n.cloud',
+    'n8n.cloud',
+    'app.n8n.cloud',
+  ];
+
   const validateWebhookUrl = (url: string): string | null => {
     try {
       const parsed = new URL(url);
       if (parsed.protocol !== 'https:') {
         return 'Apenas URLs HTTPS são permitidas por segurança.';
+      }
+      // Allow any .n8n. domain or custom n8n instances
+      const hostname = parsed.hostname.toLowerCase();
+      const isAllowed = ALLOWED_WEBHOOK_DOMAINS.some(d => hostname.endsWith(d)) ||
+        hostname.includes('n8n');
+      if (!isAllowed) {
+        return 'Apenas domínios n8n são permitidos. O hostname deve conter "n8n".';
       }
       return null;
     } catch {

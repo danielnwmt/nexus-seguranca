@@ -62,11 +62,14 @@ const ChatWidget = () => {
 
       let replyText = '';
 
-      const isValidHttpsUrl = (url: string) => {
-        try { return new URL(url).protocol === 'https:'; } catch { return false; }
+      const isValidWebhookUrl = (url: string) => {
+        try {
+          const parsed = new URL(url);
+          return parsed.protocol === 'https:' && parsed.hostname.toLowerCase().includes('n8n');
+        } catch { return false; }
       };
 
-      if (webhookUrl && botEnabled && isValidHttpsUrl(webhookUrl)) {
+      if (webhookUrl && botEnabled && isValidWebhookUrl(webhookUrl)) {
         // Try n8n webhook first
         try {
           const res = await fetch(webhookUrl, {
