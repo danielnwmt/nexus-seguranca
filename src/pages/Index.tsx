@@ -29,7 +29,7 @@ const Index = () => {
       id: c.id, name: c.name, clientId: c.client_id || '', clientName: client?.name || '',
       streamUrl: c.stream_url || '', protocol: c.protocol || 'RTSP', status: c.status || 'online',
       location: c.location || '', resolution: c.resolution || '', storagePath: c.storage_path || '',
-      retentionDays: c.retention_days || 30, analytics: c.analytics || [],
+      retentionDays: c.retention_days ?? 30, analytics: c.analytics || [],
     };
   };
 
