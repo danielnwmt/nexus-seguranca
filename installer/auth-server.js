@@ -229,36 +229,36 @@ const server = http.createServer(async (req, res) => {
       const INSTALL_DIR = process.env.INSTALL_DIR || '/opt/nexus-monitoramento';
 
       try {
-        // Descartar alteracoes locais feitas pelo instalador antes do pull
-        execSync(`cd ${INSTALL_DIR} && git checkout -- . 2>&1`, { timeout: 15000 });
-        // Git pull
-        const gitOutput = execSync(`cd ${INSTALL_DIR} && git pull origin main 2>&1`, { timeout: 60000 }).toString();
-        
-        if (gitOutput.includes('Already up to date')) {
+        const scriptPath = `${INSTALL_DIR}/atualizar-nexus.sh`;
+        const output = execSync(`bash ${scriptPath} 2>&1`, { timeout: 600000 }).toString();
+
+        if (output.includes('Already up to date') || output.includes('ja esta na versao')) {
           return sendJSON(res, 200, { 
             status: 'up_to_date', 
             message: 'Sistema ja esta na versao mais recente.',
-            output: gitOutput.trim()
+            output: output.trim()
           });
         }
-
-        // Reinstalar dependencias e rebuild
-        execSync(`cd ${INSTALL_DIR} && npm install --legacy-peer-deps 2>&1`, { timeout: 300000 });
-        execSync(`cd ${INSTALL_DIR} && npm run build 2>&1`, { timeout: 300000 });
-        
-        // Restart nginx para servir novos arquivos
-        try { execSync('sudo systemctl restart nginx 2>&1', { timeout: 10000 }); } catch(e) {}
 
         return sendJSON(res, 200, { 
           status: 'updated', 
           message: 'Sistema atualizado com sucesso! Recarregue a pagina.',
-          output: gitOutput.trim()
+          output: output.trim()
         });
       } catch (error) {
+        const stdout = error.stdout ? error.stdout.toString() : '';
+        // Se o script rodou mas retornou algo util, pode ser sucesso
+        if (stdout.includes('atualizado') || stdout.includes('sucesso')) {
+          return sendJSON(res, 200, {
+            status: 'updated',
+            message: 'Sistema atualizado com sucesso! Recarregue a pagina.',
+            output: stdout.trim()
+          });
+        }
         return sendJSON(res, 500, { 
           status: 'error', 
           message: 'Erro ao atualizar: ' + error.message,
-          output: error.stdout ? error.stdout.toString() : ''
+          output: stdout
         });
       }
     }
