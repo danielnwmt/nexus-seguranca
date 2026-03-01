@@ -62,13 +62,12 @@ if (Test-Path "$InstallDir\.git") {
 
 Set-Location $InstallDir
 
-# Corrigir finais de linha (LF -> CRLF) para PowerShell
+# Corrigir finais de linha (LF -> CRLF) e encoding para PowerShell (UTF-16 LE)
 Write-Host ">> Corrigindo encoding dos scripts..." -ForegroundColor Gray
 Get-ChildItem -Path $InstallDir -Filter "*.ps1" -Recurse | ForEach-Object {
-    $content = [IO.File]::ReadAllText($_.FullName)
-    if ($content -match "(?<!\r)\n") {
-        [IO.File]::WriteAllText($_.FullName, ($content -replace "(?<!\r)\n", "`r`n"))
-    }
+    $content = Get-Content -Path $_.FullName -Raw
+    $normalized = $content -replace "(?<!`r)`n", "`r`n"
+    Set-Content -Path $_.FullName -Value $normalized -Encoding Unicode
 }
 
 # Executar instalador principal
