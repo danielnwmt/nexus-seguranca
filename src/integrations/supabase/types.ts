@@ -184,6 +184,33 @@ export type Database = {
         }
         Relationships: []
       }
+      bank_configs_audit: {
+        Row: {
+          accessed_at: string | null
+          action: string
+          bank_config_id: string
+          id: string
+          ip_address: string | null
+          user_id: string | null
+        }
+        Insert: {
+          accessed_at?: string | null
+          action: string
+          bank_config_id: string
+          id?: string
+          ip_address?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          accessed_at?: string | null
+          action?: string
+          bank_config_id?: string
+          id?: string
+          ip_address?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       bills: {
         Row: {
           amount: number
