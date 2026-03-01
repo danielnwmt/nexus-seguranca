@@ -50,26 +50,26 @@ const Login = () => {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4 relative"
+      className="min-h-screen flex flex-col items-center justify-end pb-12 p-4 relative"
       style={{
         backgroundImage: 'url(/images/login-bg.png)',
         backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        backgroundPosition: 'center top',
         backgroundRepeat: 'no-repeat',
       }}
     >
-      {/* Dark overlay */}
-      <div className="absolute inset-0 bg-black/50" />
+      {/* Dark gradient overlay - lighter on top to show logo, darker at bottom */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/80" />
 
       <div className="w-full max-w-sm relative z-10">
-        <div className="flex flex-col items-center mb-8">
+        <div className="flex flex-col items-center mb-6">
           <h1 className="text-2xl font-bold text-white tracking-widest">
             {company?.name?.toUpperCase() || 'NEXUS'}
           </h1>
-          <p className="text-xs font-mono text-cyan-400 tracking-[0.3em]">MONITORAMENTO</p>
+          <p className="text-xs font-mono text-primary tracking-[0.3em]">MONITORAMENTO</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-white/10 bg-black/60 backdrop-blur-md p-6">
+        <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-white/10 bg-black/70 backdrop-blur-md p-6">
           <div>
             <Label className="text-xs text-white/70">Email</Label>
             <div className="relative">
