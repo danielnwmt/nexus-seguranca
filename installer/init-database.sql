@@ -157,6 +157,126 @@ CREATE TABLE IF NOT EXISTS public.company_settings (
   phone TEXT,
   address TEXT,
   logo_url TEXT,
+  media_server_ip TEXT DEFAULT '',
+  login_bg_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.storage_servers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  ip_address TEXT NOT NULL DEFAULT '',
+  storage_path TEXT NOT NULL DEFAULT '',
+  max_storage_gb INTEGER DEFAULT 1000,
+  status TEXT DEFAULT 'active',
+  description TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.media_servers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL DEFAULT 'Servidor MediaMTX',
+  ip_address TEXT NOT NULL DEFAULT '',
+  instances INTEGER NOT NULL DEFAULT 1,
+  rtmp_base_port INTEGER NOT NULL DEFAULT 1935,
+  hls_base_port INTEGER NOT NULL DEFAULT 8888,
+  webrtc_base_port INTEGER NOT NULL DEFAULT 8889,
+  status TEXT NOT NULL DEFAULT 'active',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.recordings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  camera_id UUID REFERENCES public.cameras(id) ON DELETE SET NULL,
+  camera_name TEXT,
+  client_id UUID REFERENCES public.clients(id) ON DELETE SET NULL,
+  client_name TEXT,
+  file_path TEXT NOT NULL DEFAULT '',
+  file_size_mb NUMERIC DEFAULT 0,
+  duration_seconds INTEGER DEFAULT 0,
+  start_time TIMESTAMPTZ DEFAULT now(),
+  end_time TIMESTAMPTZ,
+  status TEXT DEFAULT 'completed',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.analytics_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  camera_id UUID REFERENCES public.cameras(id) ON DELETE SET NULL,
+  camera_name TEXT,
+  client_id UUID REFERENCES public.clients(id) ON DELETE SET NULL,
+  client_name TEXT,
+  event_type TEXT NOT NULL DEFAULT 'motion',
+  confidence NUMERIC DEFAULT 0,
+  details JSONB DEFAULT '{}'::jsonb,
+  thumbnail_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.service_orders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_number TEXT NOT NULL DEFAULT ('OS-' || to_char(now(), 'YYYYMMDD') || '-' || substr(gen_random_uuid()::text, 1, 4)),
+  type TEXT NOT NULL DEFAULT 'installation',
+  status TEXT NOT NULL DEFAULT 'pending',
+  description TEXT,
+  notes TEXT,
+  client_id UUID REFERENCES public.clients(id) ON DELETE SET NULL,
+  client_name TEXT,
+  installer_id UUID,
+  installer_name TEXT,
+  scheduled_date DATE,
+  completed_date DATE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.installers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  cpf TEXT,
+  email TEXT,
+  phone TEXT,
+  specialty TEXT DEFAULT 'cameras',
+  status TEXT DEFAULT 'active',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.patrol_routes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL DEFAULT 'Ronda',
+  description TEXT,
+  guard_id UUID REFERENCES public.guards(id) ON DELETE SET NULL,
+  client_id UUID REFERENCES public.clients(id) ON DELETE SET NULL,
+  city TEXT,
+  waypoints JSONB NOT NULL DEFAULT '[]'::jsonb,
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.bank_configs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  bank TEXT NOT NULL,
+  label TEXT NOT NULL,
+  agencia TEXT DEFAULT '',
+  conta TEXT DEFAULT '',
+  convenio TEXT DEFAULT '',
+  api_key_encrypted TEXT DEFAULT '',
+  active BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.auth_rate_limits (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  identifier TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 1,
+  first_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  locked_until TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -291,6 +411,15 @@ ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bills ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.company_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.storage_servers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.media_servers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.recordings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.analytics_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.service_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.installers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.patrol_routes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bank_configs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.auth_rate_limits ENABLE ROW LEVEL SECURITY;
 
 -- Politicas: usuarios autenticados podem tudo
 CREATE POLICY IF NOT EXISTS "auth_all_clients" ON public.clients FOR ALL USING (auth.uid() IS NOT NULL);
@@ -301,6 +430,15 @@ CREATE POLICY IF NOT EXISTS "auth_all_invoices" ON public.invoices FOR ALL USING
 CREATE POLICY IF NOT EXISTS "auth_all_bills" ON public.bills FOR ALL USING (auth.uid() IS NOT NULL);
 CREATE POLICY IF NOT EXISTS "auth_all_company" ON public.company_settings FOR ALL USING (auth.uid() IS NOT NULL);
 CREATE POLICY IF NOT EXISTS "auth_all_roles" ON public.user_roles FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY IF NOT EXISTS "auth_all_storage" ON public.storage_servers FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY IF NOT EXISTS "auth_all_media" ON public.media_servers FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY IF NOT EXISTS "auth_all_recordings" ON public.recordings FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY IF NOT EXISTS "auth_all_analytics" ON public.analytics_events FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY IF NOT EXISTS "auth_all_service_orders" ON public.service_orders FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY IF NOT EXISTS "auth_all_installers" ON public.installers FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY IF NOT EXISTS "auth_all_patrol_routes" ON public.patrol_routes FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY IF NOT EXISTS "auth_all_bank_configs" ON public.bank_configs FOR ALL USING (auth.uid() IS NOT NULL);
+CREATE POLICY IF NOT EXISTS "auth_all_rate_limits" ON public.auth_rate_limits FOR ALL USING (false);
 
 -- 8. Permissoes para PostgREST
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
