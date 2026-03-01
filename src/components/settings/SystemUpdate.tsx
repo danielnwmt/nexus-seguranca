@@ -82,7 +82,7 @@ const SystemUpdate = () => {
       setUpdateMessage('Não foi possível conectar ao servidor. Verifique se o sistema está rodando no servidor local.');
       toast({
         title: 'Erro de conexão',
-        description: 'Servidor não acessível. Use o script: bash atualizar-bravo.sh',
+        description: 'Servidor não acessível. Use o script: bash atualizar-nexus.sh',
         variant: 'destructive',
       });
     } finally {
@@ -163,7 +163,7 @@ const SystemUpdate = () => {
           <div className="border-t border-border pt-3">
             <p className="text-xs text-muted-foreground">
               O sistema faz <strong>git pull</strong> do repositório GitHub, reinstala dependências e reconstrói o frontend automaticamente.
-              Você também pode atualizar via terminal: <code className="bg-muted px-1 py-0.5 rounded text-xs">bash /opt/bravo-monitoramento/atualizar-bravo.sh</code>
+              Você também pode atualizar via terminal: <code className="bg-muted px-1 py-0.5 rounded text-xs">bash /opt/nexus-monitoramento/atualizar-nexus.sh</code>
             </p>
           </div>
         </CardContent>
@@ -211,7 +211,7 @@ const SystemUpdate = () => {
         <CardContent>
           <div className="bg-muted p-3 rounded-lg border border-border">
             <code className="text-xs font-mono text-foreground break-all">
-              curl -fsSL https://raw.githubusercontent.com/danielnwmt/bravo-seguran-a/main/installer/install-online.sh | sudo bash
+              curl -fsSL https://raw.githubusercontent.com/danielnwmt/nexus-seguranca/main/installer/install-online.sh | sudo bash
             </code>
           </div>
           <p className="text-xs text-muted-foreground mt-2">
@@ -231,7 +231,7 @@ const SystemUpdate = () => {
         <CardContent className="space-y-3">
           <div className="bg-muted p-3 rounded-lg border border-border">
             <code className="text-xs font-mono text-foreground break-all">
-              Set-ExecutionPolicy Bypass -Scope Process -Force; iwr -useb https://raw.githubusercontent.com/danielnwmt/bravo-seguran-a/main/installer/install-online.ps1 | iex
+              Set-ExecutionPolicy Bypass -Scope Process -Force; iwr -useb https://raw.githubusercontent.com/danielnwmt/nexus-seguranca/main/installer/install-online.ps1 | iex
             </code>
           </div>
           <p className="text-xs text-muted-foreground">

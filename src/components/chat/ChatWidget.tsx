@@ -18,7 +18,7 @@ interface BotAction {
 const ChatWidget = () => {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', role: 'bot', content: 'Olá! Sou o assistente Bravo. Como posso ajudar?', timestamp: new Date() },
+    { id: '1', role: 'bot', content: 'Olá! Sou o assistente Nexus. Como posso ajudar?', timestamp: new Date() },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,7 +32,7 @@ const ChatWidget = () => {
 
   const getFallbackReply = (message: string): string | null => {
     try {
-      const actionsJson = localStorage.getItem('bravo_bot_actions');
+      const actionsJson = localStorage.getItem('nexus_bot_actions');
       if (!actionsJson) return null;
       const actions: BotAction[] = JSON.parse(actionsJson);
       const lower = message.toLowerCase();
@@ -57,8 +57,8 @@ const ChatWidget = () => {
     setLoading(true);
 
     try {
-      const webhookUrl = localStorage.getItem('bravo_n8n_webhook');
-      const botEnabled = localStorage.getItem('bravo_bot_enabled') !== 'false';
+      const webhookUrl = localStorage.getItem('nexus_n8n_webhook');
+      const botEnabled = localStorage.getItem('nexus_bot_enabled') !== 'false';
 
       let replyText = '';
 
@@ -77,7 +77,7 @@ const ChatWidget = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               message: userMsg.content,
-              source: 'bravo-chat',
+              source: 'nexus-chat',
               timestamp: new Date().toISOString(),
             }),
           });
@@ -132,7 +132,7 @@ const ChatWidget = () => {
         <div className="flex items-center gap-2">
           <Bot className="w-5 h-5" />
           <div>
-            <p className="text-sm font-semibold">Assistente Bravo</p>
+            <p className="text-sm font-semibold">Assistente Nexus</p>
             <p className="text-[10px] opacity-80">Online • n8n</p>
           </div>
         </div>

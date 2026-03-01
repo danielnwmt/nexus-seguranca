@@ -38,7 +38,7 @@ const CompanySettings = () => {
   const [loginBgPreview, setLoginBgPreview] = useState<string | null>(null);
   const [form, setForm] = useState({
     id: '',
-    name: 'Bravo Monitoramento',
+    name: 'Nexus Monitoramento',
     razao_social: '',
     cnpj: '',
     address: '',
