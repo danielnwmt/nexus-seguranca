@@ -317,9 +317,14 @@ INSERT INTO public.company_settings (name)
 VALUES ('Nexus Segurança')
 ON CONFLICT DO NOTHING;
 
--- 10. Usuario administrador padrao (admin@protenexus.com / 1234)
-INSERT INTO auth.users (email, encrypted_password)
-VALUES ('admin@protenexus.com', crypt('1234', gen_salt('bf')))
+-- 10. Usuario administrador padrao (admin@protenexus.com)
+-- Senha temporária aleatória - o admin deve redefinir no primeiro acesso
+INSERT INTO auth.users (email, encrypted_password, raw_user_meta_data)
+VALUES (
+  'admin@protenexus.com',
+  crypt(gen_random_uuid()::text, gen_salt('bf')),
+  '{"force_password_change": true}'::jsonb
+)
 ON CONFLICT (email) DO NOTHING;
 
 -- 10. Funcao de login (retorna JWT claims)

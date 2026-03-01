@@ -17,6 +17,7 @@ import Installers from "./pages/Installers";
 import ServiceOrders from "./pages/ServiceOrders";
 import Support from "./pages/Support";
 import Login from "./pages/Login";
+import ResetPassword from "./pages/ResetPassword";
 import Analytics from "./pages/Analytics";
 import NotFound from "./pages/NotFound";
 
@@ -31,6 +32,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/" element={<Index />} />
               <Route path="/cameras" element={<Cameras />} />
