@@ -6,7 +6,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null; rateLimited?: boolean; message?: string; remainingAttempts?: number; remainingSeconds?: number }>;
   signOut: () => Promise<void>;
 }
 
@@ -34,8 +34,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error as Error | null };
+    try {
+      // Use server-side rate-limited auth endpoint
+      const { data, error } = await supabase.functions.invoke('auth-login', {
+        body: { email, password },
+      });
+
+      if (error) {
+        return { error: new Error('Erro de conexão com o servidor') };
+      }
+
+      // Rate limited
+      if (data?.error === 'rate_limited') {
+        return {
+          error: new Error(data.message),
+          rateLimited: true,
+          remainingSeconds: data.remaining_seconds,
+        };
+      }
+
+      // Invalid credentials
+      if (data?.error === 'invalid_credentials') {
+        return {
+          error: new Error(data.message || 'Email ou senha inválidos'),
+          remainingAttempts: data.remaining_attempts,
+        };
+      }
+
+      // Other errors
+      if (data?.error) {
+        return { error: new Error(data.message || data.error) };
+      }
+
+      // Success - set session from the response
+      if (data?.session) {
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+      }
+
+      return { error: null };
+    } catch (err) {
+      return { error: err as Error };
+    }
   };
 
   const signOut = async () => {

@@ -115,6 +115,36 @@ export type Database = {
           },
         ]
       }
+      auth_rate_limits: {
+        Row: {
+          attempts: number
+          created_at: string | null
+          first_attempt_at: string
+          id: string
+          identifier: string
+          locked_until: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string | null
+          first_attempt_at?: string
+          id?: string
+          identifier: string
+          locked_until?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          created_at?: string | null
+          first_attempt_at?: string
+          id?: string
+          identifier?: string
+          locked_until?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       bank_configs: {
         Row: {
           active: boolean | null
@@ -783,6 +813,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_rate_limit: {
+        Args: {
+          _identifier: string
+          _lockout_minutes?: number
+          _max_attempts?: number
+          _window_minutes?: number
+        }
+        Returns: Json
+      }
+      cleanup_old_rate_limits: { Args: never; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -791,6 +831,7 @@ export type Database = {
         Returns: boolean
       }
       is_authenticated: { Args: never; Returns: boolean }
+      reset_rate_limit: { Args: { _identifier: string }; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "n1" | "n2" | "n3"
