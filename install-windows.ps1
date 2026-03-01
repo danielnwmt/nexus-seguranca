@@ -27,6 +27,76 @@ function Write-Ok($msg)   { Write-Host "  [OK] $msg" -ForegroundColor Green }
 function Write-Warn($msg) { Write-Host "  [!] $msg" -ForegroundColor Yellow }
 function Write-Err($msg)  { Write-Host "  [X] $msg" -ForegroundColor Red }
 
+function Get-PostgresDataDir([string]$pgInstallPath) {
+    $candidate = Join-Path $pgInstallPath "data"
+    if (Test-Path (Join-Path $candidate "pg_hba.conf")) { return $candidate }
+
+    try {
+        $pgSvc = Get-Service -Name "postgresql*" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($pgSvc) {
+            $svc = Get-CimInstance Win32_Service -Filter "Name='$($pgSvc.Name)'"
+            if ($svc -and $svc.PathName -match '-D\s+"?([^"]+)"?') {
+                $svcDataDir = $Matches[1].Trim()
+                if (Test-Path (Join-Path $svcDataDir "pg_hba.conf")) { return $svcDataDir }
+            }
+        }
+    } catch {}
+
+    return $null
+}
+
+function Set-PostgresPasswordWithTrust([string]$psqlPath, [string]$pgInstallPath, [string]$PgPassword) {
+    $pgDataDir = Get-PostgresDataDir -pgInstallPath $pgInstallPath
+    if (-not $pgDataDir) {
+        Write-Warn "Nao foi possivel localizar pg_hba.conf para redefinir senha"
+        return $false
+    }
+
+    $pgHbaPath = Join-Path $pgDataDir "pg_hba.conf"
+    $pgHbaBackup = "$pgHbaPath.bak-nexus"
+    $pgSvc = Get-Service -Name "postgresql*" -ErrorAction SilentlyContinue | Select-Object -First 1
+    $alterOk = $false
+
+    try {
+        Copy-Item $pgHbaPath $pgHbaBackup -Force
+        $hbaContent = Get-Content -Path $pgHbaPath -Raw
+        $trustBlock = @"
+# nexus-temp-trust-start
+local   all             all                                     trust
+host    all             all             127.0.0.1/32            trust
+host    all             all             ::1/128                 trust
+# nexus-temp-trust-end
+"@
+        Set-Content -Path $pgHbaPath -Value ($trustBlock + "`r`n" + $hbaContent) -Encoding UTF8
+
+        if ($pgSvc) { Restart-Service $pgSvc.Name -Force; Start-Sleep -Seconds 3 }
+
+        & $psqlPath -h localhost -U postgres -d postgres -c "ALTER USER postgres PASSWORD '$PgPassword';" 2>&1 | Out-Null
+        $alterOk = ($LASTEXITCODE -eq 0)
+    } catch {
+        Write-Warn "Falha ao redefinir senha do PostgreSQL: $($_.Exception.Message)"
+    } finally {
+        if (Test-Path $pgHbaBackup) {
+            Copy-Item $pgHbaBackup $pgHbaPath -Force
+            Remove-Item $pgHbaBackup -Force -ErrorAction SilentlyContinue
+        }
+        if ($pgSvc) { Restart-Service $pgSvc.Name -Force; Start-Sleep -Seconds 3 }
+    }
+
+    if ($alterOk) {
+        Write-Ok "Senha do PostgreSQL configurada"
+        return $true
+    }
+
+    return $false
+}
+
+function Test-PostgresAccess([string]$psqlPath, [string]$PgPassword) {
+    $env:PGPASSWORD = $PgPassword
+    & $psqlPath -h localhost -U postgres -d postgres -tAc "SELECT 1;" 2>&1 | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+
 Write-Host ""
 Write-Host "=============================================" -ForegroundColor DarkCyan
 Write-Host "   NEXUS MONITORAMENTO - Instalador Windows" -ForegroundColor White
@@ -174,54 +244,10 @@ if (!$pgOk) {
             [System.Environment]::SetEnvironmentVariable("Path", "$pgBinPath;$machinePath", "Machine")
         }
 
-        # Quando instalado via winget, a senha do postgres nao e definida pelo nosso script.
-        # Precisamos redefinir a senha usando pg_hba.conf trust temporario ou ALTER USER.
         if ($installedByWinget) {
             Write-Host "  Configurando senha do PostgreSQL (instalado via winget)..." -ForegroundColor Gray
             Start-Sleep -Seconds 5
-
-            # Localizar pg_hba.conf
-            $pgDataDir = "$pgInstallPath\data"
-            if (-not (Test-Path "$pgDataDir\pg_hba.conf")) {
-                # Tentar encontrar data dir via servico
-                $pgSvc = Get-Service -Name "postgresql*" -ErrorAction SilentlyContinue | Select-Object -First 1
-                if ($pgSvc) {
-                    $svcPath = (Get-WmiObject win32_service | Where-Object { $_.Name -eq $pgSvc.Name }).PathName
-                    if ($svcPath -match '-D\s+"?([^"]+)"?') {
-                        $pgDataDir = $Matches[1].Trim()
-                    }
-                }
-            }
-
-            $pgHbaPath = "$pgDataDir\pg_hba.conf"
-            if (Test-Path $pgHbaPath) {
-                # Backup pg_hba.conf
-                Copy-Item $pgHbaPath "$pgHbaPath.bak" -Force
-
-                # Temporariamente definir trust para conexoes locais
-                $hbaContent = Get-Content $pgHbaPath -Raw
-                $hbaModified = $hbaContent -replace '(host\s+all\s+all\s+127\.0\.0\.1/32\s+)\w+', '${1}trust'
-                $hbaModified = $hbaModified -replace '(host\s+all\s+all\s+::1/128\s+)\w+', '${1}trust'
-                Set-Content -Path $pgHbaPath -Value $hbaModified -Encoding UTF8
-
-                # Reiniciar servico para aplicar trust
-                $pgSvc = Get-Service -Name "postgresql*" -ErrorAction SilentlyContinue | Select-Object -First 1
-                if ($pgSvc) { Restart-Service $pgSvc.Name -Force; Start-Sleep -Seconds 3 }
-
-                # Alterar senha do postgres
-                & "$pgBinPath\psql.exe" -h localhost -U postgres -c "ALTER USER postgres PASSWORD '$PgPassword';" 2>&1 | Out-Null
-
-                # Restaurar pg_hba.conf original
-                Copy-Item "$pgHbaPath.bak" $pgHbaPath -Force
-                Remove-Item "$pgHbaPath.bak" -Force -ErrorAction SilentlyContinue
-
-                # Reiniciar servico com config original
-                if ($pgSvc) { Restart-Service $pgSvc.Name -Force; Start-Sleep -Seconds 3 }
-
-                Write-Ok "Senha do PostgreSQL configurada"
-            } else {
-                Write-Warn "pg_hba.conf nao encontrado em $pgDataDir. Defina a senha manualmente."
-            }
+            [void](Set-PostgresPasswordWithTrust -psqlPath $psqlPath -pgInstallPath $pgInstallPath -PgPassword $PgPassword)
         }
 
         Write-Ok "PostgreSQL instalado com sucesso"
@@ -257,6 +283,16 @@ if ($pgService) {
 Write-Step "Configurando banco de dados..."
 
 $env:PGPASSWORD = $PgPassword
+
+if (-not (Test-PostgresAccess -psqlPath $psqlPath -PgPassword $PgPassword)) {
+    Write-Warn "Falha de autenticacao no PostgreSQL com a senha configurada. Tentando corrigir automaticamente..."
+    $fixed = Set-PostgresPasswordWithTrust -psqlPath $psqlPath -pgInstallPath $pgInstallPath -PgPassword $PgPassword
+    if (-not $fixed -or -not (Test-PostgresAccess -psqlPath $psqlPath -PgPassword $PgPassword)) {
+        Write-Err "Nao foi possivel autenticar no PostgreSQL com a senha configurada"
+        Write-Host "  Verifique o usuario postgres e tente novamente" -ForegroundColor Gray
+        exit 1
+    }
+}
 
 # Criar banco
 try {
