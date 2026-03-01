@@ -36,7 +36,7 @@ const Login = () => {
         <div className="flex flex-col items-center mb-8">
           <img src={company?.logo_url || nexusLogo} alt={company?.name || 'Nexus Segurança'} className="w-20 h-20 object-contain mb-4 rounded-lg" />
           <h1 className="text-xl font-bold text-foreground tracking-wide">{company?.name?.toUpperCase() || 'NEXUS'}</h1>
-          <p className="text-[10px] font-mono text-muted-foreground tracking-widest">SEGURANÇA</p>
+          <p className="text-[10px] font-mono text-muted-foreground tracking-widest">MONITORAMENTO</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 rounded-lg border border-border bg-card p-6">
