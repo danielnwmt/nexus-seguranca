@@ -30,7 +30,7 @@ const AppSidebar = () => {
           <img src={company?.logo_url || nexusLogo} alt={company?.name || 'Nexus Segurança'} className="w-9 h-9 object-contain rounded" />
           <div>
             <h1 className="text-sm font-bold text-foreground tracking-wide">{company?.name?.toUpperCase() || 'NEXUS'}</h1>
-            <p className="text-[10px] font-mono text-muted-foreground tracking-widest">SEGURANÇA</p>
+            <p className="text-[10px] font-mono text-muted-foreground tracking-widest">MONITORAMENTO</p>
           </div>
         </div>
       </div>
