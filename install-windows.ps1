@@ -157,11 +157,13 @@ Write-Step "Configurando banco de dados..."
 $env:PGPASSWORD = $PgPassword
 
 # Criar banco
-$dbExists = & $psqlPath -h localhost -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='nexus'" 2>$null
-if ($dbExists -match "1") {
+try {
+    $dbExists = & $psqlPath -h localhost -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='nexus'" 2>&1
+} catch { $dbExists = "" }
+if ("$dbExists" -match "1") {
     Write-Ok "Banco 'nexus' ja existe"
 } else {
-    & $psqlPath -h localhost -U postgres -c "CREATE DATABASE nexus;" 2>$null
+    & $psqlPath -h localhost -U postgres -c "CREATE DATABASE nexus;" 2>&1 | Out-Null
     Write-Ok "Banco 'nexus' criado"
 }
 
@@ -183,13 +185,13 @@ if (Test-Path $sqlFile) {
 
 # Criar usuario admin
 Write-Host "  Criando usuario admin..." -ForegroundColor Gray
-$createAdmin = @"
-INSERT INTO auth.users (email, encrypted_password)
-VALUES ('$AdminEmail', crypt('$AdminPassword', gen_salt('bf')))
-ON CONFLICT (email) DO NOTHING;
-"@
-& $psqlPath -h localhost -U postgres -d nexus -c $createAdmin 2>&1 | Out-Null
-Write-Ok "Usuario admin criado: $AdminEmail"
+$createAdmin = "INSERT INTO auth.users (email, encrypted_password) VALUES ('" + $AdminEmail + "', crypt('" + $AdminPassword + "', gen_salt('bf'))) ON CONFLICT (email) DO NOTHING;"
+try {
+    & $psqlPath -h localhost -U postgres -d nexus -c $createAdmin 2>&1 | Out-Null
+    Write-Ok "Usuario admin criado: $AdminEmail"
+} catch {
+    Write-Warn "Nao foi possivel criar usuario admin (pode ja existir)"
+}
 
 # ----------------------------------------------------------
 # 3.1 Criar pasta de gravacoes e servidor padrao
@@ -207,13 +209,14 @@ $localIP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAl
 if (!$localIP) { $localIP = "127.0.0.1" }
 
 # Registrar servidor padrao no banco
-$createServer = @"
-INSERT INTO public.storage_servers (name, ip_address, storage_path, max_storage_gb, status, description)
-VALUES ('Servidor Local', '$localIP', '$($storagePath -replace "\\", "\\")', 
-  $(([math]::Round((Get-PSDrive -Name ($storagePath.Substring(0,1))) | Select-Object -ExpandProperty Free) / 1GB)), 
-  'active', 'Servidor de gravacao local - configurado automaticamente')
-ON CONFLICT DO NOTHING;
-"@
+$escapedPath = $storagePath -replace "\\", "\\"
+$freeGB = 500
+try {
+    $driveLetter = $storagePath.Substring(0,1)
+    $driveInfo = Get-PSDrive -Name $driveLetter -ErrorAction SilentlyContinue
+    if ($driveInfo) { $freeGB = [math]::Round($driveInfo.Free / 1GB) }
+} catch {}
+$createServer = "INSERT INTO public.storage_servers (name, ip_address, storage_path, max_storage_gb, status, description) VALUES ('Servidor Local', '" + $localIP + "', '" + $escapedPath + "', " + $freeGB + ", 'active', 'Servidor de gravacao local - configurado automaticamente') ON CONFLICT DO NOTHING;"
 try {
     & $psqlPath -h localhost -U postgres -d nexus -c $createServer 2>&1 | Out-Null
     Write-Ok "Servidor de gravacao registrado no banco (IP: $localIP)"
