@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { isLocalInstallation } from '@/hooks/useLocalApi';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -38,11 +39,18 @@ const Login = () => {
     } else {
       setIsRateLimited(false);
       setRemainingAttempts(null);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.user_metadata?.force_password_change) {
-        navigate('/reset-password');
-      } else {
+      
+      // For local installations, check user_metadata from the auth response directly
+      if (isLocalInstallation()) {
+        // User metadata is already set in context; redirect
         navigate('/');
+      } else {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.user_metadata?.force_password_change) {
+          navigate('/reset-password');
+        } else {
+          navigate('/');
+        }
       }
     }
     setLoading(false);

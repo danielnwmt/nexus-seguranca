@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
@@ -18,6 +19,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // For local installations, check if we have a locally-stored session
+    if (isLocalInstallation()) {
+      const stored = localStorage.getItem('nexus-local-session');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          setUser(parsed.user);
+          setSession(parsed as Session);
+        } catch {}
+      }
+      setLoading(false);
+      return;
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -33,16 +48,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const isLocalServer = !import.meta.env.VITE_SUPABASE_URL?.includes('supabase.co');
+  const isLocal = isLocalInstallation();
 
   const signIn = async (email: string, password: string) => {
     try {
-      // Local server: use direct Supabase auth (compatible with local auth-server)
-      if (isLocalServer) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) {
-          return { error: new Error(error.message === 'Invalid login credentials' ? 'Email ou senha inválidos' : error.message) };
+      // Local server: call auth server directly using browser hostname (works with public IP)
+      if (isLocal) {
+        const apiBase = getLocalApiBase();
+        const res = await fetch(`${apiBase}/auth/v1/token?grant_type=password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          return { error: new Error(data.error === 'Invalid login credentials' ? 'Email ou senha inválidos' : (data.error || 'Erro de autenticação')) };
         }
+
+        // Store session locally
+        const localSession = {
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+          token_type: data.token_type,
+          expires_in: data.expires_in,
+          user: data.user,
+        };
+        localStorage.setItem('nexus-local-session', JSON.stringify(localSession));
+        setUser(data.user);
+        setSession(localSession as any);
+
         return { error: null };
       }
 
@@ -88,6 +124,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    if (isLocal) {
+      localStorage.removeItem('nexus-local-session');
+      setUser(null);
+      setSession(null);
+      return;
+    }
     await supabase.auth.signOut();
   };
 
