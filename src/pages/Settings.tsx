@@ -165,22 +165,7 @@ const Settings = () => {
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
-  // ---- Permissions (client-side UI only) ----
-  const [permissions, setPermissions] = useState<Record<string, Record<string, boolean>>>(
-    JSON.parse(JSON.stringify(defaultPermissions))
-  );
-
-  const handleTogglePermission = (level: string, key: string) => {
-    if (level === 'admin') return;
-    setPermissions(prev => ({
-      ...prev,
-      [level]: { ...prev[level], [key]: !prev[level][key] },
-    }));
-  };
-
-  const handleSavePermissions = () => {
-    toast({ title: 'Permissões salvas', description: 'As permissões foram atualizadas com sucesso.' });
-  };
+   // ---- Permissions are read-only reference (enforced via RLS) ----
 
   // ---- PWA ----
   const [pwaEnabled, setPwaEnabled] = useState(true);
@@ -411,17 +396,16 @@ const Settings = () => {
             ))}
           </div>
 
-          {/* Permissions Matrix */}
-          <Card className="bg-card border-border">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-base">Matriz de Permissões</CardTitle>
-                <CardDescription className="text-xs">Clique nos checkboxes para editar as permissões de cada nível</CardDescription>
-              </div>
-              <Button size="sm" onClick={handleSavePermissions} className="gap-1">
-                <Save className="w-4 h-4" /> Salvar Permissões
-              </Button>
-            </CardHeader>
+           {/* Permissions Matrix */}
+           <Card className="bg-card border-border">
+             <CardHeader className="pb-3">
+               <div>
+                 <CardTitle className="text-base">Matriz de Permissões</CardTitle>
+                 <CardDescription className="text-xs">
+                   Referência visual dos acessos de cada nível. As permissões são aplicadas automaticamente no banco de dados via políticas de segurança (RLS).
+                 </CardDescription>
+               </div>
+             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
@@ -440,11 +424,10 @@ const Settings = () => {
                       {(['n1', 'n2', 'n3', 'admin'] as const).map(level => (
                         <TableCell key={level} className="text-center">
                           <Switch
-                            checked={permissions[level][mod.key]}
-                            onCheckedChange={() => handleTogglePermission(level, mod.key)}
-                            disabled={level === 'admin'}
-                            className="mx-auto"
-                          />
+                             checked={defaultPermissions[level][mod.key]}
+                             disabled={true}
+                             className="mx-auto"
+                           />
                         </TableCell>
                       ))}
                     </TableRow>
