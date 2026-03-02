@@ -12,7 +12,6 @@ import { useToast } from '@/hooks/use-toast';
 import type { AnalyticType } from '@/types/monitoring';
 import { ANALYTIC_LABELS } from '@/types/monitoring';
 import { useTableQuery, usePaginatedQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
-import { useCompanySettings } from '@/hooks/useCompanySettings';
 
 const RETENTION_OPTIONS = [0, 5, 10, 15, 20, 25, 30] as const;
 const ALL_ANALYTICS: AnalyticType[] = ['lpr', 'weapon_detection', 'line_crossing', 'area_intrusion', 'loitering', 'human_car_classification', 'fallen_person', 'people_counting', 'tampering'];
@@ -41,8 +40,12 @@ const emptyForm: CameraForm = { name: '', streamUrl: '', protocol: 'RTSP', locat
 const Cameras = () => {
   const { toast } = useToast();
   const { data: clients = [] } = useTableQuery('clients');
-  const { data: companySettings } = useCompanySettings();
-  const mediaServerIp = (companySettings as any)?.media_server_ip || '';
+  const { data: mediaServers = [] } = useTableQuery('media_servers');
+  const serverList = mediaServers as any[];
+  const firstServer = serverList.length > 0 ? serverList[0] : null;
+  const mediaServerIp = firstServer?.ip_address || '';
+  const hlsPort = firstServer?.hls_base_port || 8888;
+  const rtmpPort = firstServer?.rtmp_base_port || 1935;
   const insertMutation = useInsertMutation('cameras');
   const updateMutation = useUpdateMutation('cameras');
   const deleteMutation = useDeleteMutation('cameras');
@@ -137,7 +140,7 @@ const Cameras = () => {
     const client = clients.find((cl: any) => cl.id === c.client_id);
     // Generate stream URL from media server IP + stream_key
     const streamUrl = mediaServerIp && c.stream_key
-      ? `http://${mediaServerIp}:8888/${c.stream_key}/`
+      ? `http://${mediaServerIp}:${hlsPort}/${c.stream_key}/`
       : c.stream_url || '';
     return {
       id: c.id,
@@ -164,7 +167,13 @@ const Cameras = () => {
         </div>
         <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) resetForm(); else setDialogOpen(true); }}>
           <DialogTrigger asChild>
-            <Button className="gap-2" onClick={() => { setEditingId(null); setNewCamera({ ...emptyForm }); }}>
+            <Button className="gap-2" onClick={() => {
+              if (serverList.length === 0) {
+                toast({ title: 'Servidor de mídia obrigatório', description: 'Cadastre pelo menos um servidor de mídia em Configurações → Servidores antes de adicionar câmeras.', variant: 'destructive' });
+                return;
+              }
+              setEditingId(null); setNewCamera({ ...emptyForm });
+            }}>
               <Plus className="w-4 h-4" /> Nova Câmera
             </Button>
           </DialogTrigger>
@@ -202,21 +211,21 @@ const Cameras = () => {
                     <div className="space-y-1 pt-1">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px] shrink-0">RTMP</Badge>
-                        <code className="text-[11px] font-mono text-muted-foreground truncate">rtmp://{mediaServerIp}/live/{editingStreamKey}</code>
-                        <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => { navigator.clipboard.writeText(`rtmp://${mediaServerIp}/live/${editingStreamKey}`); toast({ title: 'URL RTMP copiada!' }); }}>
+                        <code className="text-[11px] font-mono text-muted-foreground truncate">rtmp://{mediaServerIp}:{rtmpPort}/live/{editingStreamKey}</code>
+                        <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => { navigator.clipboard.writeText(`rtmp://${mediaServerIp}:${rtmpPort}/live/${editingStreamKey}`); toast({ title: 'URL RTMP copiada!' }); }}>
                           <Copy className="w-3 h-3" />
                         </Button>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px] shrink-0">HLS</Badge>
-                        <code className="text-[11px] font-mono text-muted-foreground truncate">http://{mediaServerIp}:8888/{editingStreamKey}/</code>
-                        <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => { navigator.clipboard.writeText(`http://${mediaServerIp}:8888/${editingStreamKey}/`); toast({ title: 'URL HLS copiada!' }); }}>
+                        <code className="text-[11px] font-mono text-muted-foreground truncate">http://{mediaServerIp}:{hlsPort}/{editingStreamKey}/</code>
+                        <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => { navigator.clipboard.writeText(`http://${mediaServerIp}:${hlsPort}/${editingStreamKey}/`); toast({ title: 'URL HLS copiada!' }); }}>
                           <Copy className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>
                   ) : (
-                    <p className="text-[11px] text-destructive">⚠️ Configure o IP do servidor de mídia em Configurações → Servidores para gerar os links.</p>
+                    <p className="text-[11px] text-destructive">⚠️ Cadastre um servidor de mídia em Configurações → Servidores para gerar os links.</p>
                   )}
                 </div>
               )}
