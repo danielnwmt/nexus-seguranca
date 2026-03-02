@@ -221,77 +221,115 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---- SYSTEM UPDATE ENDPOINT ----
+    // ---- SYSTEM UPDATE (SSE streaming) ----
     if (path === '/api/system/update' && req.method === 'POST') {
-      // Verificar autenticacao
       const authHeader = req.headers.authorization;
       if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
       const token = authHeader.replace('Bearer ', '');
       const payload = verifyJWT(token);
       if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
 
-      const { execSync } = require('child_process');
+      // SSE headers
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': CORS_HEADERS,
+        'Access-Control-Allow-Methods': CORS_METHODS
+      });
+
+      const sendEvent = (step, status, message, detail) => {
+        const data = JSON.stringify({ step, status, message, detail: detail || '' });
+        res.write(`data: ${data}\n\n`);
+      };
+
+      const { execSync, spawn } = require('child_process');
       const INSTALL_DIR = process.env.INSTALL_DIR || '/opt/nexus-monitoramento';
 
       try {
-        const scriptPath = `${INSTALL_DIR}/atualizar-nexus.sh`;
-        let output = '';
-        let commandUsed = '';
-
-        if (fs.existsSync(scriptPath)) {
-          commandUsed = `bash ${scriptPath}`;
-          output = execSync(`${commandUsed} 2>&1`, { timeout: 600000 }).toString();
-        } else {
-          // Fallback: proteger .env e auth-server antes do checkout
-          const branch = execSync(`cd ${INSTALL_DIR} && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main`).toString().trim() || 'main';
-          const safeUpdate = [
-            `cd ${INSTALL_DIR}`,
-            `cp -f .env .env.bak 2>/dev/null || true`,
-            `cp -f auth-server/server.js auth-server/server.js.bak 2>/dev/null || true`,
-            `git checkout -- .`,
-            `git pull origin ${branch}`,
-            `cp -f .env.bak .env 2>/dev/null || true`,
-            `cp -f auth-server/server.js.bak auth-server/server.js 2>/dev/null || true`,
-            `npm install --legacy-peer-deps`,
-            `npm run build`,
-            `sudo systemctl restart nexus-auth nginx`
-          ].join(' && ');
-          commandUsed = safeUpdate;
-          output = execSync(`${safeUpdate} 2>&1`, { timeout: 600000, shell: '/bin/bash' }).toString();
+        // Etapa 1: Backup
+        sendEvent(1, 'running', 'Fazendo backup de configurações...');
+        try {
+          execSync(`cd ${INSTALL_DIR} && cp -f .env .env.bak 2>/dev/null || true && cp -f auth-server/server.js auth-server/server.js.bak 2>/dev/null || true`, { timeout: 10000 });
+          sendEvent(1, 'done', 'Backup concluído (.env e auth-server)');
+        } catch (e) {
+          sendEvent(1, 'warn', 'Backup parcial', e.message);
         }
 
-        if (output.includes('Already up to date') || output.includes('ja esta na versao') || output.includes('Already up-to-date')) {
-          return sendJSON(res, 200, {
-            status: 'up_to_date',
-            message: 'Sistema ja esta na versao mais recente.',
-            command: commandUsed,
-            output: output.trim()
-          });
+        // Etapa 2: Git checkout + pull
+        sendEvent(2, 'running', 'Baixando atualizações do GitHub...');
+        try {
+          const branch = execSync(`cd ${INSTALL_DIR} && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main`, { timeout: 10000 }).toString().trim() || 'main';
+          execSync(`cd ${INSTALL_DIR} && git checkout -- . 2>&1`, { timeout: 30000 });
+          const pullOutput = execSync(`cd ${INSTALL_DIR} && git pull origin ${branch} 2>&1`, { timeout: 120000 }).toString().trim();
+          
+          if (pullOutput.includes('Already up to date') || pullOutput.includes('Already up-to-date')) {
+            sendEvent(2, 'done', 'Já está na versão mais recente', pullOutput);
+            // Restaurar configs
+            execSync(`cd ${INSTALL_DIR} && cp -f .env.bak .env 2>/dev/null || true && cp -f auth-server/server.js.bak auth-server/server.js 2>/dev/null || true`, { timeout: 10000 });
+            sendEvent(6, 'done', 'Sistema já está atualizado.');
+            res.write(`data: ${JSON.stringify({ step: 'complete', status: 'up_to_date', message: 'Sistema já está na versão mais recente.' })}\n\n`);
+            return res.end();
+          }
+          sendEvent(2, 'done', 'Código atualizado', pullOutput.substring(0, 200));
+        } catch (e) {
+          const output = (e.stdout ? e.stdout.toString() : '') + (e.stderr ? e.stderr.toString() : '');
+          sendEvent(2, 'error', 'Erro no git pull', output);
+          res.write(`data: ${JSON.stringify({ step: 'complete', status: 'error', message: 'Falha ao baixar atualizações', output })}\n\n`);
+          return res.end();
         }
 
-        return sendJSON(res, 200, {
-          status: 'updated',
-          message: 'Sistema atualizado com sucesso! Recarregue a pagina.',
-          command: commandUsed,
-          output: output.trim()
-        });
+        // Etapa 3: Restaurar configs
+        sendEvent(3, 'running', 'Restaurando configurações locais...');
+        try {
+          execSync(`cd ${INSTALL_DIR} && cp -f .env.bak .env 2>/dev/null || true && cp -f auth-server/server.js.bak auth-server/server.js 2>/dev/null || true`, { timeout: 10000 });
+          sendEvent(3, 'done', 'Configurações restauradas');
+        } catch (e) {
+          sendEvent(3, 'warn', 'Restauração parcial', e.message);
+        }
+
+        // Etapa 4: npm install
+        sendEvent(4, 'running', 'Instalando dependências (pode levar alguns minutos)...');
+        try {
+          const npmOutput = execSync(`cd ${INSTALL_DIR} && npm install --legacy-peer-deps 2>&1`, { timeout: 300000 }).toString().trim();
+          const added = npmOutput.match(/added \d+ packages/);
+          sendEvent(4, 'done', 'Dependências instaladas', added ? added[0] : '');
+        } catch (e) {
+          const output = (e.stdout ? e.stdout.toString() : '') + (e.stderr ? e.stderr.toString() : '');
+          sendEvent(4, 'error', 'Erro ao instalar dependências', output.substring(0, 500));
+          res.write(`data: ${JSON.stringify({ step: 'complete', status: 'error', message: 'Falha no npm install', output })}\n\n`);
+          return res.end();
+        }
+
+        // Etapa 5: Build
+        sendEvent(5, 'running', 'Compilando frontend (pode levar alguns minutos)...');
+        try {
+          const buildOutput = execSync(`cd ${INSTALL_DIR} && npm run build 2>&1`, { timeout: 300000 }).toString().trim();
+          sendEvent(5, 'done', 'Frontend compilado com sucesso');
+        } catch (e) {
+          const output = (e.stdout ? e.stdout.toString() : '') + (e.stderr ? e.stderr.toString() : '');
+          sendEvent(5, 'error', 'Erro ao compilar', output.substring(0, 500));
+          res.write(`data: ${JSON.stringify({ step: 'complete', status: 'error', message: 'Falha no build', output })}\n\n`);
+          return res.end();
+        }
+
+        // Etapa 6: Reiniciar serviços
+        sendEvent(6, 'running', 'Reiniciando serviços...');
+        try {
+          execSync(`sudo systemctl restart nexus-auth nginx 2>&1`, { timeout: 30000 });
+          sendEvent(6, 'done', 'Serviços reiniciados');
+        } catch (e) {
+          sendEvent(6, 'warn', 'Serviços podem precisar de reinício manual', e.message);
+        }
+
+        res.write(`data: ${JSON.stringify({ step: 'complete', status: 'updated', message: 'Sistema atualizado com sucesso! Recarregue a página.' })}\n\n`);
+        res.end();
+
       } catch (error) {
-        const stdout = error.stdout ? error.stdout.toString() : '';
-        const stderr = error.stderr ? error.stderr.toString() : '';
-        const output = `${stdout}\n${stderr}`.trim();
-
-        // Se o script rodou mas retornou algo util, pode ser sucesso
-        if (output.includes('atualizado') || output.includes('sucesso')) {
-          return sendJSON(res, 200, {
-            status: 'updated',
-            message: 'Sistema atualizado com sucesso! Recarregue a pagina.',
-            output
-          });
-        }
-        return sendJSON(res, 500, {
-          status: 'error',
-          message: 'Erro ao atualizar: ' + error.message,
-          output
-        });
+        sendEvent(0, 'error', 'Erro inesperado', error.message);
+        res.write(`data: ${JSON.stringify({ step: 'complete', status: 'error', message: error.message })}\n\n`);
+        res.end();
       }
     }
 
