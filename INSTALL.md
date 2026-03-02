@@ -293,14 +293,84 @@ sudo systemctl status nexus-mediamtx
 sudo systemctl restart nginx
 ```
 
+---
+
+## 📹 Servidor de Mídia (MediaMTX)
+
+O **MediaMTX** é o servidor responsável por receber os streams RTMP das câmeras e convertê-los para HLS/WebRTC para visualização no navegador.
+
+### Instalação Automática (Ubuntu)
+
+No Ubuntu, o instalador já configura o MediaMTX automaticamente. Além disso, ao acessar **Configurações → Servidores de Mídia**, o sistema **detecta e cadastra** o servidor local automaticamente.
+
+### Instalação Manual (Windows)
+
+1. Baixe o MediaMTX: [https://github.com/bluenviron/mediamtx/releases](https://github.com/bluenviron/mediamtx/releases)
+2. Extraia em `C:\NexusMonitoramento\mediamtx\`
+3. Copie o arquivo `installer/mediamtx.yml` para a pasta do MediaMTX
+4. Execute:
+
+```powershell
+cd C:\NexusMonitoramento\mediamtx
+mediamtx.exe
+```
+
+Para rodar como serviço (com NSSM):
+
+```powershell
+nssm install NexusMediaMTX "C:\NexusMonitoramento\mediamtx\mediamtx.exe"
+nssm set NexusMediaMTX AppDirectory "C:\NexusMonitoramento\mediamtx"
+nssm start NexusMediaMTX
+```
+
+### Cadastrar no Sistema
+
+1. Acesse **Configurações → Servidores de Mídia**
+2. Na primeira vez, o servidor local é cadastrado automaticamente
+3. Para adicionar outro servidor, clique em **Novo Servidor** e informe:
+   - **Nome:** Ex: "MediaMTX Filial"
+   - **IP:** Ex: `192.168.1.200`
+   - **SO:** Linux ou Windows
+   - **Portas:** RTMP (1935), HLS (8888), WebRTC (8889)
+4. Use o botão ▶️ para **testar a conexão**
+
+### Cadastrar e Instalar (Ubuntu - Remoto)
+
+Para servidores Ubuntu remotos, o botão **"Cadastrar e Instalar"** automatiza:
+- Download do MediaMTX
+- Configuração do `mediamtx.yml`
+- Criação do serviço `systemd`
+- Teste de conexão
+
+> ⚠️ Requer acesso SSH ao servidor remoto.
+
+### Portas do MediaMTX
+
+| Porta | Protocolo | Uso |
+|-------|-----------|-----|
+| 1935  | RTMP      | Receber streams das câmeras |
+| 8554  | RTSP      | Stream RTSP (opcional) |
+| 8888  | HLS       | Visualização no navegador |
+| 8889  | WebRTC    | Visualização em tempo real |
+
 ### Testar Câmera RTMP
 
 ```bash
 # Enviar stream de teste com FFmpeg
-ffmpeg -re -i video.mp4 -c copy -f flv rtmp://localhost:1935/cam01
+ffmpeg -re -i video.mp4 -c copy -f flv rtmp://SEU_IP:1935/cam01
 
 # Verificar no browser
 # HLS: http://SEU_IP:8888/cam01/
+```
+
+### Verificar Status
+
+```bash
+# Ubuntu
+sudo systemctl status nexus-mediamtx
+
+# Windows
+Get-Service NexusMediaMTX
 ```
 
 ### Desinstalar
