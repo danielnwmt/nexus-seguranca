@@ -3,7 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 
 type TableName = 'clients' | 'cameras' | 'guards' | 'alarms' | 'invoices' | 'storage_servers' | 'installers' | 'service_orders' | 'bills' | 'media_servers';
 
-export function useTableQuery<T = any>(table: TableName, orderBy = 'created_at', ascending = false) {
+export function useTableQuery<T = any>(table: TableName, orderBy = 'created_at', ascendingOrOptions?: boolean | { ascending?: boolean; enabled?: boolean }) {
+  const ascending = typeof ascendingOrOptions === 'boolean' ? ascendingOrOptions : (ascendingOrOptions?.ascending ?? false);
+  const enabled = typeof ascendingOrOptions === 'object' ? (ascendingOrOptions?.enabled ?? true) : true;
   return useQuery({
     queryKey: [table],
     queryFn: async () => {
@@ -13,6 +15,7 @@ export function useTableQuery<T = any>(table: TableName, orderBy = 'created_at',
       if (error) throw error;
       return data as T[];
     },
+    enabled,
   });
 }
 

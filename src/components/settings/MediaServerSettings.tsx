@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
+import { isLocalInstallation, useLocalTableQuery, useLocalInsertMutation, useLocalUpdateMutation, useLocalPatchMutation, useLocalDeleteMutation } from '@/hooks/useLocalApi';
 import { toast } from 'sonner';
 
 interface MediaServer {
@@ -34,10 +35,27 @@ const defaultForm = {
 };
 
 const MediaServerSettings = () => {
-  const { data: servers = [], isLoading } = useTableQuery('media_servers');
-  const insertMutation = useInsertMutation('media_servers');
-  const updateMutation = useUpdateMutation('media_servers');
-  const deleteMutation = useDeleteMutation('media_servers');
+  const isLocal = isLocalInstallation();
+
+  // Cloud (Supabase) hooks - only enabled when NOT local
+  const cloudQuery = useTableQuery('media_servers', 'created_at', { enabled: !isLocal });
+  const cloudInsert = useInsertMutation('media_servers');
+  const cloudUpdate = useUpdateMutation('media_servers');
+  const cloudDelete = useDeleteMutation('media_servers');
+
+  // Local API hooks
+  const localQuery = useLocalTableQuery('media_servers');
+  const localInsert = useLocalInsertMutation('media_servers');
+  const localUpdate = useLocalUpdateMutation('media_servers');
+  const localPatch = useLocalPatchMutation('media_servers');
+  const localDelete = useLocalDeleteMutation('media_servers');
+
+  // Select the right source based on environment
+  const servers = isLocal ? (localQuery.data || []) : (cloudQuery.data || []);
+  const isLoading = isLocal ? localQuery.isLoading : cloudQuery.isLoading;
+  const insertMutation = isLocal ? localInsert : cloudInsert;
+  const updateMutation = isLocal ? localUpdate : cloudUpdate;
+  const deleteMutation = isLocal ? localDelete : cloudDelete;
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingServer, setEditingServer] = useState<MediaServer | null>(null);
@@ -125,19 +143,19 @@ const MediaServerSettings = () => {
           toast.success(`✅ ${server.name} está online! RTMP: ${result.rtmp ? '✓' : '✗'} | HLS: ${result.hls ? '✓' : '✗'}`);
           // Atualizar status para online se estava offline
           if (server.status !== 'online' && server.status !== 'active') {
-            updateMutation.mutate({ id: server.id, status: 'online' } as any);
+            if (isLocal) { localPatch.mutate({ id: server.id, status: 'online' }); } else { updateMutation.mutate({ id: server.id, status: 'online' } as any); }
           }
         } else {
           toast.error(`❌ ${server.name}: MediaMTX não respondeu. RTMP: ${result.rtmp ? '✓' : '✗'} | HLS: ${result.hls ? '✓' : '✗'}`);
-          updateMutation.mutate({ id: server.id, status: 'offline' } as any);
+          if (isLocal) { localPatch.mutate({ id: server.id, status: 'offline' }); } else { updateMutation.mutate({ id: server.id, status: 'offline' } as any); }
         }
       } else {
         toast.error(`❌ ${server.name}: Auth-server não acessível (HTTP ${response.status})`);
-        updateMutation.mutate({ id: server.id, status: 'offline' } as any);
+        if (isLocal) { localPatch.mutate({ id: server.id, status: 'offline' }); } else { updateMutation.mutate({ id: server.id, status: 'offline' } as any); }
       }
     } catch {
       toast.error(`❌ ${server.name}: Servidor não acessível em ${server.ip_address}:8001`);
-      updateMutation.mutate({ id: server.id, status: 'offline' } as any);
+      if (isLocal) { localPatch.mutate({ id: server.id, status: 'offline' }); } else { updateMutation.mutate({ id: server.id, status: 'offline' } as any); }
     } finally {
       setTestingId(null);
     }

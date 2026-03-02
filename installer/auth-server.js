@@ -380,6 +380,93 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    // ---- CRUD LOCAL: media_servers ----
+    if (path === '/api/local/media-servers' && req.method === 'GET') {
+      try {
+        const result = await pool.query('SELECT * FROM media_servers ORDER BY created_at DESC');
+        return sendJSON(res, 200, result.rows);
+      } catch (e) { return sendJSON(res, 500, { error: e.message }); }
+    }
+    if (path === '/api/local/media-servers' && req.method === 'POST') {
+      try {
+        const body = await readBody(req);
+        const result = await pool.query(
+          `INSERT INTO media_servers (name, ip_address, instances, rtmp_base_port, hls_base_port, webrtc_base_port, status, os)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+          [body.name, body.ip_address, body.instances||1, body.rtmp_base_port||1935, body.hls_base_port||8888, body.webrtc_base_port||8889, body.status||'active', body.os||'linux']
+        );
+        return sendJSON(res, 201, result.rows[0]);
+      } catch (e) { return sendJSON(res, 500, { error: e.message }); }
+    }
+    if (path.startsWith('/api/local/media-servers/') && req.method === 'PUT') {
+      try {
+        const id = path.split('/').pop();
+        const body = await readBody(req);
+        const result = await pool.query(
+          `UPDATE media_servers SET name=$1, ip_address=$2, instances=$3, rtmp_base_port=$4, hls_base_port=$5, webrtc_base_port=$6, status=$7, os=$8, updated_at=NOW() WHERE id=$9 RETURNING *`,
+          [body.name, body.ip_address, body.instances||1, body.rtmp_base_port||1935, body.hls_base_port||8888, body.webrtc_base_port||8889, body.status||'active', body.os||'linux', id]
+        );
+        return sendJSON(res, 200, result.rows[0]);
+      } catch (e) { return sendJSON(res, 500, { error: e.message }); }
+    }
+    if (path.startsWith('/api/local/media-servers/') && req.method === 'PATCH') {
+      try {
+        const id = path.split('/').pop();
+        const body = await readBody(req);
+        const fields = Object.keys(body).filter(k => k !== 'id');
+        if (fields.length === 0) return sendJSON(res, 400, { error: 'No fields' });
+        const sets = fields.map((f, i) => `${f}=$${i+1}`).join(', ');
+        const vals = fields.map(f => body[f]);
+        vals.push(id);
+        const result = await pool.query(`UPDATE media_servers SET ${sets}, updated_at=NOW() WHERE id=$${vals.length} RETURNING *`, vals);
+        return sendJSON(res, 200, result.rows[0]);
+      } catch (e) { return sendJSON(res, 500, { error: e.message }); }
+    }
+    if (path.startsWith('/api/local/media-servers/') && req.method === 'DELETE') {
+      try {
+        const id = path.split('/').pop();
+        await pool.query('DELETE FROM media_servers WHERE id=$1', [id]);
+        return sendJSON(res, 200, { success: true });
+      } catch (e) { return sendJSON(res, 500, { error: e.message }); }
+    }
+
+    // ---- CRUD LOCAL: storage_servers ----
+    if (path === '/api/local/storage-servers' && req.method === 'GET') {
+      try {
+        const result = await pool.query('SELECT * FROM storage_servers ORDER BY created_at DESC');
+        return sendJSON(res, 200, result.rows);
+      } catch (e) { return sendJSON(res, 500, { error: e.message }); }
+    }
+    if (path === '/api/local/storage-servers' && req.method === 'POST') {
+      try {
+        const body = await readBody(req);
+        const result = await pool.query(
+          `INSERT INTO storage_servers (name, ip_address, storage_path, description, max_storage_gb, status)
+           VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+          [body.name, body.ip_address, body.storage_path||'', body.description||'', body.max_storage_gb||1000, body.status||'active']
+        );
+        return sendJSON(res, 201, result.rows[0]);
+      } catch (e) { return sendJSON(res, 500, { error: e.message }); }
+    }
+    if (path.startsWith('/api/local/storage-servers/') && req.method === 'PUT') {
+      try {
+        const id = path.split('/').pop();
+        const body = await readBody(req);
+        const result = await pool.query(
+          `UPDATE storage_servers SET name=$1, ip_address=$2, storage_path=$3, description=$4, max_storage_gb=$5, status=$6, updated_at=NOW() WHERE id=$7 RETURNING *`,
+          [body.name, body.ip_address, body.storage_path||'', body.description||'', body.max_storage_gb||1000, body.status||'active', id]
+        );
+        return sendJSON(res, 200, result.rows[0]);
+      } catch (e) { return sendJSON(res, 500, { error: e.message }); }
+    }
+    if (path.startsWith('/api/local/storage-servers/') && req.method === 'DELETE') {
+      try {
+        const id = path.split('/').pop();
+        await pool.query('DELETE FROM storage_servers WHERE id=$1', [id]);
+        return sendJSON(res, 200, { success: true });
+      } catch (e) { return sendJSON(res, 500, { error: e.message }); }
+    }
+
     // ---- SNAPSHOT ENDPOINT (captura frame do HLS via ffmpeg) ----
     if (path === '/api/cameras/snapshot' && req.method === 'POST') {
       const authHeader = req.headers.authorization;
