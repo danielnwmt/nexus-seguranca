@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { toast } from 'sonner';
 
@@ -33,6 +32,12 @@ const defaultForm = {
   status: 'active',
 };
 
+// Helper: resolve base URL do auth-server local
+function getLocalApiBase() {
+  const { hostname } = window.location;
+  return `http://${hostname}:8001`;
+}
+
 const MediaServerSettings = () => {
   const qc = useQueryClient();
   const { data: company } = useCompanySettings();
@@ -41,25 +46,34 @@ const MediaServerSettings = () => {
   const [form, setForm] = useState(defaultForm);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  const apiBase = getLocalApiBase();
+
   const { data: servers = [], isLoading } = useQuery({
     queryKey: ['media_servers'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('media_servers').select('*').order('created_at');
-      if (error) throw error;
-      return data as MediaServer[];
+      const res = await fetch(`${apiBase}/api/media-servers`);
+      if (!res.ok) throw new Error('Não foi possível conectar ao servidor local');
+      return res.json() as Promise<MediaServer[]>;
     },
   });
 
   const saveMutation = useMutation({
     mutationFn: async (values: typeof defaultForm & { id?: string }) => {
-      if (values.id) {
-        const { id, ...updates } = values;
-        const { error } = await supabase.from('media_servers').update(updates).eq('id', id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('media_servers').insert(values);
-        if (error) throw error;
+      const url = values.id
+        ? `${apiBase}/api/media-servers/${values.id}`
+        : `${apiBase}/api/media-servers`;
+      const method = values.id ? 'PUT' : 'POST';
+      const { id, ...body } = values as any;
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Erro ao salvar servidor');
       }
+      return res.json();
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['media_servers'] });
@@ -71,8 +85,8 @@ const MediaServerSettings = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('media_servers').delete().eq('id', id);
-      if (error) throw error;
+      const res = await fetch(`${apiBase}/api/media-servers/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Erro ao remover servidor');
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['media_servers'] });
@@ -84,7 +98,6 @@ const MediaServerSettings = () => {
 
   const syncMutation = useMutation({
     mutationFn: async () => {
-      // Detectar IP do servidor local (media_server_ip do company_settings ou fallback)
       const serverIp = company?.media_server_ip || window.location.hostname;
       const syncUrl = `http://${serverIp}:8001/api/sync/media-servers`;
       const res = await fetch(syncUrl, { method: 'POST' });
