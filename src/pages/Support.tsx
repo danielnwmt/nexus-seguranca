@@ -26,29 +26,7 @@ interface Ticket {
   createdAt: string;
 }
 
-const mockTickets: Ticket[] = [
-  {
-    id: '1', client: 'Maria Silva', subject: 'Câmera offline', status: 'open', createdAt: new Date().toISOString(),
-    messages: [
-      { id: '1', sender: 'client', name: 'Maria Silva', text: 'Olá, minha câmera do portão está offline desde ontem.', time: '10:30' },
-      { id: '2', sender: 'bot', name: 'Assistente', text: 'Olá Maria! Identificamos que a câmera CAM-001 está offline. Um técnico será notificado.', time: '10:30' },
-    ],
-  },
-  {
-    id: '2', client: 'João Santos', subject: 'Solicitar manutenção', status: 'in_progress', createdAt: new Date().toISOString(),
-    messages: [
-      { id: '1', sender: 'client', name: 'João Santos', text: 'Preciso de manutenção no sistema de alarme.', time: '09:15' },
-      { id: '2', sender: 'operator', name: 'Operador', text: 'Bom dia João! Já estamos agendando a visita técnica.', time: '09:20' },
-    ],
-  },
-  {
-    id: '3', client: 'Ana Costa', subject: 'Dúvida sobre fatura', status: 'open', createdAt: new Date(Date.now() - 3600000).toISOString(),
-    messages: [
-      { id: '1', sender: 'client', name: 'Ana Costa', text: 'Minha fatura veio com valor diferente este mês.', time: '08:00' },
-    ],
-  },
-];
-
+const mockTickets: Ticket[] = [];
 const statusConfig: Record<string, { label: string; color: string }> = {
   open: { label: 'Aberto', color: 'text-yellow-500' },
   in_progress: { label: 'Em Atendimento', color: 'text-primary' },
@@ -58,7 +36,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 const Support = () => {
   const { toast } = useToast();
   const [tickets, setTickets] = useState<Ticket[]>(mockTickets);
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(mockTickets[0]);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const messagesEndRef = useRef<HTMLDivElement>(null);
