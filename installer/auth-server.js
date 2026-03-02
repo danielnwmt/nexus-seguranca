@@ -366,6 +366,12 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, getAnalysisStatus());
     }
 
+    // ---- SYNC: Sincronizar dados locais → Supabase Cloud ----
+    if (path === '/api/sync/media-servers' && req.method === 'POST') {
+      const result = await syncMediaServersToCloud();
+      return sendJSON(res, 200, result);
+    }
+
     // ---- SNAPSHOT MANUAL (manter para uso pontual) ----
     // Keep existing auto-analyze endpoint for manual trigger
     if (path === '/api/cameras/auto-analyze' && req.method === 'POST') {
@@ -701,9 +707,89 @@ async function autoStartAnalysis() {
   }
 }
 
+// Sincronizar media_servers locais para Supabase Cloud
+async function syncMediaServersToCloud() {
+  const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return { error: 'Supabase não configurado no .env', synced: 0 };
+  }
+  try {
+    const localServers = await pool.query('SELECT * FROM media_servers ORDER BY created_at');
+    if (localServers.rows.length === 0) {
+      return { synced: 0, message: 'Nenhum servidor local encontrado' };
+    }
+
+    const serviceToken = createServiceToken();
+    let synced = 0;
+
+    for (const srv of localServers.rows) {
+      // Upsert by name+ip to avoid duplicates
+      const checkRes = await fetch(`${supabaseUrl}/rest/v1/media_servers?name=eq.${encodeURIComponent(srv.name)}&ip_address=eq.${encodeURIComponent(srv.ip_address)}`, {
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Accept': 'application/json',
+        },
+      });
+      const existing = await checkRes.json();
+
+      if (existing.length === 0) {
+        // Insert
+        const insertRes = await fetch(`${supabaseUrl}/rest/v1/media_servers`, {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseAnonKey,
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal',
+          },
+          body: JSON.stringify({
+            name: srv.name,
+            ip_address: srv.ip_address,
+            instances: srv.instances,
+            rtmp_base_port: srv.rtmp_base_port,
+            hls_base_port: srv.hls_base_port,
+            webrtc_base_port: srv.webrtc_base_port,
+            status: srv.status,
+          }),
+        });
+        if (insertRes.ok) synced++;
+        else console.log('Sync insert error:', await insertRes.text());
+      } else {
+        // Update
+        await fetch(`${supabaseUrl}/rest/v1/media_servers?id=eq.${existing[0].id}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': supabaseAnonKey,
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal',
+          },
+          body: JSON.stringify({
+            instances: srv.instances,
+            rtmp_base_port: srv.rtmp_base_port,
+            hls_base_port: srv.hls_base_port,
+            webrtc_base_port: srv.webrtc_base_port,
+            status: srv.status,
+          }),
+        });
+        synced++;
+      }
+    }
+
+    console.log(`✅ Sync: ${synced} servidor(es) sincronizados com a nuvem`);
+    return { synced, total: localServers.rows.length };
+  } catch (err) {
+    console.error('Sync error:', err.message);
+    return { error: err.message, synced: 0 };
+  }
+}
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Nexus Auth + API Gateway rodando em http://localhost:${PORT}`);
   console.log(`PostgREST em ${POSTGREST_URL}`);
+  // Sincronizar servidores locais com a nuvem
+  setTimeout(() => syncMediaServersToCloud(), 5000);
   // Iniciar análise contínua automaticamente
   autoStartAnalysis();
 });

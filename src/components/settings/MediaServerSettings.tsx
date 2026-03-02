@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Wifi, Server, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
+import { Wifi, Server, Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { toast } from 'sonner';
 
 interface MediaServer {
@@ -34,6 +35,7 @@ const defaultForm = {
 
 const MediaServerSettings = () => {
   const qc = useQueryClient();
+  const { data: company } = useCompanySettings();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingServer, setEditingServer] = useState<MediaServer | null>(null);
   const [form, setForm] = useState(defaultForm);
@@ -78,6 +80,26 @@ const MediaServerSettings = () => {
       setDeleteId(null);
     },
     onError: (e: any) => toast.error(e.message),
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      // Detectar IP do servidor local (media_server_ip do company_settings ou fallback)
+      const serverIp = company?.media_server_ip || window.location.hostname;
+      const syncUrl = `http://${serverIp}:8001/api/sync/media-servers`;
+      const res = await fetch(syncUrl, { method: 'POST' });
+      if (!res.ok) throw new Error('Não foi possível conectar ao servidor local');
+      return res.json();
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['media_servers'] });
+      if (data.error) {
+        toast.error(data.error);
+      } else {
+        toast.success(`${data.synced} servidor(es) sincronizado(s)`);
+      }
+    },
+    onError: (e: any) => toast.error('Erro ao sincronizar: ' + e.message),
   });
 
   const openCreate = () => {
@@ -128,10 +150,16 @@ const MediaServerSettings = () => {
                 Gerencie os servidores MediaMTX para streaming das câmeras.
               </CardDescription>
             </div>
-            <Button size="sm" onClick={openCreate} className="gap-1.5">
-              <Plus className="w-3.5 h-3.5" />
-              Novo Servidor
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} className="gap-1.5">
+                <RefreshCw className={`w-3.5 h-3.5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                Sincronizar
+              </Button>
+              <Button size="sm" onClick={openCreate} className="gap-1.5">
+                <Plus className="w-3.5 h-3.5" />
+                Novo Servidor
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
