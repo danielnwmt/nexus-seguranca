@@ -241,9 +241,22 @@ const server = http.createServer(async (req, res) => {
           commandUsed = `bash ${scriptPath}`;
           output = execSync(`${commandUsed} 2>&1`, { timeout: 600000 }).toString();
         } else {
+          // Fallback: proteger .env e auth-server antes do checkout
           const branch = execSync(`cd ${INSTALL_DIR} && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main`).toString().trim() || 'main';
-          commandUsed = `cd ${INSTALL_DIR} && git checkout -- . && git pull origin ${branch} && npm install --legacy-peer-deps && npm run build && sudo systemctl restart nexus-auth nginx`;
-          output = execSync(`${commandUsed} 2>&1`, { timeout: 600000, shell: '/bin/bash' }).toString();
+          const safeUpdate = [
+            `cd ${INSTALL_DIR}`,
+            `cp -f .env .env.bak 2>/dev/null || true`,
+            `cp -f auth-server/server.js auth-server/server.js.bak 2>/dev/null || true`,
+            `git checkout -- .`,
+            `git pull origin ${branch}`,
+            `cp -f .env.bak .env 2>/dev/null || true`,
+            `cp -f auth-server/server.js.bak auth-server/server.js 2>/dev/null || true`,
+            `npm install --legacy-peer-deps`,
+            `npm run build`,
+            `sudo systemctl restart nexus-auth nginx`
+          ].join(' && ');
+          commandUsed = safeUpdate;
+          output = execSync(`${safeUpdate} 2>&1`, { timeout: 600000, shell: '/bin/bash' }).toString();
         }
 
         if (output.includes('Already up to date') || output.includes('ja esta na versao') || output.includes('Already up-to-date')) {
