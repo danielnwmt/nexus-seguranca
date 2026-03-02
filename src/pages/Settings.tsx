@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store, Server, HardDrive, Bot, Globe, Palette, Loader2 } from 'lucide-react';
+import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store, Server, HardDrive, Bot, Globe, Palette, Loader2, KeyRound, Eye, EyeOff } from 'lucide-react';
 import CompanySettings from '@/components/settings/CompanySettings';
 import StorageServers from '@/components/settings/StorageServers';
 import MediaServerSettings from '@/components/settings/MediaServerSettings';
@@ -174,6 +174,30 @@ const Settings = () => {
   // ---- User Dialog ----
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
+  const [resetPasswordResult, setResetPasswordResult] = useState<{ userId: string; password: string } | null>(null);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState<string | null>(null);
+
+  const handleResetPassword = async (targetUserId: string) => {
+    setResettingPassword(targetUserId);
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-users', {
+        body: { action: 'reset_password', user_id: targetUserId },
+      });
+      if (error || data?.error) {
+        toast({ title: data?.error || 'Erro ao redefinir senha', variant: 'destructive' });
+        return;
+      }
+      setResetPasswordResult({ userId: targetUserId, password: data.temporary_password });
+      setShowResetPassword(false);
+      toast({ title: 'Senha redefinida com sucesso' });
+    } catch {
+      toast({ title: 'Erro ao redefinir senha', variant: 'destructive' });
+    } finally {
+      setResettingPassword(null);
+    }
+  };
+
   const [userForm, setUserForm] = useState({ name: '', email: '', password: '', level: 'n1', active: true });
 
   const openAddUser = () => {
@@ -454,11 +478,12 @@ const Settings = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Nome</TableHead>
+                     <TableHead>Nome</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Nível</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="w-[100px]">Ações</TableHead>
+                      <TableHead>Senha</TableHead>
+                      <TableHead className="w-[120px]">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -475,6 +500,32 @@ const Settings = () => {
                           <span className={`text-xs font-mono ${user.active ? 'text-success' : 'text-destructive'}`}>
                             {user.active ? 'Ativo' : 'Inativo'}
                           </span>
+                        </TableCell>
+                        <TableCell>
+                          {resetPasswordResult?.userId === user.id ? (
+                            <div className="flex items-center gap-1">
+                              <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                                {showResetPassword ? resetPasswordResult.password : '••••••••'}
+                              </code>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowResetPassword(v => !v)}>
+                                {showResetPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { navigator.clipboard.writeText(resetPasswordResult.password); toast({ title: 'Senha copiada!' }); }}>
+                                <Copy className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="h-7 text-xs gap-1"
+                              onClick={() => handleResetPassword(user.id)}
+                              disabled={resettingPassword === user.id}
+                            >
+                              {resettingPassword === user.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <KeyRound className="w-3 h-3" />}
+                              Redefinir
+                            </Button>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
