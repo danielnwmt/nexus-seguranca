@@ -372,6 +372,43 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, result);
     }
 
+    // ---- CRUD: Media Servers (local) ----
+    if (path === '/api/media-servers' && req.method === 'GET') {
+      const result = await pool.query('SELECT * FROM media_servers ORDER BY created_at');
+      return sendJSON(res, 200, result.rows);
+    }
+
+    if (path === '/api/media-servers' && req.method === 'POST') {
+      const body = await parseBody(req);
+      const { name, ip_address, instances, rtmp_base_port, hls_base_port, webrtc_base_port, status } = body;
+      const result = await pool.query(
+        `INSERT INTO media_servers (name, ip_address, instances, rtmp_base_port, hls_base_port, webrtc_base_port, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        [name || 'Servidor MediaMTX', ip_address, instances || 1, rtmp_base_port || 1935, hls_base_port || 8888, webrtc_base_port || 8889, status || 'active']
+      );
+      return sendJSON(res, 201, result.rows[0]);
+    }
+
+    if (path.startsWith('/api/media-servers/') && req.method === 'PUT') {
+      const id = path.split('/').pop();
+      const body = await parseBody(req);
+      const { name, ip_address, instances, rtmp_base_port, hls_base_port, webrtc_base_port, status } = body;
+      const result = await pool.query(
+        `UPDATE media_servers SET name=$1, ip_address=$2, instances=$3, rtmp_base_port=$4, hls_base_port=$5, webrtc_base_port=$6, status=$7, updated_at=now()
+         WHERE id=$8 RETURNING *`,
+        [name, ip_address, instances, rtmp_base_port, hls_base_port, webrtc_base_port, status, id]
+      );
+      if (result.rows.length === 0) return sendJSON(res, 404, { error: 'Servidor não encontrado' });
+      return sendJSON(res, 200, result.rows[0]);
+    }
+
+    if (path.startsWith('/api/media-servers/') && req.method === 'DELETE') {
+      const id = path.split('/').pop();
+      const result = await pool.query('DELETE FROM media_servers WHERE id=$1 RETURNING id', [id]);
+      if (result.rows.length === 0) return sendJSON(res, 404, { error: 'Servidor não encontrado' });
+      return sendJSON(res, 200, { deleted: true });
+    }
+
     // ---- SNAPSHOT MANUAL (manter para uso pontual) ----
     // Keep existing auto-analyze endpoint for manual trigger
     if (path === '/api/cameras/auto-analyze' && req.method === 'POST') {
