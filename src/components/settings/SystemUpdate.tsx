@@ -29,13 +29,23 @@ const SystemUpdate = () => {
 
   const fetchVersion = async () => {
     try {
-      const res = await fetch(`${systemApiBase}/version`);
-      if (res.ok) {
+      let res: Response | null = null;
+      try {
+        res = await fetch(`${systemApiBase}/version`, { signal: AbortSignal.timeout(5000) });
+      } catch {
+        // Fallback direto na porta 8001
+        try {
+          res = await fetch(`http://${host}:8001/api/system/version`, { signal: AbortSignal.timeout(5000) });
+        } catch {
+          return;
+        }
+      }
+      if (res && res.ok) {
         const data = await res.json();
         setVersionInfo(data);
       }
     } catch {
-      // Server local não disponível (dev mode)
+      // Servidor local não disponível
     }
   };
 
@@ -59,15 +69,50 @@ const SystemUpdate = () => {
       const { data: { session } } = await supabase.auth.getSession();
       const accessToken = session?.access_token || '';
 
-      const res = await fetch(`${systemApiBase}/update`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
+      // Tentar via Nginx proxy primeiro, depois direto na porta 8001
+      let res: Response | null = null;
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      };
 
-      const data = await res.json();
+      try {
+        res = await fetch(`${systemApiBase}/update`, {
+          method: 'POST',
+          headers,
+          signal: AbortSignal.timeout(620000), // 10min + margem
+        });
+      } catch {
+        // Fallback: tentar direto na porta 8001
+        try {
+          const directUrl = `http://${window.location.hostname}:8001/api/system/update`;
+          res = await fetch(directUrl, {
+            method: 'POST',
+            headers,
+            signal: AbortSignal.timeout(620000),
+          });
+        } catch {
+          res = null;
+        }
+      }
+
+      if (!res) {
+        setStatus('error');
+        setUpdateMessage('Não foi possível conectar ao servidor. Verifique se o serviço está rodando. Você pode atualizar manualmente via terminal.');
+        toast({
+          title: 'Servidor não acessível',
+          description: 'Use: bash /opt/nexus-monitoramento/atualizar-nexus.sh',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        data = { status: 'error', message: 'Resposta inválida do servidor' };
+      }
 
       if (res.ok) {
         setStatus(data.status === 'updated' ? 'updated' : 'up_to_date');
@@ -78,7 +123,6 @@ const SystemUpdate = () => {
             title: '✅ Sistema atualizado!',
             description: 'Recarregue a página para ver as mudanças.',
           });
-          // Recarregar após 3s
           setTimeout(() => window.location.reload(), 3000);
         } else {
           toast({
@@ -91,16 +135,16 @@ const SystemUpdate = () => {
         setUpdateMessage(data.message || 'Erro ao atualizar');
         toast({
           title: 'Erro na atualização',
-          description: data.message,
+          description: data.message || 'Verifique os logs do servidor.',
           variant: 'destructive',
         });
       }
     } catch (err: any) {
       setStatus('error');
-      setUpdateMessage('Não foi possível conectar ao servidor. Verifique se o sistema está rodando no servidor local.');
+      setUpdateMessage('Erro inesperado: ' + (err.message || 'Verifique se o sistema está rodando no servidor.'));
       toast({
-        title: 'Erro de conexão',
-        description: 'Servidor não acessível. Use o script: bash atualizar-nexus.sh',
+        title: 'Erro na atualização',
+        description: err.message || 'Use o script manual: bash atualizar-nexus.sh',
         variant: 'destructive',
       });
     } finally {
