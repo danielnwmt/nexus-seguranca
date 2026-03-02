@@ -353,6 +353,9 @@ server {
         proxy_pass http://127.0.0.1:$API_PORT/;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
+        proxy_read_timeout 900s;
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 900s;
     }
 
     # Proxy para PostgREST (API REST)
