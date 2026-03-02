@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { isValidCpf } from '@/lib/validators';
 import { Shield, Plus, Search, Pencil, Trash2, Moon, Sun, Clock, MapPin, Route, ArrowRightLeft } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -120,7 +121,11 @@ const Guards = () => {
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!form.name.trim()) newErrors.name = 'Nome é obrigatório';
-    if (!form.cpf.trim()) newErrors.cpf = 'CPF é obrigatório';
+    if (!form.cpf.trim()) {
+      newErrors.cpf = 'CPF é obrigatório';
+    } else if (!isValidCpf(form.cpf)) {
+      newErrors.cpf = 'CPF inválido';
+    }
     if (!form.phone.trim()) newErrors.phone = 'Telefone é obrigatório';
     if (!form.email.trim()) newErrors.email = 'Email é obrigatório';
     if (!form.cnv.trim()) newErrors.cnv = 'CNV é obrigatória';
