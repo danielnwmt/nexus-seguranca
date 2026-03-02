@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { RefreshCw, CheckCircle2, AlertCircle, Loader2, GitBranch, Clock } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { RefreshCw, CheckCircle2, AlertCircle, Loader2, GitBranch, Clock, Circle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,13 +7,31 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 
+interface UpdateStep {
+  step: number;
+  status: 'pending' | 'running' | 'done' | 'warn' | 'error';
+  message: string;
+  detail?: string;
+}
+
+const STEP_LABELS: Record<number, string> = {
+  1: 'Backup de configurações',
+  2: 'Download do GitHub',
+  3: 'Restaurar configurações',
+  4: 'Instalar dependências',
+  5: 'Compilar frontend',
+  6: 'Reiniciar serviços',
+};
+
 const SystemUpdate = () => {
   const { toast } = useToast();
   const [updating, setUpdating] = useState(false);
   const [status, setStatus] = useState<'idle' | 'checking' | 'updated' | 'up_to_date' | 'error'>('idle');
   const [updateMessage, setUpdateMessage] = useState('');
   const [errorOutput, setErrorOutput] = useState('');
+  const [steps, setSteps] = useState<UpdateStep[]>([]);
   const [versionInfo, setVersionInfo] = useState<{ version: string; date: string; branch: string } | null>(null);
+  const logRef = useRef<HTMLDivElement>(null);
 
   const host = typeof window !== 'undefined' ? window.location.hostname : '';
   const isPreviewEnv = host.includes('lovable.app') || host.includes('lovableproject.com');
@@ -55,112 +73,128 @@ const SystemUpdate = () => {
   const handleUpdate = async () => {
     setUpdating(true);
     setStatus('checking');
-    setUpdateMessage('Verificando atualizações no GitHub...');
+    setUpdateMessage('Conectando ao servidor...');
     setErrorOutput('');
+    setSteps(
+      Object.entries(STEP_LABELS).map(([k, label]) => ({
+        step: Number(k),
+        status: 'pending',
+        message: label,
+      }))
+    );
+
     try {
       if (!updateAvailable) {
         setStatus('error');
         setUpdateMessage(blockedReason || 'Atualização por botão indisponível neste ambiente.');
-        toast({
-          title: 'Atualização indisponível',
-          description: blockedReason || 'Use o terminal no servidor local.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Atualização indisponível', description: blockedReason || 'Use o terminal no servidor local.', variant: 'destructive' });
         return;
       }
 
       const { data: { session } } = await supabase.auth.getSession();
       const accessToken = session?.access_token || '';
 
-      // Tentar via Nginx proxy primeiro, depois direto na porta 8001
-      const headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`
-      };
-
       const urls = [
         `${systemApiBase}/update`,
         `http://${window.location.hostname}:8001/api/system/update`,
       ];
 
-      let res: Response | null = null;
+      let connected = false;
+
       for (const url of urls) {
         try {
-          console.log(`[SystemUpdate] Tentando atualizar via ${url}`);
-          res = await fetch(url, {
+          console.log(`[SystemUpdate] Tentando SSE via ${url}`);
+          const response = await fetch(url, {
             method: 'POST',
-            headers,
-            signal: AbortSignal.timeout(620000),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`,
+            },
           });
-          const ct = res.headers.get('content-type') || '';
-          if (!ct.includes('application/json')) {
-            console.warn(`[SystemUpdate] ${url} retornou content-type: ${ct} (esperado JSON)`);
-            res = null;
-            continue;
+
+          const ct = response.headers.get('content-type') || '';
+
+          // SSE stream
+          if (ct.includes('text/event-stream') && response.body) {
+            connected = true;
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
+
+              for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                try {
+                  const event = JSON.parse(line.slice(6));
+
+                  if (event.step === 'complete') {
+                    setStatus(event.status === 'updated' ? 'updated' : event.status === 'up_to_date' ? 'up_to_date' : 'error');
+                    setUpdateMessage(event.message);
+                    if (event.output) setErrorOutput(event.output);
+                    if (event.status === 'updated') {
+                      toast({ title: '✅ Sistema atualizado!', description: 'Recarregue a página.' });
+                      setTimeout(() => window.location.reload(), 3000);
+                    } else if (event.status === 'error') {
+                      toast({ title: 'Erro na atualização', description: event.message, variant: 'destructive' });
+                    } else {
+                      toast({ title: 'Sistema atualizado', description: event.message });
+                    }
+                  } else {
+                    // Update step
+                    setSteps(prev => prev.map(s =>
+                      s.step === event.step
+                        ? { ...s, status: event.status, message: event.message, detail: event.detail }
+                        : s
+                    ));
+                    setUpdateMessage(event.message);
+                  }
+                } catch {}
+              }
+            }
+            break;
           }
-          break; // sucesso
+
+          // Fallback: JSON response (old server)
+          if (ct.includes('application/json')) {
+            connected = true;
+            const data = await response.json();
+            if (response.ok) {
+              setStatus(data.status === 'updated' ? 'updated' : 'up_to_date');
+              setUpdateMessage(data.message);
+              if (data.status === 'updated') {
+                toast({ title: '✅ Sistema atualizado!', description: 'Recarregue a página.' });
+                setTimeout(() => window.location.reload(), 3000);
+              }
+            } else {
+              setStatus('error');
+              setUpdateMessage(data.message || 'Erro ao atualizar');
+              setErrorOutput(data.output || '');
+              toast({ title: 'Erro na atualização', description: data.message, variant: 'destructive' });
+            }
+            break;
+          }
         } catch (err) {
           console.warn(`[SystemUpdate] Falha em ${url}:`, err);
-          res = null;
         }
       }
 
-      if (!res) {
+      if (!connected) {
         setStatus('error');
-        setUpdateMessage('Não foi possível conectar ao servidor. Verifique se o serviço está rodando.');
-        setErrorOutput('Nenhuma das URLs respondeu com JSON válido. Verifique se o auth-server está rodando na porta 8001 e se o Nginx está configurado corretamente.');
-        toast({
-          title: 'Servidor não acessível',
-          description: 'Use: bash /opt/nexus-monitoramento/atualizar-nexus.sh',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      let data: any;
-      try {
-        data = await res.json();
-      } catch (parseErr) {
-        console.error('[SystemUpdate] Erro ao parsear resposta JSON:', parseErr);
-        data = { status: 'error', message: 'Resposta inválida do servidor' };
-      }
-
-      if (res.ok) {
-        setStatus(data.status === 'updated' ? 'updated' : 'up_to_date');
-        setUpdateMessage(data.message);
-        
-        if (data.status === 'updated') {
-          toast({
-            title: '✅ Sistema atualizado!',
-            description: 'Recarregue a página para ver as mudanças.',
-          });
-          setTimeout(() => window.location.reload(), 3000);
-        } else {
-          toast({
-            title: 'Sistema atualizado',
-            description: data.message,
-          });
-        }
-      } else {
-        setStatus('error');
-        const serverOutput = data?.output || '';
-        const errorMsg = data?.message || 'Erro ao atualizar';
-        setUpdateMessage(errorMsg);
-        setErrorOutput(serverOutput || (data?.command ? `Comando: ${data.command}` : 'Sem detalhes retornados pelo servidor.'));
-        toast({
-          title: 'Erro na atualização',
-          description: errorMsg,
-          variant: 'destructive',
-        });
+        setUpdateMessage('Não foi possível conectar ao servidor.');
+        setErrorOutput('Verifique se o auth-server está rodando na porta 8001.');
+        toast({ title: 'Servidor não acessível', description: 'Use: bash /opt/nexus-monitoramento/atualizar-nexus.sh', variant: 'destructive' });
       }
     } catch (err: any) {
       setStatus('error');
-      setUpdateMessage('Erro inesperado: ' + (err.message || 'Verifique se o sistema está rodando no servidor.'));
-      toast({
-        title: 'Erro na atualização',
-        description: err.message || 'Use: bash /opt/nexus-monitoramento/atualizar-nexus.sh',
-        variant: 'destructive',
-      });
+      setUpdateMessage('Erro inesperado: ' + (err.message || ''));
+      toast({ title: 'Erro na atualização', description: err.message, variant: 'destructive' });
     } finally {
       setUpdating(false);
       fetchVersion();
@@ -217,17 +251,50 @@ const SystemUpdate = () => {
             </div>
           )}
 
-          {/* Status da atualização */}
-          {status !== 'idle' && (
+          {/* Progress steps */}
+          {steps.length > 0 && status !== 'idle' && (
+            <div className="space-y-1.5 p-3 rounded-lg bg-muted/50 border border-border" ref={logRef}>
+              {steps.map((s) => (
+                <div key={s.step} className="flex items-start gap-2">
+                  <div className="mt-0.5 shrink-0">
+                    {s.status === 'pending' && <Circle className="w-3.5 h-3.5 text-muted-foreground" />}
+                    {s.status === 'running' && <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />}
+                    {s.status === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-primary" />}
+                    {s.status === 'warn' && <AlertCircle className="w-3.5 h-3.5 text-yellow-500" />}
+                    {s.status === 'error' && <AlertCircle className="w-3.5 h-3.5 text-destructive" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-xs font-medium ${
+                      s.status === 'error' ? 'text-destructive' :
+                      s.status === 'done' ? 'text-foreground' :
+                      s.status === 'running' ? 'text-primary' :
+                      'text-muted-foreground'
+                    }`}>
+                      {s.message}
+                    </p>
+                    {s.detail && (
+                      <p className="text-[10px] text-muted-foreground font-mono mt-0.5 break-all">{s.detail}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Final status message */}
+          {status !== 'idle' && status !== 'checking' && (
             <div className="space-y-2">
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted border border-border">
+              <div className={`flex items-start gap-3 p-3 rounded-lg border ${
+                status === 'error' ? 'bg-destructive/10 border-destructive/20' :
+                'bg-primary/10 border-primary/20'
+              }`}>
                 {statusIcon[status]}
                 <p className="text-sm text-foreground">{updateMessage}</p>
               </div>
               {status === 'error' && errorOutput && (
-                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                  <p className="text-xs font-semibold text-destructive mb-1">Detalhes do erro:</p>
-                  <pre className="text-xs text-destructive/80 whitespace-pre-wrap font-mono max-h-48 overflow-y-auto">{errorOutput}</pre>
+                <div className="p-3 rounded-lg bg-destructive/5 border border-destructive/20">
+                  <p className="text-xs font-semibold text-destructive mb-1">Saída do servidor:</p>
+                  <pre className="text-[11px] text-destructive/80 whitespace-pre-wrap font-mono max-h-64 overflow-y-auto">{errorOutput}</pre>
                 </div>
               )}
             </div>
