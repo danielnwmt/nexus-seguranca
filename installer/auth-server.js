@@ -313,17 +313,14 @@ const server = http.createServer(async (req, res) => {
           }
         } catch {}
 
-        let sourceUrl = snapshot_url;
-        if (!sourceUrl && stream_key) {
-          // Construir URL HLS do MediaMTX
-          sourceUrl = `http://${mediaIp}:${hlsPort}/${stream_key}/`;
-        }
+        // Usar apenas a URL HLS do stream cadastrado (MediaMTX)
+        const sourceUrl = `http://${mediaIp}:${hlsPort}/${stream_key}/`;
 
         // Capturar frame via ffmpeg
         execSync(`ffmpeg -y -i "${sourceUrl}" -vframes 1 -q:v 2 -f image2 "${tmpFile}" 2>/dev/null`, { timeout: 15000 });
 
         if (!fs.existsSync(tmpFile)) {
-          return sendJSON(res, 500, { error: 'Failed to capture frame' });
+          return sendJSON(res, 500, { error: 'Falha ao capturar frame do stream' });
         }
 
         const imageBase64 = fs.readFileSync(tmpFile).toString('base64');
@@ -396,8 +393,8 @@ const server = http.createServer(async (req, res) => {
         for (const cam of camResult.rows) {
           const tmpFile = pathMod.join(os.tmpdir(), `nexus-analyze-${cam.id}.jpg`);
           try {
-            // Tentar capturar do HLS (stream RTMP/RTSP via MediaMTX) primeiro
-            let sourceUrl = `http://${mediaIp}:${hlsPort}/${cam.stream_key}/`;
+            // Capturar frame apenas da URL HLS do stream cadastrado (MediaMTX)
+            const sourceUrl = `http://${mediaIp}:${hlsPort}/${cam.stream_key}/`;
             let captured = false;
 
             try {
@@ -405,24 +402,8 @@ const server = http.createServer(async (req, res) => {
               if (fs.existsSync(tmpFile)) captured = true;
             } catch {}
 
-            // Fallback: usar snapshot_url se configurada
-            if (!captured && cam.snapshot_url) {
-              try {
-                execSync(`ffmpeg -y -i "${cam.snapshot_url}" -vframes 1 -q:v 2 -f image2 "${tmpFile}" 2>/dev/null`, { timeout: 15000 });
-                if (fs.existsSync(tmpFile)) captured = true;
-              } catch {}
-            }
-
-            // Fallback: usar stream_url direto (RTSP)
-            if (!captured && cam.stream_url) {
-              try {
-                execSync(`ffmpeg -y -rtsp_transport tcp -i "${cam.stream_url}" -vframes 1 -q:v 2 -f image2 "${tmpFile}" 2>/dev/null`, { timeout: 15000 });
-                if (fs.existsSync(tmpFile)) captured = true;
-              } catch {}
-            }
-
             if (!captured) {
-              results.push({ camera: cam.name, status: 'skip', reason: 'no_stream' });
+              results.push({ camera: cam.name, status: 'skip', reason: 'stream_offline' });
               continue;
             }
 

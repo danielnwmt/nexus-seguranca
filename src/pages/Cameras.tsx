@@ -235,9 +235,9 @@ const Cameras = () => {
                 <Input value={newCamera.streamUrl} onChange={e => setNewCamera(p => ({ ...p, streamUrl: e.target.value }))} placeholder={newCamera.protocol === 'RTMP' ? 'rtmp://192.168.1.100:1935/stream1' : 'rtsp://192.168.1.100:554/stream1'} className="bg-muted border-border font-mono text-xs" />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground flex items-center gap-1"><Brain className="w-3 h-3" /> URL de Snapshot (para IA automática)</Label>
+                <Label className="text-xs text-muted-foreground flex items-center gap-1"><Brain className="w-3 h-3" /> URL de Snapshot (opcional)</Label>
                 <Input value={newCamera.snapshotUrl} onChange={e => setNewCamera(p => ({ ...p, snapshotUrl: e.target.value }))} placeholder="http://192.168.1.100/ISAPI/Streaming/channels/101/picture" className="bg-muted border-border font-mono text-xs" />
-                <p className="text-[10px] text-muted-foreground mt-1">Endpoint HTTP da câmera que retorna uma imagem JPEG. Necessário para análise automática em background.</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Opcional. A análise IA usa o stream HLS cadastrado para capturar frames automaticamente.</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
