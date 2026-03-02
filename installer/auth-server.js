@@ -380,6 +380,72 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    // ---- AUTO-REGISTER: detecta IP local e cadastra servidor de mídia se não existir ----
+    if (path === '/api/local/media-servers/auto-register' && req.method === 'POST') {
+      try {
+        // Detectar IP local
+        const nets = os.networkInterfaces();
+        let localIp = '127.0.0.1';
+        for (const name of Object.keys(nets)) {
+          for (const net of nets[name]) {
+            if (net.family === 'IPv4' && !net.internal) {
+              localIp = net.address;
+              break;
+            }
+          }
+          if (localIp !== '127.0.0.1') break;
+        }
+
+        // Detectar OS
+        const detectedOs = process.platform === 'win32' ? 'windows' : 'linux';
+
+        // Verificar se já existe servidor cadastrado com esse IP
+        const existing = await pool.query('SELECT * FROM media_servers WHERE ip_address = $1', [localIp]);
+        let server;
+        if (existing.rows.length > 0) {
+          server = existing.rows[0];
+        } else {
+          // Cadastrar automaticamente
+          const insertResult = await pool.query(
+            `INSERT INTO media_servers (name, ip_address, instances, rtmp_base_port, hls_base_port, webrtc_base_port, status, os)
+             VALUES ($1,$2,1,1935,8888,8889,'active',$3) RETURNING *`,
+            ['Servidor Local', localIp, detectedOs]
+          );
+          server = insertResult.rows[0];
+        }
+
+        // Testar conexão MediaMTX (HLS e RTMP)
+        let hlsOk = false, rtmpOk = false;
+        try {
+          const hlsTest = await new Promise((resolve) => {
+            const req = http.get(`http://${localIp}:${server.hls_base_port}/v3/paths/list`, { timeout: 4000 }, (r) => resolve(r.statusCode < 500));
+            req.on('error', () => resolve(false));
+            req.on('timeout', () => { req.destroy(); resolve(false); });
+          });
+          hlsOk = hlsTest;
+        } catch(e) {}
+
+        try {
+          const net = require('net');
+          rtmpOk = await new Promise((resolve) => {
+            const sock = net.createConnection({ host: localIp, port: server.rtmp_base_port, timeout: 4000 });
+            sock.on('connect', () => { sock.destroy(); resolve(true); });
+            sock.on('error', () => resolve(false));
+            sock.on('timeout', () => { sock.destroy(); resolve(false); });
+          });
+        } catch(e) {}
+
+        const isOnline = hlsOk || rtmpOk;
+        const newStatus = isOnline ? 'online' : 'offline';
+
+        // Atualizar status
+        await pool.query('UPDATE media_servers SET status=$1, updated_at=NOW() WHERE id=$2', [newStatus, server.id]);
+        server.status = newStatus;
+
+        return sendJSON(res, 200, { server, detected_ip: localIp, detected_os: detectedOs, online: isOnline, hls: hlsOk, rtmp: rtmpOk });
+      } catch (e) { return sendJSON(res, 500, { error: e.message }); }
+    }
+
     // ---- CRUD LOCAL: media_servers ----
     if (path === '/api/local/media-servers' && req.method === 'GET') {
       try {
