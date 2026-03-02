@@ -12,6 +12,7 @@ const SystemUpdate = () => {
   const [updating, setUpdating] = useState(false);
   const [status, setStatus] = useState<'idle' | 'checking' | 'updated' | 'up_to_date' | 'error'>('idle');
   const [updateMessage, setUpdateMessage] = useState('');
+  const [errorOutput, setErrorOutput] = useState('');
   const [versionInfo, setVersionInfo] = useState<{ version: string; date: string; branch: string } | null>(null);
 
   const host = typeof window !== 'undefined' ? window.location.hostname : '';
@@ -55,7 +56,7 @@ const SystemUpdate = () => {
     setUpdating(true);
     setStatus('checking');
     setUpdateMessage('Verificando atualizações no GitHub...');
-
+    setErrorOutput('');
     try {
       if (!updateAvailable) {
         setStatus('error');
@@ -106,7 +107,8 @@ const SystemUpdate = () => {
 
       if (!res) {
         setStatus('error');
-        setUpdateMessage('Não foi possível conectar ao servidor. Verifique se o serviço está rodando. Você pode atualizar manualmente via terminal.');
+        setUpdateMessage('Não foi possível conectar ao servidor. Verifique se o serviço está rodando.');
+        setErrorOutput('Nenhuma das URLs respondeu com JSON válido. Verifique se o auth-server está rodando na porta 8001 e se o Nginx está configurado corretamente.');
         toast({
           title: 'Servidor não acessível',
           description: 'Use: bash /opt/nexus-monitoramento/atualizar-nexus.sh',
@@ -141,11 +143,13 @@ const SystemUpdate = () => {
         }
       } else {
         setStatus('error');
-        const commandInfo = data?.command ? ` Comando: ${data.command}` : '';
-        setUpdateMessage((data.message || 'Erro ao atualizar') + commandInfo);
+        const serverOutput = data?.output || '';
+        const errorMsg = data?.message || 'Erro ao atualizar';
+        setUpdateMessage(errorMsg);
+        setErrorOutput(serverOutput || (data?.command ? `Comando: ${data.command}` : 'Sem detalhes retornados pelo servidor.'));
         toast({
           title: 'Erro na atualização',
-          description: data.message || 'Verifique os logs do servidor.',
+          description: errorMsg,
           variant: 'destructive',
         });
       }
@@ -215,9 +219,17 @@ const SystemUpdate = () => {
 
           {/* Status da atualização */}
           {status !== 'idle' && (
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-muted border border-border">
-              {statusIcon[status]}
-              <p className="text-sm text-foreground">{updateMessage}</p>
+            <div className="space-y-2">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted border border-border">
+                {statusIcon[status]}
+                <p className="text-sm text-foreground">{updateMessage}</p>
+              </div>
+              {status === 'error' && errorOutput && (
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <p className="text-xs font-semibold text-destructive mb-1">Detalhes do erro:</p>
+                  <pre className="text-xs text-destructive/80 whitespace-pre-wrap font-mono max-h-48 overflow-y-auto">{errorOutput}</pre>
+                </div>
+              )}
             </div>
           )}
 
