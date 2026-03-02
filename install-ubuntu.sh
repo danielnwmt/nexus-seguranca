@@ -120,13 +120,16 @@ else
   err "Arquivo init-database.sql nao encontrado em: $SQL_FILE"
 fi
 
-# Criar usuario admin
+# Criar usuario admin (ou redefinir senha se ja existe)
 sudo -u postgres psql -d nexus -c "
-  INSERT INTO auth.users (email, encrypted_password)
-  VALUES ('$ADMIN_EMAIL', crypt('$ADMIN_PASSWORD', gen_salt('bf')))
-  ON CONFLICT (email) DO NOTHING;
+  INSERT INTO auth.users (email, encrypted_password, raw_user_meta_data)
+  VALUES ('$ADMIN_EMAIL', crypt('$ADMIN_PASSWORD', gen_salt('bf')), '{\"force_password_change\": true}'::jsonb)
+  ON CONFLICT (email) DO UPDATE SET
+    encrypted_password = crypt('$ADMIN_PASSWORD', gen_salt('bf')),
+    raw_user_meta_data = '{\"force_password_change\": true}'::jsonb,
+    updated_at = now();
 " > /dev/null 2>&1
-ok "Usuario admin criado: $ADMIN_EMAIL"
+ok "Usuario admin criado: $ADMIN_EMAIL / senha: $ADMIN_PASSWORD"
 
 # ----------------------------------------------------------
 # 5. Configurar armazenamento local

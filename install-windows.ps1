@@ -332,14 +332,14 @@ if (Test-Path $sqlFile) {
     exit 1
 }
 
-# Criar usuario admin
+# Criar usuario admin (ou redefinir senha se ja existe)
 Write-Host "  Criando usuario admin..." -ForegroundColor Gray
-$createAdmin = "INSERT INTO auth.users (email, encrypted_password) VALUES ('" + $AdminEmail + "', crypt('" + $AdminPassword + "', gen_salt('bf'))) ON CONFLICT (email) DO NOTHING;"
+$createAdmin = "INSERT INTO auth.users (email, encrypted_password, raw_user_meta_data) VALUES ('" + $AdminEmail + "', crypt('" + $AdminPassword + "', gen_salt('bf')), '{""force_password_change"": true}'::jsonb) ON CONFLICT (email) DO UPDATE SET encrypted_password = crypt('" + $AdminPassword + "', gen_salt('bf')), raw_user_meta_data = '{""force_password_change"": true}'::jsonb, updated_at = now();"
 try {
     & $psqlPath -h localhost -U postgres -d nexus -c $createAdmin 2>&1 | Out-Null
-    Write-Ok "Usuario admin criado: $AdminEmail"
+    Write-Ok "Usuario admin criado: $AdminEmail / senha: $AdminPassword"
 } catch {
-    Write-Warn "Nao foi possivel criar usuario admin (pode ja existir)"
+    Write-Warn "Nao foi possivel criar usuario admin"
 }
 
 # ----------------------------------------------------------
