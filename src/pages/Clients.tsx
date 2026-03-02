@@ -116,16 +116,29 @@ const Clients = () => {
     };
 
     if (editingId) {
-      updateMutation.mutate({ id: editingId, ...payload } as any);
+      updateMutation.mutate({ id: editingId, ...payload } as any, {
+        onSuccess: () => {
+          toast({ title: 'Cliente atualizado' });
+          resetForm();
+        },
+        onError: (err: any) => {
+          console.error('Erro ao atualizar cliente:', err);
+          toast({ title: 'Erro ao atualizar', description: err.message, variant: 'destructive' });
+        },
+      });
     } else {
       insertMutation.mutate(payload as any, {
         onSuccess: (data: any) => {
           createClientFolder(form.name, data.id);
           toast({ title: 'Cliente adicionado', description: 'Pasta de imagens criada automaticamente.' });
+          resetForm();
+        },
+        onError: (err: any) => {
+          console.error('Erro ao adicionar cliente:', err);
+          toast({ title: 'Erro ao adicionar', description: err.message, variant: 'destructive' });
         },
       });
     }
-    resetForm();
   };
 
   const handleEdit = (client: any) => {
