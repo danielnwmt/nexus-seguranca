@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useTableQuery, usePaginatedQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
-import { isLocalInstallation, useLocalTableQuery } from '@/hooks/useLocalApi';
 import ClientCameraViewer from '@/components/clients/ClientCameraViewer';
 
 const maskCpfCnpj = (value: string) => {
@@ -56,10 +55,7 @@ const Clients = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const isLocal = isLocalInstallation();
-  const cloudStorageServers = useTableQuery('storage_servers', 'created_at', { enabled: !isLocal });
-  const localStorageServers = useLocalTableQuery('storage_servers');
-  const storageServers = isLocal ? (localStorageServers.data || []) : (cloudStorageServers.data || []);
+  const { data: storageServers = [] } = useTableQuery('storage_servers');
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
 
