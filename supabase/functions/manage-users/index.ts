@@ -180,6 +180,42 @@ Deno.serve(async (req) => {
         });
       }
 
+      if (body.action === "reset_password") {
+        const { user_id } = body;
+
+        if (!user_id || typeof user_id !== "string") {
+          return new Response(JSON.stringify({ error: "User ID required" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Generate a random temporary password
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
+        let tempPassword = "";
+        for (let i = 0; i < 12; i++) {
+          tempPassword += chars[Math.floor(Math.random() * chars.length)];
+        }
+        // Ensure it meets policy: uppercase, number, special
+        tempPassword = "A1!" + tempPassword;
+
+        const { error: resetErr } = await adminClient.auth.admin.updateUserById(user_id, {
+          password: tempPassword,
+          user_metadata: { force_password_change: true },
+        });
+
+        if (resetErr) {
+          return new Response(JSON.stringify({ error: resetErr.message }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ success: true, temporary_password: tempPassword }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       if (body.action === "delete") {
         const { user_id } = body;
 
