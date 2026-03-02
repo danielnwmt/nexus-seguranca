@@ -9,20 +9,42 @@ export function isLocalInstallation(): boolean {
   return !hostname.includes('lovable.app') && !hostname.includes('lovableproject.com') && !hostname.includes('localhost');
 }
 
-function getLocalApiBase() {
+export function getLocalApiBase() {
   return `http://${window.location.hostname}:8001`;
 }
 
 /**
- * Hook para buscar dados de uma tabela local via auth-server
+ * Converte nome de tabela para endpoint legado (media-servers, storage-servers)
+ * Para outras tabelas, usa o proxy PostgREST via /rest/v1/
  */
-export function useLocalTableQuery<T = any>(table: string) {
-  const endpoint = table === 'media_servers' ? 'media-servers' : 'storage-servers';
+const LEGACY_ENDPOINTS: Record<string, string> = {
+  media_servers: 'media-servers',
+  storage_servers: 'storage-servers',
+};
 
+function isLegacyTable(table: string): boolean {
+  return table in LEGACY_ENDPOINTS;
+}
+
+/**
+ * Hook genérico para buscar dados de qualquer tabela local
+ * Usa endpoints legados para media_servers/storage_servers
+ * Usa proxy PostgREST (/rest/v1/) para todas as outras tabelas
+ */
+export function useLocalTableQuery<T = any>(table: string, orderBy = 'created_at', ascending = false) {
   return useQuery<T[]>({
     queryKey: ['local', table],
     queryFn: async () => {
-      const res = await fetch(`${getLocalApiBase()}/api/local/${endpoint}`);
+      if (isLegacyTable(table)) {
+        const res = await fetch(`${getLocalApiBase()}/api/local/${LEGACY_ENDPOINTS[table]}`);
+        if (!res.ok) throw new Error(`Erro ao buscar ${table}`);
+        return res.json();
+      }
+      // Usar proxy PostgREST
+      const res = await fetch(
+        `${getLocalApiBase()}/rest/v1/${table}?select=*&order=${orderBy}.${ascending ? 'asc' : 'desc'}`,
+        { headers: { 'Content-Type': 'application/json' } }
+      );
       if (!res.ok) throw new Error(`Erro ao buscar ${table}`);
       return res.json();
     },
@@ -30,86 +52,228 @@ export function useLocalTableQuery<T = any>(table: string) {
   });
 }
 
+/**
+ * Hook paginado para tabelas locais via proxy PostgREST
+ */
+export function useLocalPaginatedQuery<T = any>(
+  table: string,
+  page: number,
+  pageSize: number,
+  options?: {
+    orderBy?: string;
+    ascending?: boolean;
+    search?: string;
+    searchColumns?: string[];
+    filters?: Record<string, string>;
+  }
+) {
+  const { orderBy = 'created_at', ascending = false, search, searchColumns, filters } = options || {};
+
+  return useQuery({
+    queryKey: ['local', table, 'paginated', page, pageSize, search, filters],
+    queryFn: async () => {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+
+      const params = new URLSearchParams();
+      params.set('select', '*');
+      params.set('order', `${orderBy}.${ascending ? 'asc' : 'desc'}`);
+      params.set('offset', String(from));
+      params.set('limit', String(pageSize));
+
+      // Text search
+      if (search && searchColumns && searchColumns.length > 0) {
+        const orFilter = searchColumns.map(col => `${col}.ilike.*${search}*`).join(',');
+        params.set('or', `(${orFilter})`);
+      }
+
+      // Exact filters
+      if (filters) {
+        for (const [key, value] of Object.entries(filters)) {
+          if (value && value !== 'all') {
+            params.set(key, `eq.${value}`);
+          }
+        }
+      }
+
+      const res = await fetch(
+        `${getLocalApiBase()}/rest/v1/${table}?${params.toString()}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Prefer': 'count=exact',
+          },
+        }
+      );
+      if (!res.ok) throw new Error(`Erro ao buscar ${table}`);
+
+      const data = await res.json() as T[];
+      // PostgREST retorna contagem no header Content-Range
+      const contentRange = res.headers.get('content-range');
+      let count = data.length;
+      if (contentRange) {
+        const match = contentRange.match(/\/(\d+|\*)/);
+        if (match && match[1] !== '*') count = parseInt(match[1]);
+      }
+
+      return {
+        data,
+        count,
+        totalPages: Math.ceil(count / pageSize),
+      };
+    },
+    placeholderData: (prev: any) => prev,
+    enabled: isLocalInstallation(),
+  });
+}
+
 export function useLocalInsertMutation(table: string) {
   const queryClient = useQueryClient();
-  const endpoint = table === 'media_servers' ? 'media-servers' : 'storage-servers';
 
   return useMutation({
     mutationFn: async (data: any) => {
-      const res = await fetch(`${getLocalApiBase()}/api/local/${endpoint}`, {
+      if (isLegacyTable(table)) {
+        const res = await fetch(`${getLocalApiBase()}/api/local/${LEGACY_ENDPOINTS[table]}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Erro ao inserir');
+        }
+        return res.json();
+      }
+      // Proxy PostgREST
+      const res = await fetch(`${getLocalApiBase()}/rest/v1/${table}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation',
+        },
         body: JSON.stringify(data),
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Erro ao inserir');
+        const err = await res.json().catch(() => ({ message: 'Erro ao inserir' }));
+        throw new Error(err.message || err.error || 'Erro ao inserir');
       }
-      return res.json();
+      const result = await res.json();
+      return Array.isArray(result) ? result[0] : result;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['local', table] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['local', table] });
+    },
   });
 }
 
 export function useLocalUpdateMutation(table: string) {
   const queryClient = useQueryClient();
-  const endpoint = table === 'media_servers' ? 'media-servers' : 'storage-servers';
 
   return useMutation({
     mutationFn: async (data: any) => {
       const { id, ...rest } = data;
-      const res = await fetch(`${getLocalApiBase()}/api/local/${endpoint}/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      if (isLegacyTable(table)) {
+        const res = await fetch(`${getLocalApiBase()}/api/local/${LEGACY_ENDPOINTS[table]}/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(rest),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Erro ao atualizar');
+        }
+        return res.json();
+      }
+      // Proxy PostgREST
+      const res = await fetch(`${getLocalApiBase()}/rest/v1/${table}?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation',
+        },
         body: JSON.stringify(rest),
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Erro ao atualizar');
+        const err = await res.json().catch(() => ({ message: 'Erro ao atualizar' }));
+        throw new Error(err.message || err.error || 'Erro ao atualizar');
       }
-      return res.json();
+      const result = await res.json();
+      return Array.isArray(result) ? result[0] : result;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['local', table] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['local', table] });
+    },
   });
 }
 
 export function useLocalPatchMutation(table: string) {
   const queryClient = useQueryClient();
-  const endpoint = table === 'media_servers' ? 'media-servers' : 'storage-servers';
 
   return useMutation({
     mutationFn: async (data: any) => {
       const { id, ...rest } = data;
-      const res = await fetch(`${getLocalApiBase()}/api/local/${endpoint}/${id}`, {
+      if (isLegacyTable(table)) {
+        const endpoint = LEGACY_ENDPOINTS[table];
+        const res = await fetch(`${getLocalApiBase()}/api/local/${endpoint}/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(rest),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Erro ao atualizar');
+        }
+        return res.json();
+      }
+      // Proxy PostgREST
+      const res = await fetch(`${getLocalApiBase()}/rest/v1/${table}?id=eq.${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation',
+        },
         body: JSON.stringify(rest),
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Erro ao atualizar');
+        const err = await res.json().catch(() => ({ message: 'Erro ao atualizar' }));
+        throw new Error(err.message || err.error || 'Erro ao atualizar');
       }
-      return res.json();
+      const result = await res.json();
+      return Array.isArray(result) ? result[0] : result;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['local', table] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['local', table] });
+    },
   });
 }
 
 export function useLocalDeleteMutation(table: string) {
   const queryClient = useQueryClient();
-  const endpoint = table === 'media_servers' ? 'media-servers' : 'storage-servers';
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`${getLocalApiBase()}/api/local/${endpoint}/${id}`, {
+      if (isLegacyTable(table)) {
+        const res = await fetch(`${getLocalApiBase()}/api/local/${LEGACY_ENDPOINTS[table]}/${id}`, {
+          method: 'DELETE',
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Erro ao remover');
+        }
+        return res.json();
+      }
+      // Proxy PostgREST
+      const res = await fetch(`${getLocalApiBase()}/rest/v1/${table}?id=eq.${id}`, {
         method: 'DELETE',
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Erro ao remover');
+        const err = await res.json().catch(() => ({ message: 'Erro ao remover' }));
+        throw new Error(err.message || err.error || 'Erro ao remover');
       }
-      return res.json();
+      return { success: true };
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['local', table] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['local', table] });
+    },
   });
 }
