@@ -409,6 +409,90 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { deleted: true });
     }
 
+    // ---- SYSTEM INFO: Detectar SO e sugerir path de gravação ----
+    if (path === '/api/system-info' && req.method === 'GET') {
+      const platform = os.platform(); // 'win32', 'linux', 'darwin'
+      const hostname = os.hostname();
+      const totalMem = Math.round(os.totalmem() / (1024 * 1024 * 1024));
+      
+      // Detectar IP local
+      const nets = os.networkInterfaces();
+      let localIp = '127.0.0.1';
+      for (const name of Object.keys(nets)) {
+        for (const net of nets[name]) {
+          if (net.family === 'IPv4' && !net.internal) {
+            localIp = net.address;
+            break;
+          }
+        }
+        if (localIp !== '127.0.0.1') break;
+      }
+      
+      // Sugerir path de gravação baseado no SO
+      let suggestedPath = '';
+      let osName = '';
+      if (platform === 'win32') {
+        osName = 'Windows';
+        suggestedPath = 'D:\\Gravacoes';
+        // Verificar se D: existe, senão usar C:
+        try {
+          if (!fs.existsSync('D:\\')) {
+            suggestedPath = 'C:\\Gravacoes';
+          }
+        } catch (e) {
+          suggestedPath = 'C:\\Gravacoes';
+        }
+      } else {
+        osName = 'Linux';
+        suggestedPath = '/opt/nexus-monitoramento/gravacoes';
+      }
+      
+      // Calcular espaço em disco disponível
+      let diskFreeGb = 0;
+      try {
+        if (platform === 'win32') {
+          const drive = suggestedPath.charAt(0);
+          const out = execSync(`wmic logicaldisk where "DeviceID='${drive}:'" get FreeSpace /format:value`, { encoding: 'utf8' });
+          const match = out.match(/FreeSpace=(\d+)/);
+          if (match) diskFreeGb = Math.round(parseInt(match[1]) / (1024 * 1024 * 1024));
+        } else {
+          const out = execSync(`df -BG --output=avail / | tail -1`, { encoding: 'utf8' });
+          diskFreeGb = parseInt(out.trim()) || 0;
+        }
+      } catch (e) {
+        diskFreeGb = 0;
+      }
+      
+      return sendJSON(res, 200, {
+        platform,
+        os_name: osName,
+        hostname,
+        local_ip: localIp,
+        suggested_path: suggestedPath,
+        disk_free_gb: diskFreeGb,
+        total_memory_gb: totalMem,
+      });
+    }
+
+    // ---- CREATE STORAGE PATH: Criar pasta de gravação no servidor ----
+    if (path === '/api/storage/create-path' && req.method === 'POST') {
+      const body = await parseBody(req);
+      const { storage_path } = body;
+      if (!storage_path || typeof storage_path !== 'string') {
+        return sendJSON(res, 400, { error: 'Caminho inválido' });
+      }
+      // Sanitize: block traversal
+      if (storage_path.includes('..')) {
+        return sendJSON(res, 400, { error: 'Caminho inválido' });
+      }
+      try {
+        fs.mkdirSync(storage_path, { recursive: true });
+        return sendJSON(res, 200, { created: true, path: storage_path });
+      } catch (e) {
+        return sendJSON(res, 500, { error: 'Não foi possível criar o diretório: ' + e.message });
+      }
+    }
+
     // ---- SNAPSHOT MANUAL (manter para uso pontual) ----
     // Keep existing auto-analyze endpoint for manual trigger
     if (path === '/api/cameras/auto-analyze' && req.method === 'POST') {
