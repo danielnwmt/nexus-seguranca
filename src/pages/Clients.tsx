@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isValidCpfCnpj } from '@/lib/validators';
 import { Plus, Search, Users, Pencil, Trash2, Camera, Printer, UserX, UserCheck, Eye } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -80,7 +81,11 @@ const Clients = () => {
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!form.name.trim()) newErrors.name = 'Nome é obrigatório';
-    if (!form.cpf.trim()) newErrors.cpf = 'CPF/CNPJ é obrigatório';
+    if (!form.cpf.trim()) {
+      newErrors.cpf = 'CPF/CNPJ é obrigatório';
+    } else if (!isValidCpfCnpj(form.cpf)) {
+      newErrors.cpf = 'CPF/CNPJ inválido';
+    }
     if (!form.email.trim()) newErrors.email = 'Email é obrigatório';
     if (!form.phone.trim()) newErrors.phone = 'Telefone é obrigatório';
     if (!form.address.trim()) newErrors.address = 'Endereço é obrigatório';
