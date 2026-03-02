@@ -394,10 +394,9 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, getAnalysisStatus());
     }
 
-    // ---- SYNC: Sincronizar dados locais → Supabase Cloud ----
+    // ---- SYNC: Desabilitado — cada servidor é independente ----
     if (path === '/api/sync/media-servers' && req.method === 'POST') {
-      const result = await syncMediaServersToCloud();
-      return sendJSON(res, 200, result);
+      return sendJSON(res, 200, { synced: 0, message: 'Sincronizacao desabilitada. Cada servidor gerencia seus proprios dados.' });
     }
 
     // ---- CRUD: Media Servers (local) ----
@@ -937,8 +936,7 @@ async function syncMediaServersToCloud() {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Nexus Auth + API Gateway rodando em http://localhost:${PORT}`);
   console.log(`PostgREST em ${POSTGREST_URL}`);
-  // Sincronizar servidores locais com a nuvem
-  setTimeout(() => syncMediaServersToCloud(), 5000);
+  // Cada servidor é independente — sem sync para nuvem
   // Iniciar análise contínua automaticamente
   autoStartAnalysis();
 });
