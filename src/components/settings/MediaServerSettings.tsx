@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Wifi, Server, Plus, Pencil, Trash2, PlayCircle, Loader2, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -65,6 +65,41 @@ const MediaServerSettings = () => {
   const [installing, setInstalling] = useState(false);
   const [installLog, setInstallLog] = useState<string[]>([]);
   const [dialogTestStatus, setDialogTestStatus] = useState<'idle' | 'testing' | 'online' | 'offline'>('idle');
+  const [autoRegistering, setAutoRegistering] = useState(false);
+  const autoRegisterDone = useRef(false);
+
+  // Auto-register local media server on first load
+  useEffect(() => {
+    if (!isLocal || autoRegisterDone.current || isLoading) return;
+    // Only auto-register if no servers exist yet
+    const serverList = (servers as unknown as MediaServer[]);
+    if (serverList.length > 0) {
+      autoRegisterDone.current = true;
+      return;
+    }
+    autoRegisterDone.current = true;
+    setAutoRegistering(true);
+    const apiBase = `http://${window.location.hostname}:8001`;
+    fetch(`${apiBase}/api/local/media-servers/auto-register`, { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.server) {
+          if (data.online) {
+            toast.success(`✅ Servidor local detectado (${data.detected_ip}) - Online!`);
+          } else {
+            toast.warning(`⚠️ Servidor local cadastrado (${data.detected_ip}) mas MediaMTX offline`);
+          }
+          // Refresh the list
+          if (isLocal) {
+            localQuery.refetch();
+          }
+        }
+      })
+      .catch(() => {
+        // Silent fail - user can manually add
+      })
+      .finally(() => setAutoRegistering(false));
+  }, [isLocal, isLoading, servers]);
 
   const openCreate = () => {
     setEditingServer(null);
