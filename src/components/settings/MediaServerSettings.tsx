@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Wifi, Server, Plus, Pencil, Trash2, AlertTriangle } from 'lucide-react';
+import { Wifi, Server, Plus, Pencil, Trash2, PlayCircle, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -19,6 +19,7 @@ interface MediaServer {
   hls_base_port: number;
   webrtc_base_port: number;
   status: string;
+  os: string;
 }
 
 const defaultForm = {
@@ -29,6 +30,7 @@ const defaultForm = {
   hls_base_port: 8888,
   webrtc_base_port: 8889,
   status: 'active',
+  os: 'linux',
 };
 
 const MediaServerSettings = () => {
@@ -41,6 +43,7 @@ const MediaServerSettings = () => {
   const [editingServer, setEditingServer] = useState<MediaServer | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [testingId, setTestingId] = useState<string | null>(null);
 
   const openCreate = () => {
     setEditingServer(null);
@@ -58,6 +61,7 @@ const MediaServerSettings = () => {
       hls_base_port: s.hls_base_port,
       webrtc_base_port: s.webrtc_base_port,
       status: s.status,
+      os: s.os || 'linux',
     });
     setDialogOpen(true);
   };
@@ -94,7 +98,58 @@ const MediaServerSettings = () => {
     });
   };
 
+  const handleTest = async (server: MediaServer) => {
+    setTestingId(server.id);
+    try {
+      // Tenta testar via API local do auth-server (porta 8001)
+      const testUrl = `http://${server.ip_address}:8001/api/media-servers/test`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      
+      const response = await fetch(testUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ip_address: server.ip_address,
+          hls_base_port: server.hls_base_port,
+          rtmp_base_port: server.rtmp_base_port,
+          os: server.os,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.online) {
+          toast.success(`✅ ${server.name} está online! RTMP: ${result.rtmp ? '✓' : '✗'} | HLS: ${result.hls ? '✓' : '✗'}`);
+          // Atualizar status para online se estava offline
+          if (server.status !== 'online' && server.status !== 'active') {
+            updateMutation.mutate({ id: server.id, status: 'online' } as any);
+          }
+        } else {
+          toast.error(`❌ ${server.name}: MediaMTX não respondeu. RTMP: ${result.rtmp ? '✓' : '✗'} | HLS: ${result.hls ? '✓' : '✗'}`);
+          updateMutation.mutate({ id: server.id, status: 'offline' } as any);
+        }
+      } else {
+        toast.error(`❌ ${server.name}: Auth-server não acessível (HTTP ${response.status})`);
+        updateMutation.mutate({ id: server.id, status: 'offline' } as any);
+      }
+    } catch {
+      toast.error(`❌ ${server.name}: Servidor não acessível em ${server.ip_address}:8001`);
+      updateMutation.mutate({ id: server.id, status: 'offline' } as any);
+    } finally {
+      setTestingId(null);
+    }
+  };
+
   const serverList = servers as unknown as MediaServer[];
+
+  const osLabel = (osVal: string) => {
+    if (osVal === 'windows') return '🪟 Windows';
+    if (osVal === 'linux') return '🐧 Linux';
+    return osVal;
+  };
 
   return (
     <>
@@ -107,15 +162,13 @@ const MediaServerSettings = () => {
                 Servidores de Mídia
               </CardTitle>
               <CardDescription className="text-xs mt-1">
-                Gerencie os servidores MediaMTX para streaming das câmeras. Cada servidor é independente.
+                Cadastre e teste os servidores MediaMTX. Cada servidor é gerenciado via web.
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <Button size="sm" onClick={openCreate} className="gap-1.5">
-                <Plus className="w-3.5 h-3.5" />
-                Novo Servidor
-              </Button>
-            </div>
+            <Button size="sm" onClick={openCreate} className="gap-1.5">
+              <Plus className="w-3.5 h-3.5" />
+              Novo Servidor
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -124,11 +177,9 @@ const MediaServerSettings = () => {
           ) : serverList.length === 0 ? (
             <div className="bg-muted/50 border border-border rounded-lg p-4 text-center">
               <Wifi className="w-8 h-8 mx-auto mb-2 opacity-50 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                Nenhum servidor cadastrado.
-              </p>
+              <p className="text-sm text-muted-foreground">Nenhum servidor cadastrado.</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Clique em "Novo Servidor" para cadastrar manualmente ou instale o sistema para registro automático.
+                Clique em "Novo Servidor" para cadastrar.
               </p>
             </div>
           ) : (
@@ -136,10 +187,13 @@ const MediaServerSettings = () => {
               {serverList.map(server => (
                 <div key={server.id} className="bg-muted/50 rounded-lg p-3 border border-border space-y-2">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Server className="w-4 h-4 text-primary" />
                       <span className="text-sm font-medium text-foreground">{server.name}</span>
                       <Badge variant="outline" className="text-[10px] font-mono">{server.ip_address}</Badge>
+                      <Badge variant="outline" className="text-[10px]">
+                        {osLabel(server.os || 'linux')}
+                      </Badge>
                       <Badge variant="outline" className="text-[10px]">
                         {server.instances} instância{server.instances > 1 ? 's' : ''}
                       </Badge>
@@ -152,6 +206,20 @@ const MediaServerSettings = () => {
                       </Badge>
                     </div>
                     <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-primary"
+                        onClick={() => handleTest(server)}
+                        disabled={testingId === server.id}
+                        title="Testar conexão"
+                      >
+                        {testingId === server.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <PlayCircle className="w-3.5 h-3.5" />
+                        )}
+                      </Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(server)}>
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
@@ -196,10 +264,20 @@ const MediaServerSettings = () => {
               <Label className="text-xs">Endereço IP</Label>
               <Input value={form.ip_address} onChange={e => setForm(f => ({ ...f, ip_address: e.target.value }))} placeholder="192.168.1.100" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div>
                 <Label className="text-xs">Instâncias</Label>
                 <Input type="number" min={1} max={4} value={form.instances} onChange={e => setForm(f => ({ ...f, instances: parseInt(e.target.value) || 1 }))} />
+              </div>
+              <div>
+                <Label className="text-xs">Sistema Operacional</Label>
+                <Select value={form.os} onValueChange={v => setForm(f => ({ ...f, os: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="linux">Linux</SelectItem>
+                    <SelectItem value="windows">Windows</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label className="text-xs">Status</Label>
