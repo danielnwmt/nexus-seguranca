@@ -1,7 +1,11 @@
 -- ============================================================
 --  Nexus Monitoramento — Inicializacao do Banco de Dados
 --  PostgreSQL + PostgREST (sem Docker/Supabase)
+--  IDEMPOTENTE: pode ser executado multiplas vezes sem erro
 -- ============================================================
+
+-- 0. Extensao pgcrypto (necessaria ANTES de usar crypt/gen_salt)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- 1. Criar roles para PostgREST
 DO $$
@@ -421,24 +425,57 @@ ALTER TABLE public.patrol_routes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bank_configs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.auth_rate_limits ENABLE ROW LEVEL SECURITY;
 
--- Politicas: usuarios autenticados podem tudo
-CREATE POLICY IF NOT EXISTS "auth_all_clients" ON public.clients FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY IF NOT EXISTS "auth_all_cameras" ON public.cameras FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY IF NOT EXISTS "auth_all_guards" ON public.guards FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY IF NOT EXISTS "auth_all_alarms" ON public.alarms FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY IF NOT EXISTS "auth_all_invoices" ON public.invoices FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY IF NOT EXISTS "auth_all_bills" ON public.bills FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY IF NOT EXISTS "auth_all_company" ON public.company_settings FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY IF NOT EXISTS "auth_all_roles" ON public.user_roles FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY IF NOT EXISTS "auth_all_storage" ON public.storage_servers FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY IF NOT EXISTS "auth_all_media" ON public.media_servers FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY IF NOT EXISTS "auth_all_recordings" ON public.recordings FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY IF NOT EXISTS "auth_all_analytics" ON public.analytics_events FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY IF NOT EXISTS "auth_all_service_orders" ON public.service_orders FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY IF NOT EXISTS "auth_all_installers" ON public.installers FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY IF NOT EXISTS "auth_all_patrol_routes" ON public.patrol_routes FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY IF NOT EXISTS "auth_all_bank_configs" ON public.bank_configs FOR ALL USING (auth.uid() IS NOT NULL);
-CREATE POLICY IF NOT EXISTS "auth_all_rate_limits" ON public.auth_rate_limits FOR ALL USING (false);
+-- Politicas: usuarios autenticados podem tudo (DROP + CREATE para idempotencia)
+DROP POLICY IF EXISTS "auth_all_clients" ON public.clients;
+CREATE POLICY "auth_all_clients" ON public.clients FOR ALL USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "auth_all_cameras" ON public.cameras;
+CREATE POLICY "auth_all_cameras" ON public.cameras FOR ALL USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "auth_all_guards" ON public.guards;
+CREATE POLICY "auth_all_guards" ON public.guards FOR ALL USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "auth_all_alarms" ON public.alarms;
+CREATE POLICY "auth_all_alarms" ON public.alarms FOR ALL USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "auth_all_invoices" ON public.invoices;
+CREATE POLICY "auth_all_invoices" ON public.invoices FOR ALL USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "auth_all_bills" ON public.bills;
+CREATE POLICY "auth_all_bills" ON public.bills FOR ALL USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "auth_all_company" ON public.company_settings;
+CREATE POLICY "auth_all_company" ON public.company_settings FOR ALL USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "auth_all_roles" ON public.user_roles;
+CREATE POLICY "auth_all_roles" ON public.user_roles FOR ALL USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "auth_all_storage" ON public.storage_servers;
+CREATE POLICY "auth_all_storage" ON public.storage_servers FOR ALL USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "auth_all_media" ON public.media_servers;
+CREATE POLICY "auth_all_media" ON public.media_servers FOR ALL USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "auth_all_recordings" ON public.recordings;
+CREATE POLICY "auth_all_recordings" ON public.recordings FOR ALL USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "auth_all_analytics" ON public.analytics_events;
+CREATE POLICY "auth_all_analytics" ON public.analytics_events FOR ALL USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "auth_all_service_orders" ON public.service_orders;
+CREATE POLICY "auth_all_service_orders" ON public.service_orders FOR ALL USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "auth_all_installers" ON public.installers;
+CREATE POLICY "auth_all_installers" ON public.installers FOR ALL USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "auth_all_patrol_routes" ON public.patrol_routes;
+CREATE POLICY "auth_all_patrol_routes" ON public.patrol_routes FOR ALL USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "auth_all_bank_configs" ON public.bank_configs;
+CREATE POLICY "auth_all_bank_configs" ON public.bank_configs FOR ALL USING (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "auth_all_rate_limits" ON public.auth_rate_limits;
+CREATE POLICY "auth_all_rate_limits" ON public.auth_rate_limits FOR ALL USING (false);
 
 -- 8. Permissoes para PostgREST
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
@@ -523,7 +560,5 @@ $$;
 GRANT EXECUTE ON FUNCTION public.login(TEXT, TEXT) TO anon;
 GRANT EXECUTE ON FUNCTION public.signup(TEXT, TEXT) TO anon;
 
--- Extensao pgcrypto para hash de senhas
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
-RAISE NOTICE 'Banco de dados inicializado com sucesso!';
+-- Fim
+DO $$ BEGIN RAISE NOTICE 'Banco de dados inicializado com sucesso!'; END $$;
