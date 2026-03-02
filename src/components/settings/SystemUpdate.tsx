@@ -28,25 +28,27 @@ const SystemUpdate = () => {
   }, []);
 
   const fetchVersion = async () => {
-    try {
-      let res: Response | null = null;
+    const urls = [
+      `${systemApiBase}/version`,
+      `http://${host}:8001/api/system/version`,
+    ];
+    for (const url of urls) {
       try {
-        res = await fetch(`${systemApiBase}/version`, { signal: AbortSignal.timeout(5000) });
-      } catch {
-        // Fallback direto na porta 8001
-        try {
-          res = await fetch(`http://${host}:8001/api/system/version`, { signal: AbortSignal.timeout(5000) });
-        } catch {
-          return;
+        const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+        if (!res.ok) continue;
+        const ct = res.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) {
+          console.warn(`[SystemUpdate] fetchVersion ${url} retornou content-type: ${ct} (esperado JSON)`);
+          continue;
         }
-      }
-      if (res && res.ok) {
         const data = await res.json();
         setVersionInfo(data);
+        return;
+      } catch (err) {
+        console.warn(`[SystemUpdate] fetchVersion falhou em ${url}:`, err);
       }
-    } catch {
-      // Servidor local não disponível
     }
+    console.info('[SystemUpdate] Nenhum servidor de versão acessível (normal no preview)');
   };
 
   const handleUpdate = async () => {
@@ -70,28 +72,34 @@ const SystemUpdate = () => {
       const accessToken = session?.access_token || '';
 
       // Tentar via Nginx proxy primeiro, depois direto na porta 8001
-      let res: Response | null = null;
       const headers = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${accessToken}`
       };
 
-      try {
-        res = await fetch(`${systemApiBase}/update`, {
-          method: 'POST',
-          headers,
-          signal: AbortSignal.timeout(620000), // 10min + margem
-        });
-      } catch {
-        // Fallback: tentar direto na porta 8001
+      const urls = [
+        `${systemApiBase}/update`,
+        `http://${window.location.hostname}:8001/api/system/update`,
+      ];
+
+      let res: Response | null = null;
+      for (const url of urls) {
         try {
-          const directUrl = `http://${window.location.hostname}:8001/api/system/update`;
-          res = await fetch(directUrl, {
+          console.log(`[SystemUpdate] Tentando atualizar via ${url}`);
+          res = await fetch(url, {
             method: 'POST',
             headers,
             signal: AbortSignal.timeout(620000),
           });
-        } catch {
+          const ct = res.headers.get('content-type') || '';
+          if (!ct.includes('application/json')) {
+            console.warn(`[SystemUpdate] ${url} retornou content-type: ${ct} (esperado JSON)`);
+            res = null;
+            continue;
+          }
+          break; // sucesso
+        } catch (err) {
+          console.warn(`[SystemUpdate] Falha em ${url}:`, err);
           res = null;
         }
       }
@@ -110,7 +118,8 @@ const SystemUpdate = () => {
       let data: any;
       try {
         data = await res.json();
-      } catch {
+      } catch (parseErr) {
+        console.error('[SystemUpdate] Erro ao parsear resposta JSON:', parseErr);
         data = { status: 'error', message: 'Resposta inválida do servidor' };
       }
 
