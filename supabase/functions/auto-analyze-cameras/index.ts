@@ -32,7 +32,7 @@ serve(async (req) => {
     // Buscar TODAS as cameras com analytics (não apenas as com snapshot_url)
     const { data: cameras, error: camError } = await supabase
       .from("cameras")
-      .select("id, name, client_id, snapshot_url, analytics, status, stream_key")
+      .select("id, name, client_id, snapshot_url, stream_url, analytics, status, stream_key")
       .not("analytics", "eq", "{}")
       .eq("status", "online");
 
