@@ -557,26 +557,37 @@ cat > "$INSTALL_DIR/atualizar-nexus.sh" << SCRIPT
 echo ""
 echo "============================================="
 echo "  NEXUS MONITORAMENTO - Atualizacao"
+echo "  (Dados e configuracoes locais preservados)"
 echo "============================================="
 echo ""
 cd "$INSTALL_DIR"
 
-echo "[1/4] Baixando atualizacoes do GitHub..."
+echo "[1/6] Salvando configuracoes locais..."
+cp -f .env .env.bak 2>/dev/null || true
+cp -f auth-server/server.js auth-server/server.js.bak 2>/dev/null || true
+
+echo "[2/6] Descartando alteracoes de codigo (nao dados)..."
+git checkout -- . 2>/dev/null || true
+
+echo "[3/6] Baixando atualizacoes do GitHub..."
 git pull origin main
 
-echo "[2/4] Instalando dependencias..."
-npm install --legacy-peer-deps
+echo "[4/6] Restaurando configuracoes locais..."
+cp -f .env.bak .env 2>/dev/null || true
+cp -f auth-server/server.js.bak auth-server/server.js 2>/dev/null || true
 
-echo "[3/4] Gerando novo build..."
+echo "[5/6] Instalando dependencias e gerando build..."
+npm install --legacy-peer-deps
 npm run build
 
-echo "[4/4] Reiniciando servicos..."
+echo "[6/6] Reiniciando servicos..."
 sudo systemctl restart nexus-auth
 sudo systemctl restart nginx
 
 echo ""
 echo "============================================="
 echo "  ATUALIZACAO CONCLUIDA!"
+echo "  Configuracoes locais preservadas."
 echo "  Recarregue a pagina no navegador."
 echo "============================================="
 echo ""
