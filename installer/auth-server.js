@@ -467,6 +467,109 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { return sendJSON(res, 500, { error: e.message }); }
     }
 
+    // ---- INSTALAR MediaMTX via SSE ----
+    if (path === '/api/media-servers/install' && req.method === 'POST') {
+      const body = await readBody(req);
+      const osType = (body.os || 'linux').toLowerCase();
+      
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': CORS_HEADERS,
+      });
+
+      const sendEvent = (step, status, message) => {
+        res.write(`data: ${JSON.stringify({ step, status, message })}\n\n`);
+      };
+
+      try {
+        if (osType === 'linux') {
+          sendEvent('check', 'info', 'Verificando se MediaMTX já está instalado...');
+          try {
+            execSync('which mediamtx 2>/dev/null || test -f /usr/local/bin/mediamtx');
+            sendEvent('check', 'success', 'MediaMTX já está instalado');
+          } catch {
+            sendEvent('download', 'info', 'Baixando MediaMTX...');
+            try {
+              const arch = execSync('dpkg --print-architecture 2>/dev/null || echo amd64').toString().trim();
+              const mtxArch = arch === 'arm64' ? 'arm64v8' : 'amd64';
+              execSync(`wget -q https://github.com/bluenviron/mediamtx/releases/latest/download/mediamtx_v1.12.2_linux_${mtxArch}.tar.gz -O /tmp/mediamtx.tar.gz`, { timeout: 60000 });
+              sendEvent('download', 'success', 'Download concluído');
+              
+              sendEvent('extract', 'info', 'Extraindo e instalando...');
+              execSync('cd /tmp && tar xzf mediamtx.tar.gz && sudo mv mediamtx /usr/local/bin/ && sudo chmod +x /usr/local/bin/mediamtx', { timeout: 30000 });
+              sendEvent('extract', 'success', 'Binário instalado em /usr/local/bin/mediamtx');
+            } catch (e) {
+              sendEvent('download', 'error', 'Falha no download/instalação: ' + e.message);
+              sendEvent('complete', 'error', 'Instalação falhou');
+              return res.end();
+            }
+          }
+
+          // Copiar config se existir
+          sendEvent('config', 'info', 'Configurando MediaMTX...');
+          try {
+            const configSrc = '/opt/nexus-monitoramento/installer/mediamtx.yml';
+            const configDst = '/usr/local/etc/mediamtx.yml';
+            if (fs.existsSync(configSrc)) {
+              execSync(`sudo cp ${configSrc} ${configDst}`);
+              sendEvent('config', 'success', 'Configuração copiada');
+            } else {
+              sendEvent('config', 'info', 'Usando configuração padrão');
+            }
+          } catch (e) {
+            sendEvent('config', 'warn', 'Não foi possível copiar config: ' + e.message);
+          }
+
+          // Criar serviço systemd
+          sendEvent('service', 'info', 'Criando serviço systemd...');
+          try {
+            const serviceContent = `[Unit]
+Description=MediaMTX Media Server
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/mediamtx /usr/local/etc/mediamtx.yml
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target
+`;
+            fs.writeFileSync('/tmp/mediamtx.service', serviceContent);
+            execSync('sudo mv /tmp/mediamtx.service /etc/systemd/system/mediamtx.service && sudo systemctl daemon-reload && sudo systemctl enable mediamtx && sudo systemctl start mediamtx', { timeout: 15000 });
+            sendEvent('service', 'success', 'Serviço MediaMTX criado e iniciado');
+          } catch (e) {
+            sendEvent('service', 'error', 'Falha ao criar serviço: ' + e.message);
+          }
+
+          // Verificar se está rodando
+          sendEvent('verify', 'info', 'Verificando se MediaMTX está rodando...');
+          try {
+            execSync('sleep 2 && systemctl is-active mediamtx', { timeout: 10000 });
+            sendEvent('verify', 'success', 'MediaMTX está ativo e funcionando!');
+            sendEvent('complete', 'success', 'Instalação concluída com sucesso!');
+          } catch {
+            sendEvent('verify', 'warn', 'MediaMTX pode não ter iniciado corretamente. Verifique com: sudo systemctl status mediamtx');
+            sendEvent('complete', 'success', 'Instalação concluída (verificar serviço)');
+          }
+
+        } else if (osType === 'windows') {
+          sendEvent('info', 'info', 'Para Windows, execute o instalador .exe no servidor de destino.');
+          sendEvent('complete', 'success', 'No Windows, use o instalador dedicado.');
+        } else {
+          sendEvent('complete', 'error', 'Sistema operacional não suportado: ' + osType);
+        }
+      } catch (e) {
+        sendEvent('complete', 'error', 'Erro inesperado: ' + e.message);
+      }
+
+      return res.end();
+    }
+
     // ---- SNAPSHOT ENDPOINT (captura frame do HLS via ffmpeg) ----
     if (path === '/api/cameras/snapshot' && req.method === 'POST') {
       const authHeader = req.headers.authorization;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Wifi, Server, Plus, Pencil, Trash2, PlayCircle, Loader2 } from 'lucide-react';
+import { Wifi, Server, Plus, Pencil, Trash2, PlayCircle, Loader2, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -62,6 +62,8 @@ const MediaServerSettings = () => {
   const [form, setForm] = useState(defaultForm);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [installing, setInstalling] = useState(false);
+  const [installLog, setInstallLog] = useState<string[]>([]);
 
   const openCreate = () => {
     setEditingServer(null);
@@ -90,7 +92,7 @@ const MediaServerSettings = () => {
     setForm(defaultForm);
   };
 
-  const handleSave = () => {
+  const handleSave = (andInstall = false) => {
     if (!form.ip_address.trim()) {
       toast.error('Informe o endereço IP');
       return;
@@ -102,9 +104,66 @@ const MediaServerSettings = () => {
       });
     } else {
       insertMutation.mutate(form as any, {
-        onSuccess: () => { toast.success('Servidor cadastrado'); closeDialog(); },
+        onSuccess: () => {
+          if (andInstall) {
+            toast.success('Servidor cadastrado! Iniciando instalação do MediaMTX...');
+            handleInstallMediaMTX(form.ip_address, form.os);
+          } else {
+            toast.success('Servidor cadastrado');
+            closeDialog();
+          }
+        },
         onError: (e: any) => toast.error(e.message),
       });
+    }
+  };
+
+  const handleInstallMediaMTX = async (ip: string, osType: string) => {
+    setInstalling(true);
+    setInstallLog([]);
+    try {
+      const apiBase = `http://${ip}:8001`;
+      const res = await fetch(`${apiBase}/api/media-servers/install`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ os: osType }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Erro desconhecido' }));
+        toast.error(`Falha na instalação: ${err.error}`);
+        setInstalling(false);
+        return;
+      }
+
+      // Stream SSE response
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const text = decoder.decode(value);
+          const lines = text.split('\n').filter(l => l.startsWith('data: '));
+          for (const line of lines) {
+            try {
+              const event = JSON.parse(line.replace('data: ', ''));
+              setInstallLog(prev => [...prev, `[${event.status}] ${event.message}`]);
+              if (event.step === 'complete') {
+                if (event.status === 'success') {
+                  toast.success('MediaMTX instalado com sucesso!');
+                } else {
+                  toast.error(`Instalação falhou: ${event.message}`);
+                }
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (e: any) {
+      toast.error(`Não foi possível conectar ao servidor ${ip}:8001`);
+    } finally {
+      setInstalling(false);
     }
   };
 
@@ -324,9 +383,35 @@ const MediaServerSettings = () => {
               </div>
             </div>
           </div>
-          <DialogFooter>
+          {/* Install log */}
+          {(installing || installLog.length > 0) && (
+            <div className="bg-muted/50 border border-border rounded-lg p-3 max-h-40 overflow-y-auto">
+              <p className="text-xs font-medium text-foreground mb-1 flex items-center gap-1.5">
+                {installing && <Loader2 className="w-3 h-3 animate-spin" />}
+                Log de Instalação
+              </p>
+              {installLog.map((line, i) => (
+                <p key={i} className={`text-[11px] font-mono ${line.includes('[error]') ? 'text-destructive' : line.includes('[success]') ? 'text-emerald-400' : 'text-muted-foreground'}`}>{line}</p>
+              ))}
+              {installLog.length === 0 && installing && (
+                <p className="text-[11px] text-muted-foreground">Aguardando resposta do servidor...</p>
+              )}
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-2">
             <Button variant="outline" onClick={closeDialog}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={insertMutation.isPending || updateMutation.isPending}>
+            {!editingServer && isLocal && (
+              <Button
+                variant="secondary"
+                onClick={() => handleSave(true)}
+                disabled={insertMutation.isPending || updateMutation.isPending || installing}
+                className="gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                {installing ? 'Instalando...' : 'Cadastrar e Instalar'}
+              </Button>
+            )}
+            <Button onClick={() => handleSave(false)} disabled={insertMutation.isPending || updateMutation.isPending || installing}>
               {(insertMutation.isPending || updateMutation.isPending) ? 'Salvando...' : editingServer ? 'Salvar' : 'Cadastrar'}
             </Button>
           </DialogFooter>
