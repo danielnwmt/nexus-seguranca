@@ -109,7 +109,7 @@ const SystemUpdate = () => {
         setUpdateMessage('Não foi possível conectar ao servidor. Verifique se o serviço está rodando. Você pode atualizar manualmente via terminal.');
         toast({
           title: 'Servidor não acessível',
-          description: 'Use: bash /opt/nexus-monitoramento/atualizar-nexus.sh',
+          description: 'Use: cd /opt/nexus-monitoramento && BRANCH=$(git rev-parse --abbrev-ref HEAD) && git checkout -- . && git pull origin "$BRANCH" && npm install --legacy-peer-deps && npm run build && sudo systemctl restart nexus-auth nginx',
           variant: 'destructive',
         });
         return;
@@ -141,7 +141,8 @@ const SystemUpdate = () => {
         }
       } else {
         setStatus('error');
-        setUpdateMessage(data.message || 'Erro ao atualizar');
+        const commandInfo = data?.command ? ` Comando: ${data.command}` : '';
+        setUpdateMessage((data.message || 'Erro ao atualizar') + commandInfo);
         toast({
           title: 'Erro na atualização',
           description: data.message || 'Verifique os logs do servidor.',
@@ -153,7 +154,7 @@ const SystemUpdate = () => {
       setUpdateMessage('Erro inesperado: ' + (err.message || 'Verifique se o sistema está rodando no servidor.'));
       toast({
         title: 'Erro na atualização',
-        description: err.message || 'Use o script manual: bash atualizar-nexus.sh',
+        description: err.message || 'Use: cd /opt/nexus-monitoramento && BRANCH=$(git rev-parse --abbrev-ref HEAD) && git checkout -- . && git pull origin "$BRANCH" && npm install --legacy-peer-deps && npm run build && sudo systemctl restart nexus-auth nginx',
         variant: 'destructive',
       });
     } finally {
@@ -241,7 +242,7 @@ const SystemUpdate = () => {
           <div className="border-t border-border pt-3">
             <p className="text-xs text-muted-foreground">
               O sistema faz <strong>git pull</strong> do repositório GitHub, reinstala dependências e reconstrói o frontend automaticamente.
-              Você também pode atualizar via terminal: <code className="bg-muted px-1 py-0.5 rounded text-xs">bash /opt/nexus-monitoramento/atualizar-nexus.sh</code>
+              Você também pode atualizar via terminal: <code className="bg-muted px-1 py-0.5 rounded text-xs">cd /opt/nexus-monitoramento && BRANCH=$(git rev-parse --abbrev-ref HEAD) && git checkout -- . && git pull origin "$BRANCH" && npm install --legacy-peer-deps && npm run build && sudo systemctl restart nexus-auth nginx</code>
             </p>
           </div>
         </CardContent>
