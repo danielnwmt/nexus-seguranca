@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
+import { isLocalInstallation, useLocalTableQuery, useLocalInsertMutation, useLocalUpdateMutation, useLocalDeleteMutation } from '@/hooks/useLocalApi';
 import { toast as sonnerToast } from 'sonner';
 
 interface ServerForm {
@@ -48,11 +49,26 @@ function getLocalApiBase() {
 
 const StorageServers = () => {
   const { toast } = useToast();
-  const { data: servers = [], isLoading } = useTableQuery('storage_servers');
-  const insertMutation = useInsertMutation('storage_servers');
-  const updateMutation = useUpdateMutation('storage_servers');
-  const deleteMutation = useDeleteMutation('storage_servers');
+  const isLocal = isLocalInstallation();
 
+  // Cloud hooks
+  const cloudQuery = useTableQuery('storage_servers', 'created_at', { enabled: !isLocal });
+  const cloudInsert = useInsertMutation('storage_servers');
+  const cloudUpdate = useUpdateMutation('storage_servers');
+  const cloudDelete = useDeleteMutation('storage_servers');
+
+  // Local API hooks
+  const localQuery = useLocalTableQuery('storage_servers');
+  const localInsert = useLocalInsertMutation('storage_servers');
+  const localUpdate = useLocalUpdateMutation('storage_servers');
+  const localDelete = useLocalDeleteMutation('storage_servers');
+
+  // Select the right source
+  const servers = isLocal ? (localQuery.data || []) : (cloudQuery.data || []);
+  const isLoading = isLocal ? localQuery.isLoading : cloudQuery.isLoading;
+  const insertMutation = isLocal ? localInsert : cloudInsert;
+  const updateMutation = isLocal ? localUpdate : cloudUpdate;
+  const deleteMutation = isLocal ? localDelete : cloudDelete;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ServerForm>({ ...emptyForm });
