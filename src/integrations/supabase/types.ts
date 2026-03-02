@@ -573,6 +573,7 @@ export type Database = {
           instances: number
           ip_address: string
           name: string
+          os: string
           rtmp_base_port: number
           status: string
           updated_at: string
@@ -585,6 +586,7 @@ export type Database = {
           instances?: number
           ip_address?: string
           name?: string
+          os?: string
           rtmp_base_port?: number
           status?: string
           updated_at?: string
@@ -597,6 +599,7 @@ export type Database = {
           instances?: number
           ip_address?: string
           name?: string
+          os?: string
           rtmp_base_port?: number
           status?: string
           updated_at?: string

@@ -394,46 +394,56 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, getAnalysisStatus());
     }
 
-    // ---- SYNC: Desabilitado — cada servidor é independente ----
-    if (path === '/api/sync/media-servers' && req.method === 'POST') {
-      return sendJSON(res, 200, { synced: 0, message: 'Sincronizacao desabilitada. Cada servidor gerencia seus proprios dados.' });
-    }
+    // ---- TESTE DE SERVIDOR DE MÍDIA ----
+    if (path === '/api/media-servers/test' && req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
 
-    // ---- CRUD: Media Servers (local) ----
-    if (path === '/api/media-servers' && req.method === 'GET') {
-      const result = await pool.query('SELECT * FROM media_servers ORDER BY created_at');
-      return sendJSON(res, 200, result.rows);
-    }
+      const { ip_address, hls_base_port, rtmp_base_port, os: serverOs } = await readBody(req);
+      if (!ip_address) return sendJSON(res, 400, { error: 'ip_address required' });
 
-    if (path === '/api/media-servers' && req.method === 'POST') {
-      const body = await parseBody(req);
-      const { name, ip_address, instances, rtmp_base_port, hls_base_port, webrtc_base_port, status } = body;
-      const result = await pool.query(
-        `INSERT INTO media_servers (name, ip_address, instances, rtmp_base_port, hls_base_port, webrtc_base_port, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [name || 'Servidor MediaMTX', ip_address, instances || 1, rtmp_base_port || 1935, hls_base_port || 8888, webrtc_base_port || 8889, status || 'active']
-      );
-      return sendJSON(res, 201, result.rows[0]);
-    }
+      const results = { ip_address, rtmp: false, hls: false, mediamtx_running: false, os: serverOs || 'unknown' };
 
-    if (path.startsWith('/api/media-servers/') && req.method === 'PUT') {
-      const id = path.split('/').pop();
-      const body = await parseBody(req);
-      const { name, ip_address, instances, rtmp_base_port, hls_base_port, webrtc_base_port, status } = body;
-      const result = await pool.query(
-        `UPDATE media_servers SET name=$1, ip_address=$2, instances=$3, rtmp_base_port=$4, hls_base_port=$5, webrtc_base_port=$6, status=$7, updated_at=now()
-         WHERE id=$8 RETURNING *`,
-        [name, ip_address, instances, rtmp_base_port, hls_base_port, webrtc_base_port, status, id]
-      );
-      if (result.rows.length === 0) return sendJSON(res, 404, { error: 'Servidor não encontrado' });
-      return sendJSON(res, 200, result.rows[0]);
-    }
+      // Testar conectividade HLS
+      try {
+        const hlsPort = hls_base_port || 8888;
+        const testUrl = `http://${ip_address}:${hlsPort}/v3/paths/list`;
+        const httpLib = require('http');
+        await new Promise((resolve, reject) => {
+          const r = httpLib.get(testUrl, { timeout: 5000 }, (resp) => {
+            let data = '';
+            resp.on('data', c => data += c);
+            resp.on('end', () => {
+              results.hls = resp.statusCode === 200;
+              results.mediamtx_running = resp.statusCode === 200;
+              try { results.paths = JSON.parse(data); } catch {}
+              resolve();
+            });
+          });
+          r.on('error', () => { results.hls = false; resolve(); });
+          r.on('timeout', () => { r.destroy(); results.hls = false; resolve(); });
+        });
+      } catch {}
 
-    if (path.startsWith('/api/media-servers/') && req.method === 'DELETE') {
-      const id = path.split('/').pop();
-      const result = await pool.query('DELETE FROM media_servers WHERE id=$1 RETURNING id', [id]);
-      if (result.rows.length === 0) return sendJSON(res, 404, { error: 'Servidor não encontrado' });
-      return sendJSON(res, 200, { deleted: true });
+      // Testar porta RTMP via TCP connect
+      try {
+        const net = require('net');
+        const rtmpPort = rtmp_base_port || 1935;
+        await new Promise((resolve) => {
+          const sock = new net.Socket();
+          sock.setTimeout(3000);
+          sock.on('connect', () => { results.rtmp = true; sock.destroy(); resolve(); });
+          sock.on('error', () => { results.rtmp = false; resolve(); });
+          sock.on('timeout', () => { sock.destroy(); results.rtmp = false; resolve(); });
+          sock.connect(rtmpPort, ip_address);
+        });
+      } catch {}
+
+      results.online = results.mediamtx_running || results.rtmp;
+      return sendJSON(res, 200, results);
     }
 
     // ---- SYSTEM INFO: Detectar SO e sugerir path de gravação ----

@@ -1,0 +1,1 @@
+ALTER TABLE public.media_servers ADD COLUMN IF NOT EXISTS os TEXT NOT NULL DEFAULT 'linux';
