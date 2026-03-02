@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Wifi, Server, Plus, Pencil, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Wifi, Server, Plus, Pencil, Trash2, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
-import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { toast } from 'sonner';
 
 interface MediaServer {
@@ -33,7 +32,6 @@ const defaultForm = {
 };
 
 const MediaServerSettings = () => {
-  const { data: company } = useCompanySettings();
   const { data: servers = [], isLoading } = useTableQuery('media_servers');
   const insertMutation = useInsertMutation('media_servers');
   const updateMutation = useUpdateMutation('media_servers');
@@ -43,29 +41,6 @@ const MediaServerSettings = () => {
   const [editingServer, setEditingServer] = useState<MediaServer | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const [syncWarning, setSyncWarning] = useState<string | null>(null);
-
-  const handleSync = async () => {
-    setSyncing(true);
-    setSyncWarning(null);
-    try {
-      const serverIp = company?.media_server_ip || window.location.hostname;
-      const syncUrl = `http://${serverIp}:8001/api/sync/media-servers`;
-      const res = await fetch(syncUrl, { method: 'POST', signal: AbortSignal.timeout(5000) });
-      if (!res.ok) throw new Error('Servidor local indisponível');
-      const data = await res.json();
-      if (data.error) {
-        setSyncWarning(data.error);
-      } else {
-        toast.success(`${data.synced} servidor(es) sincronizado(s)`);
-      }
-    } catch {
-      setSyncWarning('Não foi possível conectar ao servidor local (porta 8001). A sincronização só funciona quando o sistema está instalado no servidor. Você pode cadastrar servidores manualmente.');
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   const openCreate = () => {
     setEditingServer(null);
@@ -132,14 +107,10 @@ const MediaServerSettings = () => {
                 Servidores de Mídia
               </CardTitle>
               <CardDescription className="text-xs mt-1">
-                Gerencie os servidores MediaMTX para streaming das câmeras.
+                Gerencie os servidores MediaMTX para streaming das câmeras. Cada servidor é independente.
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={handleSync} disabled={syncing} className="gap-1.5">
-                <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-                Sincronizar
-              </Button>
               <Button size="sm" onClick={openCreate} className="gap-1.5">
                 <Plus className="w-3.5 h-3.5" />
                 Novo Servidor
@@ -148,14 +119,6 @@ const MediaServerSettings = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Sync warning */}
-          {syncWarning && (
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-400">{syncWarning}</p>
-            </div>
-          )}
-
           {isLoading ? (
             <p className="text-xs text-muted-foreground">Carregando...</p>
           ) : serverList.length === 0 ? (
