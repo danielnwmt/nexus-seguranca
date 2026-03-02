@@ -435,7 +435,7 @@ User=nobody
 WantedBy=multi-user.target
 EOF
 
-# Auth Server
+# Auth Server (roda como root para acesso a sistema: ffmpeg, git, systemctl)
 cat > /etc/systemd/system/nexus-auth.service << EOF
 [Unit]
 Description=Nexus - Auth Server
@@ -448,7 +448,8 @@ ExecStart=$(which node) $AUTH_DIR/server.js
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
-User=nobody
+Environment=INSTALL_DIR=$INSTALL_DIR
+User=root
 
 [Install]
 WantedBy=multi-user.target
@@ -569,25 +570,34 @@ echo "============================================="
 echo ""
 cd "$INSTALL_DIR"
 
-echo "[1/6] Salvando configuracoes locais..."
+echo "[1/7] Salvando configuracoes locais..."
 cp -f .env .env.bak 2>/dev/null || true
 cp -f auth-server/server.js auth-server/server.js.bak 2>/dev/null || true
 
-echo "[2/6] Descartando alteracoes de codigo (nao dados)..."
+echo "[2/7] Descartando alteracoes de codigo (nao dados)..."
 git checkout -- . 2>/dev/null || true
 
-echo "[3/6] Baixando atualizacoes do GitHub..."
+echo "[3/7] Baixando atualizacoes do GitHub..."
 git pull origin main
 
-echo "[4/6] Restaurando configuracoes locais..."
+echo "[4/7] Restaurando configuracoes locais..."
 cp -f .env.bak .env 2>/dev/null || true
 cp -f auth-server/server.js.bak auth-server/server.js 2>/dev/null || true
 
-echo "[5/6] Instalando dependencias e gerando build..."
+echo "[5/7] Aplicando atualizacoes no banco de dados..."
+if [ -f "installer/init-database.sql" ]; then
+  sudo -u postgres psql -d nexus -f installer/init-database.sql > /dev/null 2>&1
+  echo "  Schema do banco atualizado"
+else
+  echo "  init-database.sql nao encontrado, pulando"
+fi
+
+echo "[6/7] Instalando dependencias e gerando build..."
 npm install --legacy-peer-deps
 npm run build
 
-echo "[6/6] Reiniciando servicos..."
+echo "[7/7] Reiniciando servicos..."
+sudo systemctl restart nexus-postgrest
 sudo systemctl restart nexus-auth
 sudo systemctl restart nginx
 
@@ -595,6 +605,7 @@ echo ""
 echo "============================================="
 echo "  ATUALIZACAO CONCLUIDA!"
 echo "  Configuracoes locais preservadas."
+echo "  Schema do banco atualizado."
 echo "  Recarregue a pagina no navegador."
 echo "============================================="
 echo ""
