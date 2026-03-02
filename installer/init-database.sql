@@ -496,15 +496,17 @@ INSERT INTO public.company_settings (name)
 VALUES ('Nexus Segurança')
 ON CONFLICT DO NOTHING;
 
--- 10. Usuario administrador padrao (admin@protenexus.com)
--- Senha temporária aleatória - o admin deve redefinir no primeiro acesso
+-- 10. Usuario administrador padrao (admin@protenexus.com / senha: 1234)
 INSERT INTO auth.users (email, encrypted_password, raw_user_meta_data)
 VALUES (
   'admin@protenexus.com',
-  crypt(gen_random_uuid()::text, gen_salt('bf')),
+  crypt('1234', gen_salt('bf')),
   '{"force_password_change": true}'::jsonb
 )
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (email) DO UPDATE SET
+  encrypted_password = crypt('1234', gen_salt('bf')),
+  raw_user_meta_data = '{"force_password_change": true}'::jsonb,
+  updated_at = now();
 
 -- 10. Funcao de login (retorna JWT claims)
 CREATE OR REPLACE FUNCTION public.login(email TEXT, pass TEXT)
