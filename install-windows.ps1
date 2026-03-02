@@ -490,10 +490,10 @@ Set-Location $InstallDir
 Write-Step "Configurando variaveis de ambiente..."
 
 $envContent = @"
-VITE_SUPABASE_URL="http://localhost:$ApiPort"
+VITE_SUPABASE_URL="http://$localIP:$ApiPort"
 VITE_SUPABASE_PUBLISHABLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTcwMDAwMDAwMH0.local"
 VITE_SUPABASE_PROJECT_ID="local"
-VITE_API_URL="http://localhost:$ApiPort"
+VITE_API_URL="http://$localIP:$ApiPort"
 "@
 
 Set-Content -Path ".env" -Value $envContent -Encoding UTF8
