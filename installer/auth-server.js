@@ -234,35 +234,50 @@ const server = http.createServer(async (req, res) => {
 
       try {
         const scriptPath = `${INSTALL_DIR}/atualizar-nexus.sh`;
-        const output = execSync(`bash ${scriptPath} 2>&1`, { timeout: 600000 }).toString();
+        let output = '';
+        let commandUsed = '';
 
-        if (output.includes('Already up to date') || output.includes('ja esta na versao')) {
-          return sendJSON(res, 200, { 
-            status: 'up_to_date', 
+        if (fs.existsSync(scriptPath)) {
+          commandUsed = `bash ${scriptPath}`;
+          output = execSync(`${commandUsed} 2>&1`, { timeout: 600000 }).toString();
+        } else {
+          const branch = execSync(`cd ${INSTALL_DIR} && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo main`).toString().trim() || 'main';
+          commandUsed = `cd ${INSTALL_DIR} && git checkout -- . && git pull origin ${branch} && npm install --legacy-peer-deps && npm run build && sudo systemctl restart nexus-auth nginx`;
+          output = execSync(`${commandUsed} 2>&1`, { timeout: 600000, shell: '/bin/bash' }).toString();
+        }
+
+        if (output.includes('Already up to date') || output.includes('ja esta na versao') || output.includes('Already up-to-date')) {
+          return sendJSON(res, 200, {
+            status: 'up_to_date',
             message: 'Sistema ja esta na versao mais recente.',
+            command: commandUsed,
             output: output.trim()
           });
         }
 
-        return sendJSON(res, 200, { 
-          status: 'updated', 
+        return sendJSON(res, 200, {
+          status: 'updated',
           message: 'Sistema atualizado com sucesso! Recarregue a pagina.',
+          command: commandUsed,
           output: output.trim()
         });
       } catch (error) {
         const stdout = error.stdout ? error.stdout.toString() : '';
+        const stderr = error.stderr ? error.stderr.toString() : '';
+        const output = `${stdout}\n${stderr}`.trim();
+
         // Se o script rodou mas retornou algo util, pode ser sucesso
-        if (stdout.includes('atualizado') || stdout.includes('sucesso')) {
+        if (output.includes('atualizado') || output.includes('sucesso')) {
           return sendJSON(res, 200, {
             status: 'updated',
             message: 'Sistema atualizado com sucesso! Recarregue a pagina.',
-            output: stdout.trim()
+            output
           });
         }
-        return sendJSON(res, 500, { 
-          status: 'error', 
+        return sendJSON(res, 500, {
+          status: 'error',
           message: 'Erro ao atualizar: ' + error.message,
-          output: stdout
+          output
         });
       }
     }
