@@ -335,22 +335,49 @@ const server = http.createServer(async (req, res) => {
 
     // GET /api/system/version
     if (path === '/api/system/version' && req.method === 'GET') {
-      const { execSync } = require('child_process');
-      const INSTALL_DIR = process.env.INSTALL_DIR || '/opt/nexus-monitoramento';
-      
-      try {
-        const commitHash = execSync(`cd ${INSTALL_DIR} && git rev-parse --short HEAD 2>/dev/null`).toString().trim();
-        const commitDate = execSync(`cd ${INSTALL_DIR} && git log -1 --format="%ci" 2>/dev/null`).toString().trim();
-        const branch = execSync(`cd ${INSTALL_DIR} && git rev-parse --abbrev-ref HEAD 2>/dev/null`).toString().trim();
-        
-        return sendJSON(res, 200, {
-          version: commitHash,
-          date: commitDate,
-          branch: branch
-        });
-      } catch {
-        return sendJSON(res, 200, { version: 'unknown', date: '', branch: '' });
+      const { execFileSync } = require('child_process');
+
+      const candidates = [
+        process.env.INSTALL_DIR,
+        '/opt/nexus-monitoramento',
+        process.cwd(),
+      ].filter(Boolean);
+
+      const attempts = [];
+
+      for (const dir of candidates) {
+        try {
+          const commitHash = execFileSync('git', ['-C', dir, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim();
+          const commitDate = execFileSync('git', ['-C', dir, 'log', '-1', '--format=%ci'], { encoding: 'utf8' }).trim();
+          const branch = execFileSync('git', ['-C', dir, 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim();
+
+          if (commitHash) {
+            return sendJSON(res, 200, {
+              version: commitHash,
+              date: commitDate,
+              branch,
+              source_dir: dir,
+            });
+          }
+        } catch (e) {
+          attempts.push({
+            dir,
+            error: e?.message || 'git command failed',
+            stderr: e?.stderr ? String(e.stderr).trim() : '',
+          });
+        }
       }
+
+      return sendJSON(res, 200, {
+        version: 'unknown',
+        date: '',
+        branch: '',
+        debug: {
+          install_dir_env: process.env.INSTALL_DIR || null,
+          cwd: process.cwd(),
+          attempts,
+        },
+      });
     }
 
     // ---- SNAPSHOT ENDPOINT (captura frame do HLS via ffmpeg) ----
