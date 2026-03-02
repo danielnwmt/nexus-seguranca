@@ -6,7 +6,7 @@ import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
  */
 export function isLocalInstallation(): boolean {
   const hostname = window.location.hostname;
-  return !hostname.includes('lovable.app') && !hostname.includes('localhost');
+  return !hostname.includes('lovable.app') && !hostname.includes('lovableproject.com') && !hostname.includes('localhost');
 }
 
 function getLocalApiBase() {
