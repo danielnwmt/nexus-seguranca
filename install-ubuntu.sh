@@ -402,11 +402,15 @@ step "Configurando firewall..."
 
 ufw allow $PORT/tcp > /dev/null 2>&1
 ufw allow $API_PORT/tcp comment "Auth API" > /dev/null 2>&1
+ufw allow $POSTGREST_PORT/tcp comment "PostgREST API" > /dev/null 2>&1
 ufw allow 1935/tcp comment "RTMP MediaMTX" > /dev/null 2>&1
 ufw allow 8554/tcp comment "RTSP MediaMTX" > /dev/null 2>&1
 ufw allow 8888/tcp comment "HLS MediaMTX" > /dev/null 2>&1
 ufw allow 8889/tcp comment "WebRTC MediaMTX" > /dev/null 2>&1
-ok "Portas liberadas: $PORT, $API_PORT, 1935, 8554, 8888, 8889"
+ufw --force enable > /dev/null 2>&1
+ufw reload > /dev/null 2>&1
+ok "Portas liberadas: $PORT, $API_PORT, $POSTGREST_PORT, 1935, 8554, 8888, 8889"
+ok "Firewall ativado e recarregado"
 
 # ----------------------------------------------------------
 # 14. Criar servicos systemd
