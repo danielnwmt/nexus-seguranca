@@ -187,10 +187,14 @@ CREATE TABLE IF NOT EXISTS public.media_servers (
   rtmp_base_port INTEGER NOT NULL DEFAULT 1935,
   hls_base_port INTEGER NOT NULL DEFAULT 8888,
   webrtc_base_port INTEGER NOT NULL DEFAULT 8889,
+  os TEXT NOT NULL DEFAULT 'linux',
   status TEXT NOT NULL DEFAULT 'active',
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Garantir coluna os em instalacoes existentes
+ALTER TABLE public.media_servers ADD COLUMN IF NOT EXISTS os TEXT NOT NULL DEFAULT 'linux';
 
 CREATE TABLE IF NOT EXISTS public.recordings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
