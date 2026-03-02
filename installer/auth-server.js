@@ -7,6 +7,10 @@
 const http = require('http');
 const { Pool } = require('pg');
 const crypto = require('crypto');
+const { execSync } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const pathMod = require('path');
 
 // Configuração
 const PORT = 8001;
@@ -333,7 +337,37 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    // ---- AUTO-ANALYZE LOCAL (analisa todas as cameras via HLS) ----
+    // ---- AUTO-ANALYZE CONTÍNUO: Controle ----
+    if (path === '/api/analytics/start' && req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+
+      const body = await readBody(req);
+      const interval = body.interval || 3; // seconds
+      startContinuousAnalysis(token, interval);
+      return sendJSON(res, 200, { status: 'started', interval });
+    }
+
+    if (path === '/api/analytics/stop' && req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+
+      stopContinuousAnalysis();
+      return sendJSON(res, 200, { status: 'stopped' });
+    }
+
+    if (path === '/api/analytics/status' && req.method === 'GET') {
+      return sendJSON(res, 200, getAnalysisStatus());
+    }
+
+    // ---- SNAPSHOT MANUAL (manter para uso pontual) ----
+    // Keep existing auto-analyze endpoint for manual trigger
     if (path === '/api/cameras/auto-analyze' && req.method === 'POST') {
       const authHeader = req.headers.authorization;
       if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
@@ -341,144 +375,9 @@ const server = http.createServer(async (req, res) => {
       const payload = verifyJWT(token);
       if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
 
-      const { execSync } = require('child_process');
-      const fs = require('fs');
-      const os = require('os');
-      const pathMod = require('path');
-      const https = require('https');
-
-      try {
-        // Buscar cameras com analytics habilitados
-        const camResult = await pool.query(`
-          SELECT c.id, c.name, c.stream_key, c.stream_url, c.analytics, c.snapshot_url,
-                 c.client_id, cl.name as client_name
-          FROM cameras c
-          LEFT JOIN clients cl ON c.client_id = cl.id
-          WHERE c.status = 'online'
-            AND c.analytics IS NOT NULL
-            AND array_length(c.analytics, 1) > 0
-        `);
-
-        if (camResult.rows.length === 0) {
-          return sendJSON(res, 200, { analyzed: 0, message: 'Nenhuma camera com analiticos' });
-        }
-
-        // Buscar media server
-        let mediaIp = '127.0.0.1';
-        let hlsPort = 8888;
-        try {
-          const msResult = await pool.query(`SELECT ip_address, hls_base_port FROM media_servers WHERE status = 'online' LIMIT 1`);
-          if (msResult.rows.length > 0) {
-            mediaIp = msResult.rows[0].ip_address || '127.0.0.1';
-            hlsPort = msResult.rows[0].hls_base_port || 8888;
-          }
-        } catch {}
-
-        // Ler SUPABASE_URL e ANON_KEY do .env se disponível
-        let supabaseUrl = '';
-        let supabaseAnonKey = '';
-        try {
-          const envPath = pathMod.join(__dirname, '..', '.env');
-          if (fs.existsSync(envPath)) {
-            const envContent = fs.readFileSync(envPath, 'utf-8');
-            const urlMatch = envContent.match(/VITE_SUPABASE_URL=(.+)/);
-            const keyMatch = envContent.match(/VITE_SUPABASE_PUBLISHABLE_KEY=(.+)/);
-            if (urlMatch) supabaseUrl = urlMatch[1].trim();
-            if (keyMatch) supabaseAnonKey = keyMatch[1].trim();
-          }
-        } catch {}
-
-        const results = [];
-
-        for (const cam of camResult.rows) {
-          const tmpFile = pathMod.join(os.tmpdir(), `nexus-analyze-${cam.id}.jpg`);
-          try {
-            // Capturar frame apenas da URL HLS do stream cadastrado (MediaMTX)
-            const sourceUrl = `http://${mediaIp}:${hlsPort}/${cam.stream_key}/`;
-            let captured = false;
-
-            try {
-              execSync(`ffmpeg -y -i "${sourceUrl}" -vframes 1 -q:v 2 -f image2 "${tmpFile}" 2>/dev/null`, { timeout: 15000 });
-              if (fs.existsSync(tmpFile)) captured = true;
-            } catch {}
-
-            if (!captured) {
-              results.push({ camera: cam.name, status: 'skip', reason: 'stream_offline' });
-              continue;
-            }
-
-            const imageBase64 = fs.readFileSync(tmpFile).toString('base64');
-            try { fs.unlinkSync(tmpFile); } catch {}
-
-            // Enviar para a edge function analyze-camera para análise IA
-            if (supabaseUrl && supabaseAnonKey) {
-              try {
-                const analyzeUrl = `${supabaseUrl}/functions/v1/analyze-camera`;
-                const fetchModule = require('https');
-                const postData = JSON.stringify({
-                  image_base64: imageBase64,
-                  camera_id: cam.id,
-                  camera_name: cam.name,
-                  client_id: cam.client_id || null,
-                  client_name: cam.client_name || null,
-                  enabled_analytics: cam.analytics || [],
-                });
-
-                const analyzeResp = await new Promise((resolve, reject) => {
-                  const url = new URL(analyzeUrl);
-                  const reqOpts = {
-                    hostname: url.hostname,
-                    port: url.port || 443,
-                    path: url.pathname,
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${token}`,
-                      'apikey': supabaseAnonKey,
-                      'Content-Length': Buffer.byteLength(postData),
-                    },
-                  };
-                  const r = fetchModule.request(reqOpts, (response) => {
-                    let body = '';
-                    response.on('data', (chunk) => body += chunk);
-                    response.on('end', () => {
-                      try { resolve(JSON.parse(body)); } catch { resolve({ error: body }); }
-                    });
-                  });
-                  r.on('error', reject);
-                  r.setTimeout(30000, () => { r.destroy(); reject(new Error('Timeout')); });
-                  r.write(postData);
-                  r.end();
-                });
-
-                results.push({
-                  camera: cam.name,
-                  status: 'ok',
-                  detections: analyzeResp.detections_count || 0,
-                });
-              } catch (aiErr) {
-                console.error(`AI analysis failed for ${cam.name}:`, aiErr.message);
-                results.push({ camera: cam.name, status: 'error', error: 'AI analysis failed' });
-              }
-            } else {
-              results.push({ camera: cam.name, status: 'captured', reason: 'no_supabase_config' });
-            }
-
-            // Delay entre cameras
-            if (camResult.rows.indexOf(cam) < camResult.rows.length - 1) {
-              await new Promise(r => setTimeout(r, 2000));
-            }
-
-          } catch (err) {
-            try { fs.unlinkSync(tmpFile); } catch {}
-            results.push({ camera: cam.name, status: 'error', error: err.message });
-          }
-        }
-
-        return sendJSON(res, 200, { analyzed: results.filter(r => r.status === 'ok').length, total: camResult.rows.length, results });
-      } catch (err) {
-        return sendJSON(res, 500, { error: 'Auto-analyze failed: ' + err.message });
-      }
+      // Trigger one cycle manually
+      const result = await runAnalysisCycle(token);
+      return sendJSON(res, 200, result);
     }
 
     // ---- REST API (proxy para PostgREST) ----
@@ -498,6 +397,258 @@ const server = http.createServer(async (req, res) => {
     sendJSON(res, 500, { error: err.message });
   }
 });
+
+// ============================================================
+//  WORKER DE ANÁLISE CONTÍNUA EM TEMPO REAL
+//  Captura frames do HLS e envia para IA a cada N segundos
+// ============================================================
+
+const analysisState = {
+  running: false,
+  interval: 3, // seconds between cycles
+  concurrency: 5, // parallel camera analyses
+  token: null,
+  stats: {
+    startedAt: null,
+    cyclesCompleted: 0,
+    totalDetections: 0,
+    totalErrors: 0,
+    camerasAnalyzed: 0,
+    lastCycleAt: null,
+    lastCycleDuration: 0,
+    rateLimited: false,
+    rateLimitedUntil: null,
+  },
+};
+
+function getSupabaseConfig() {
+  let supabaseUrl = '';
+  let supabaseAnonKey = '';
+  try {
+    const envPath = pathMod.join(__dirname, '..', '.env');
+    if (fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, 'utf-8');
+      const urlMatch = envContent.match(/VITE_SUPABASE_URL=(.+)/);
+      const keyMatch = envContent.match(/VITE_SUPABASE_PUBLISHABLE_KEY=(.+)/);
+      if (urlMatch) supabaseUrl = urlMatch[1].trim();
+      if (keyMatch) supabaseAnonKey = keyMatch[1].trim();
+    }
+  } catch {}
+  return { supabaseUrl, supabaseAnonKey };
+}
+
+async function getMediaServer() {
+  let mediaIp = '127.0.0.1';
+  let hlsPort = 8888;
+  try {
+    const msResult = await pool.query(`SELECT ip_address, hls_base_port FROM media_servers WHERE status = 'online' LIMIT 1`);
+    if (msResult.rows.length > 0) {
+      mediaIp = msResult.rows[0].ip_address || '127.0.0.1';
+      hlsPort = msResult.rows[0].hls_base_port || 8888;
+    }
+  } catch {}
+  return { mediaIp, hlsPort };
+}
+
+function captureFrame(sourceUrl, tmpFile) {
+  try {
+    execSync(`ffmpeg -y -i "${sourceUrl}" -vframes 1 -q:v 2 -f image2 "${tmpFile}" 2>/dev/null`, { timeout: 10000 });
+    if (fs.existsSync(tmpFile)) {
+      const base64 = fs.readFileSync(tmpFile).toString('base64');
+      try { fs.unlinkSync(tmpFile); } catch {}
+      return base64;
+    }
+  } catch {}
+  try { fs.unlinkSync(tmpFile); } catch {}
+  return null;
+}
+
+function sendToAI(supabaseUrl, supabaseAnonKey, token, payload) {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify(payload);
+    const url = new URL(`${supabaseUrl}/functions/v1/analyze-camera`);
+    const httpModule = url.protocol === 'https:' ? require('https') : require('http');
+    const reqOpts = {
+      hostname: url.hostname,
+      port: url.port || (url.protocol === 'https:' ? 443 : 80),
+      path: url.pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'apikey': supabaseAnonKey,
+        'Content-Length': Buffer.byteLength(postData),
+      },
+    };
+    const r = httpModule.request(reqOpts, (response) => {
+      let body = '';
+      response.on('data', (chunk) => body += chunk);
+      response.on('end', () => {
+        if (response.statusCode === 429) {
+          resolve({ error: 'rate_limited', status: 429 });
+        } else if (response.statusCode === 402) {
+          resolve({ error: 'credits_exhausted', status: 402 });
+        } else {
+          try { resolve(JSON.parse(body)); } catch { resolve({ error: body }); }
+        }
+      });
+    });
+    r.on('error', reject);
+    r.setTimeout(30000, () => { r.destroy(); reject(new Error('Timeout')); });
+    r.write(postData);
+    r.end();
+  });
+}
+
+async function analyzeCamera(cam, mediaIp, hlsPort, supabaseUrl, supabaseAnonKey, token) {
+  const sourceUrl = `http://${mediaIp}:${hlsPort}/${cam.stream_key}/`;
+  const tmpFile = pathMod.join(os.tmpdir(), `nexus-rt-${cam.id}-${Date.now()}.jpg`);
+
+  const base64 = captureFrame(sourceUrl, tmpFile);
+  if (!base64) return { camera: cam.name, status: 'skip', reason: 'stream_offline' };
+
+  try {
+    const result = await sendToAI(supabaseUrl, supabaseAnonKey, token, {
+      image_base64: base64,
+      camera_id: cam.id,
+      camera_name: cam.name,
+      client_id: cam.client_id || null,
+      client_name: cam.client_name || null,
+      enabled_analytics: cam.analytics || [],
+    });
+
+    if (result.error === 'rate_limited') {
+      analysisState.stats.rateLimited = true;
+      analysisState.stats.rateLimitedUntil = Date.now() + 60000;
+      return { camera: cam.name, status: 'rate_limited' };
+    }
+    if (result.error === 'credits_exhausted') {
+      console.error('AI credits exhausted - stopping continuous analysis');
+      stopContinuousAnalysis();
+      return { camera: cam.name, status: 'credits_exhausted' };
+    }
+
+    if (result.detections_count > 0) {
+      analysisState.stats.totalDetections += result.detections_count;
+      console.log(`🚨 ${cam.name}: ${result.detections_count} detecção(ões) - ${result.detections.map(d => d.event_type).join(', ')}`);
+    }
+
+    return { camera: cam.name, status: 'ok', detections: result.detections_count || 0 };
+  } catch (err) {
+    analysisState.stats.totalErrors++;
+    return { camera: cam.name, status: 'error', error: err.message };
+  }
+}
+
+async function runAnalysisCycle(token) {
+  const cycleStart = Date.now();
+  const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return { error: 'Supabase não configurado no .env' };
+  }
+
+  const { mediaIp, hlsPort } = await getMediaServer();
+
+  const camResult = await pool.query(`
+    SELECT c.id, c.name, c.stream_key, c.analytics, c.client_id, cl.name as client_name
+    FROM cameras c
+    LEFT JOIN clients cl ON c.client_id = cl.id
+    WHERE c.status = 'online'
+      AND c.analytics IS NOT NULL
+      AND array_length(c.analytics, 1) > 0
+  `);
+
+  if (camResult.rows.length === 0) {
+    return { analyzed: 0, message: 'Nenhuma camera com analiticos' };
+  }
+
+  const cameras = camResult.rows;
+  const results = [];
+  const concurrency = analysisState.concurrency;
+
+  // Processar em lotes paralelos
+  for (let i = 0; i < cameras.length; i += concurrency) {
+    // Check rate limit cooldown
+    if (analysisState.stats.rateLimited && analysisState.stats.rateLimitedUntil > Date.now()) {
+      const waitMs = analysisState.stats.rateLimitedUntil - Date.now();
+      console.log(`⏳ Rate limited, aguardando ${Math.ceil(waitMs/1000)}s...`);
+      await new Promise(r => setTimeout(r, waitMs));
+      analysisState.stats.rateLimited = false;
+    }
+
+    const batch = cameras.slice(i, i + concurrency);
+    const batchResults = await Promise.all(
+      batch.map(cam => analyzeCamera(cam, mediaIp, hlsPort, supabaseUrl, supabaseAnonKey, token))
+    );
+    results.push(...batchResults);
+  }
+
+  const cycleDuration = Date.now() - cycleStart;
+  analysisState.stats.cyclesCompleted++;
+  analysisState.stats.camerasAnalyzed = cameras.length;
+  analysisState.stats.lastCycleAt = new Date().toISOString();
+  analysisState.stats.lastCycleDuration = cycleDuration;
+
+  return {
+    analyzed: results.filter(r => r.status === 'ok').length,
+    total: cameras.length,
+    duration_ms: cycleDuration,
+    results,
+  };
+}
+
+let analysisLoop = null;
+
+function startContinuousAnalysis(token, interval) {
+  if (analysisState.running) {
+    console.log('⚠️ Análise contínua já está rodando');
+    return;
+  }
+
+  analysisState.running = true;
+  analysisState.interval = interval || 3;
+  analysisState.token = token;
+  analysisState.stats.startedAt = new Date().toISOString();
+  analysisState.stats.cyclesCompleted = 0;
+  analysisState.stats.totalDetections = 0;
+  analysisState.stats.totalErrors = 0;
+
+  console.log(`🟢 Análise contínua INICIADA - intervalo: ${analysisState.interval}s`);
+
+  const loop = async () => {
+    while (analysisState.running) {
+      try {
+        await runAnalysisCycle(analysisState.token);
+      } catch (err) {
+        console.error('Cycle error:', err.message);
+        analysisState.stats.totalErrors++;
+      }
+
+      // Aguardar o intervalo antes do próximo ciclo
+      if (analysisState.running) {
+        await new Promise(r => setTimeout(r, analysisState.interval * 1000));
+      }
+    }
+  };
+
+  analysisLoop = loop();
+}
+
+function stopContinuousAnalysis() {
+  if (!analysisState.running) return;
+  analysisState.running = false;
+  analysisState.token = null;
+  console.log('🔴 Análise contínua PARADA');
+}
+
+function getAnalysisStatus() {
+  return {
+    running: analysisState.running,
+    interval: analysisState.interval,
+    concurrency: analysisState.concurrency,
+    ...analysisState.stats,
+  };
+}
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Nexus Auth + API Gateway rodando em http://localhost:${PORT}`);

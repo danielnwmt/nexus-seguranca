@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react';
-import { Brain, ShieldAlert, Users, Car, Crosshair, Footprints, PersonStanding, ScanEye, AlertTriangle, Camera } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Brain, ShieldAlert, Users, Car, Crosshair, Footprints, PersonStanding, ScanEye, AlertTriangle, Camera, Play, Square, Loader2, Zap } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTableQuery } from '@/hooks/useSupabaseQuery';
 import { supabase } from '@/integrations/supabase/client';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
 const eventLabels: Record<string, { label: string; icon: any; color: string }> = {
@@ -20,12 +23,80 @@ const eventLabels: Record<string, { label: string; icon: any; color: string }> =
   tampering: { label: 'Sabotagem', icon: ScanEye, color: 'text-purple-400' },
 };
 
+interface AnalysisStatus {
+  running: boolean;
+  interval: number;
+  concurrency: number;
+  startedAt: string | null;
+  cyclesCompleted: number;
+  totalDetections: number;
+  totalErrors: number;
+  camerasAnalyzed: number;
+  lastCycleAt: string | null;
+  lastCycleDuration: number;
+  rateLimited: boolean;
+}
+
 const Analytics = () => {
+  const { toast } = useToast();
   const { data: cameras = [] } = useTableQuery('cameras');
   const { data: clients = [] } = useTableQuery('clients');
+  const { data: companySettings } = useCompanySettings();
+  const mediaServerIp = (companySettings as any)?.media_server_ip || '';
   const [events, setEvents] = useState<any[]>([]);
   const [filterType, setFilterType] = useState<string>('all');
   const [filterClient, setFilterClient] = useState<string>('all');
+  const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus | null>(null);
+  const [toggling, setToggling] = useState(false);
+
+  // Fetch analysis status
+  const fetchStatus = useCallback(async () => {
+    if (!mediaServerIp) return;
+    try {
+      const resp = await fetch(`http://${mediaServerIp}:8001/api/analytics/status`);
+      if (resp.ok) {
+        const data = await resp.json();
+        setAnalysisStatus(data);
+      }
+    } catch {}
+  }, [mediaServerIp]);
+
+  useEffect(() => {
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 5000);
+    return () => clearInterval(interval);
+  }, [fetchStatus]);
+
+  const handleToggleAnalysis = async () => {
+    if (!mediaServerIp) {
+      toast({ title: 'Configure o servidor de mídia primeiro', variant: 'destructive' });
+      return;
+    }
+    setToggling(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) { toast({ title: 'Faça login novamente', variant: 'destructive' }); return; }
+
+      const endpoint = analysisStatus?.running ? 'stop' : 'start';
+      const resp = await fetch(`http://${mediaServerIp}:8001/api/analytics/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ interval: 3 }),
+      });
+
+      if (resp.ok) {
+        toast({ title: endpoint === 'start' ? '🟢 Análise contínua INICIADA' : '🔴 Análise contínua PARADA' });
+        setTimeout(fetchStatus, 1000);
+      } else {
+        toast({ title: 'Erro ao controlar análise', variant: 'destructive' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Erro de conexão com servidor', description: err.message, variant: 'destructive' });
+    } finally {
+      setToggling(false);
+    }
+  };
 
   // Fetch events
   useEffect(() => {
@@ -35,16 +106,13 @@ const Analytics = () => {
         .select('*')
         .order('created_at', { ascending: false })
         .limit(200);
-
       if (filterType !== 'all') query = query.eq('event_type', filterType);
       if (filterClient !== 'all') query = query.eq('client_id', filterClient);
-
       const { data } = await query;
       setEvents(data || []);
     };
     fetchEvents();
 
-    // Realtime
     const channel = supabase
       .channel('analytics-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'analytics_events' }, (payload) => {
@@ -55,7 +123,6 @@ const Analytics = () => {
     return () => { supabase.removeChannel(channel); };
   }, [filterType, filterClient]);
 
-  // Stats
   const stats = Object.keys(eventLabels).map(type => {
     const count = events.filter(e => e.event_type === type).length;
     const info = eventLabels[type];
@@ -64,9 +131,8 @@ const Analytics = () => {
 
   const totalEvents = events.length;
   const criticalEvents = events.filter(e => ['weapon_detection', 'intrusion', 'fallen_person'].includes(e.event_type)).length;
-
-  // Cameras with analytics enabled
   const camerasWithAnalytics = cameras.filter((c: any) => c.analytics && c.analytics.length > 0);
+  const isRunning = analysisStatus?.running || false;
 
   return (
     <div className="space-y-6">
@@ -76,7 +142,7 @@ const Analytics = () => {
             <Brain className="w-6 h-6 text-primary" />
             Analíticos de IA
           </h1>
-          <p className="text-sm text-muted-foreground font-mono">Eventos detectados automaticamente pelas câmeras</p>
+          <p className="text-sm text-muted-foreground font-mono">Detecção em tempo real via IA</p>
         </div>
         <div className="flex gap-2">
           <Select value={filterClient} onValueChange={setFilterClient}>
@@ -103,6 +169,56 @@ const Analytics = () => {
           </Select>
         </div>
       </div>
+
+      {/* Painel de Controle da Análise Contínua */}
+      <Card className={`border-2 ${isRunning ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-border bg-card'}`}>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`w-3 h-3 rounded-full ${isRunning ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground/30'}`} />
+              <div>
+                <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-primary" />
+                  Análise em Tempo Real
+                  <Badge variant={isRunning ? 'default' : 'secondary'} className="text-[10px]">
+                    {isRunning ? 'ATIVA' : 'INATIVA'}
+                  </Badge>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isRunning
+                    ? `Analisando ${analysisStatus?.camerasAnalyzed || 0} câmeras a cada ${analysisStatus?.interval || 3}s • ${analysisStatus?.cyclesCompleted || 0} ciclos • ${analysisStatus?.totalDetections || 0} detecções`
+                    : 'Clique para iniciar a análise contínua das câmeras com IA'
+                  }
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {isRunning && analysisStatus && (
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  {analysisStatus.rateLimited && (
+                    <Badge variant="destructive" className="text-[10px]">Rate Limited</Badge>
+                  )}
+                  {analysisStatus.lastCycleDuration > 0 && (
+                    <span className="font-mono">{Math.round(analysisStatus.lastCycleDuration / 1000)}s/ciclo</span>
+                  )}
+                  {analysisStatus.totalErrors > 0 && (
+                    <span className="text-destructive font-mono">{analysisStatus.totalErrors} erros</span>
+                  )}
+                </div>
+              )}
+              <Button
+                onClick={handleToggleAnalysis}
+                disabled={toggling}
+                variant={isRunning ? 'destructive' : 'default'}
+                className="gap-2"
+              >
+                {toggling ? <Loader2 className="w-4 h-4 animate-spin" /> : isRunning ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                {isRunning ? 'Parar' : 'Iniciar'}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
