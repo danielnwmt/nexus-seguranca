@@ -20,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 
 // ---- Types ----
 
@@ -98,9 +99,24 @@ const Settings = () => {
   const fetchBanks = useCallback(async () => {
     setBanksLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('manage-bank-config', { method: 'GET' });
-      if (error) throw error;
-      setBanks(data || []);
+      if (isLocalInstallation()) {
+        const res = await fetch(`${getLocalApiBase()}/rest/v1/bank_configs?select=id,bank,label,agencia,conta,convenio,active,api_key_encrypted,created_at,updated_at&order=label.asc`, {
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) throw new Error('Erro ao buscar bank_configs');
+        const rows = await res.json();
+        const mapped = (rows || []).map((b: any) => ({
+          id: b.id, bank: b.bank, label: b.label, agencia: b.agencia || '',
+          conta: b.conta || '', convenio: b.convenio || '', active: !!b.active,
+          has_api_key: !!(b.api_key_encrypted && b.api_key_encrypted.length > 0),
+          created_at: b.created_at, updated_at: b.updated_at,
+        }));
+        setBanks(mapped);
+      } else {
+        const { data, error } = await supabase.functions.invoke('manage-bank-config', { method: 'GET' });
+        if (error) throw error;
+        setBanks(data || []);
+      }
     } catch {
       toast({ title: 'Erro ao carregar configurações bancárias', variant: 'destructive' });
     } finally {
@@ -125,15 +141,32 @@ const Settings = () => {
           convenio: bank.convenio,
           active: bank.active,
         };
-        // Only send API key if user entered a new one
         const newKey = bankApiKeys[bank.id];
         if (newKey !== undefined && newKey !== '') {
           payload.api_key = newKey;
         }
-        await supabase.functions.invoke('manage-bank-config', {
-          method: 'PUT',
-          body: payload,
-        });
+
+        if (isLocalInstallation()) {
+          // Local: PATCH direto no PostgREST
+          const updates: Record<string, any> = {
+            agencia: bank.agencia, conta: bank.conta,
+            convenio: bank.convenio, active: bank.active,
+          };
+          if (newKey !== undefined && newKey !== '') {
+            updates.api_key_encrypted = newKey;
+          }
+          const res = await fetch(`${getLocalApiBase()}/rest/v1/bank_configs?id=eq.${bank.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+            body: JSON.stringify(updates),
+          });
+          if (!res.ok) throw new Error('Erro ao salvar');
+        } else {
+          await supabase.functions.invoke('manage-bank-config', {
+            method: 'PUT',
+            body: payload,
+          });
+        }
       }
       setBankApiKeys({});
       toast({ title: 'Configurações bancárias salvas', description: 'As chaves de API são armazenadas de forma segura no servidor.' });
