@@ -283,6 +283,146 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // ---- SNAPSHOT ENDPOINT (captura frame do HLS via ffmpeg) ----
+    if (path === '/api/cameras/snapshot' && req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+
+      const { stream_key, snapshot_url } = await readBody(req);
+      if (!stream_key && !snapshot_url) return sendJSON(res, 400, { error: 'stream_key or snapshot_url required' });
+
+      const { execSync } = require('child_process');
+      const fs = require('fs');
+      const os = require('os');
+      const pathMod = require('path');
+
+      const tmpFile = pathMod.join(os.tmpdir(), `nexus-snap-${Date.now()}.jpg`);
+
+      try {
+        // Buscar IP do media server no banco
+        let mediaIp = '127.0.0.1';
+        let hlsPort = 8888;
+        try {
+          const msResult = await pool.query(`SELECT ip_address, hls_base_port FROM media_servers WHERE status = 'online' LIMIT 1`);
+          if (msResult.rows.length > 0) {
+            mediaIp = msResult.rows[0].ip_address || '127.0.0.1';
+            hlsPort = msResult.rows[0].hls_base_port || 8888;
+          }
+        } catch {}
+
+        let sourceUrl = snapshot_url;
+        if (!sourceUrl && stream_key) {
+          // Construir URL HLS do MediaMTX
+          sourceUrl = `http://${mediaIp}:${hlsPort}/${stream_key}/`;
+        }
+
+        // Capturar frame via ffmpeg
+        execSync(`ffmpeg -y -i "${sourceUrl}" -vframes 1 -q:v 2 -f image2 "${tmpFile}" 2>/dev/null`, { timeout: 15000 });
+
+        if (!fs.existsSync(tmpFile)) {
+          return sendJSON(res, 500, { error: 'Failed to capture frame' });
+        }
+
+        const imageBase64 = fs.readFileSync(tmpFile).toString('base64');
+        try { fs.unlinkSync(tmpFile); } catch {}
+
+        return sendJSON(res, 200, { image_base64: imageBase64 });
+      } catch (err) {
+        try { require('fs').unlinkSync(tmpFile); } catch {}
+        return sendJSON(res, 500, { error: 'Snapshot capture failed: ' + err.message });
+      }
+    }
+
+    // ---- AUTO-ANALYZE LOCAL (analisa todas as cameras via HLS) ----
+    if (path === '/api/cameras/auto-analyze' && req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+
+      const { execSync } = require('child_process');
+      const fs = require('fs');
+      const os = require('os');
+      const pathMod = require('path');
+      const https = require('https');
+
+      try {
+        // Buscar cameras com analytics habilitados
+        const camResult = await pool.query(`
+          SELECT c.id, c.name, c.stream_key, c.analytics, c.snapshot_url,
+                 c.client_id, cl.name as client_name
+          FROM cameras c
+          LEFT JOIN clients cl ON c.client_id = cl.id
+          WHERE c.status = 'online'
+            AND c.analytics IS NOT NULL
+            AND array_length(c.analytics, 1) > 0
+        `);
+
+        if (camResult.rows.length === 0) {
+          return sendJSON(res, 200, { analyzed: 0, message: 'Nenhuma camera com analiticos' });
+        }
+
+        // Buscar media server
+        let mediaIp = '127.0.0.1';
+        let hlsPort = 8888;
+        try {
+          const msResult = await pool.query(`SELECT ip_address, hls_base_port FROM media_servers WHERE status = 'online' LIMIT 1`);
+          if (msResult.rows.length > 0) {
+            mediaIp = msResult.rows[0].ip_address || '127.0.0.1';
+            hlsPort = msResult.rows[0].hls_base_port || 8888;
+          }
+        } catch {}
+
+        const results = [];
+
+        for (const cam of camResult.rows) {
+          const tmpFile = pathMod.join(os.tmpdir(), `nexus-analyze-${cam.id}.jpg`);
+          try {
+            // Tentar capturar do HLS primeiro, depois snapshot_url
+            let sourceUrl = `http://${mediaIp}:${hlsPort}/${cam.stream_key}/`;
+            let captured = false;
+
+            try {
+              execSync(`ffmpeg -y -i "${sourceUrl}" -vframes 1 -q:v 2 -f image2 "${tmpFile}" 2>/dev/null`, { timeout: 15000 });
+              if (fs.existsSync(tmpFile)) captured = true;
+            } catch {}
+
+            if (!captured && cam.snapshot_url) {
+              try {
+                execSync(`ffmpeg -y -i "${cam.snapshot_url}" -vframes 1 -q:v 2 -f image2 "${tmpFile}" 2>/dev/null`, { timeout: 15000 });
+                if (fs.existsSync(tmpFile)) captured = true;
+              } catch {}
+            }
+
+            if (!captured) {
+              results.push({ camera: cam.name, status: 'skip', reason: 'no_stream' });
+              continue;
+            }
+
+            const imageBase64 = fs.readFileSync(tmpFile).toString('base64');
+            try { fs.unlinkSync(tmpFile); } catch {}
+
+            // Inserir evento de análise direto no banco (sem chamar edge function)
+            // Salvar snapshot base64 para análise posterior via analytics-service
+            // Por enquanto, registrar que foi capturado
+            results.push({ camera: cam.name, status: 'captured', stream_key: cam.stream_key });
+
+          } catch (err) {
+            try { fs.unlinkSync(tmpFile); } catch {}
+            results.push({ camera: cam.name, status: 'error', error: err.message });
+          }
+        }
+
+        return sendJSON(res, 200, { analyzed: results.filter(r => r.status === 'captured').length, total: camResult.rows.length, results });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Auto-analyze failed: ' + err.message });
+      }
+    }
+
     // ---- REST API (proxy para PostgREST) ----
     if (path.startsWith('/rest/v1/')) {
       const postgrestPath = path.replace('/rest/v1/', '/');
