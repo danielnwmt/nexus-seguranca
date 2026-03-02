@@ -64,15 +64,10 @@ serve(async (req) => {
 
     for (const cam of cameras) {
       try {
-        // Determinar a fonte da imagem
+        // Capturar frame apenas via servidor local (HLS do stream cadastrado)
         let imagePayload: Record<string, any> = {};
 
-        if (cam.snapshot_url) {
-          // Usar snapshot URL direta (câmeras com endpoint HTTP de snapshot)
-          imagePayload = { image_url: cam.snapshot_url };
-        } else if (mediaIp && cam.stream_key) {
-          // Sem snapshot URL: tentar capturar do HLS via servidor local
-          // O auth-server expõe /api/cameras/snapshot que usa ffmpeg
+        if (mediaIp && cam.stream_key) {
           try {
             const snapshotResp = await fetch(`http://${mediaIp}:8001/api/cameras/snapshot`, {
               method: "POST",
@@ -92,8 +87,8 @@ serve(async (req) => {
         }
 
         // Se não conseguiu imagem, pular
-        if (!imagePayload.image_url && !imagePayload.image_base64) {
-          results.push({ camera: cam.name, status: "skip", reason: "no_image_source" });
+        if (!imagePayload.image_base64) {
+          results.push({ camera: cam.name, status: "skip", reason: "stream_offline" });
           continue;
         }
 
