@@ -142,11 +142,15 @@ const StorageServers = () => {
     }
   };
 
+  const [saving, setSaving] = useState(false);
+
   const handleSave = async () => {
     if (!form.name || !form.ip_address) {
       toast({ title: 'Preencha nome e IP do servidor', variant: 'destructive' });
       return;
     }
+
+    setSaving(true);
 
     // Se local, criar a pasta automaticamente
     if (form.is_local && form.storage_path) {
@@ -169,13 +173,21 @@ const StorageServers = () => {
       max_storage_gb: Number(form.max_storage_gb) || 1000,
       status: form.status,
     };
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, ...payload } as any);
-    } else {
-      insertMutation.mutate(payload as any);
-    }
-    resetForm();
-    toast({ title: editingId ? 'Servidor atualizado' : 'Servidor adicionado' });
+
+    const mutation = editingId ? updateMutation : insertMutation;
+    const mutationData = editingId ? { id: editingId, ...payload } : payload;
+
+    mutation.mutate(mutationData as any, {
+      onSuccess: () => {
+        toast({ title: editingId ? 'Servidor atualizado' : 'Servidor adicionado' });
+        resetForm();
+        setSaving(false);
+      },
+      onError: (err: any) => {
+        toast({ title: 'Erro ao salvar servidor', description: err.message, variant: 'destructive' });
+        setSaving(false);
+      },
+    });
   };
 
   const handleEdit = (server: any) => {
@@ -362,7 +374,9 @@ const StorageServers = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={resetForm}>Cancelar</Button>
-            <Button onClick={handleSave} className="gap-2"><Save className="w-4 h-4" /> Salvar</Button>
+            <Button onClick={handleSave} disabled={saving} className="gap-2">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Salvar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
