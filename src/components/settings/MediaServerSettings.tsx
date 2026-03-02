@@ -64,10 +64,12 @@ const MediaServerSettings = () => {
   const [testingId, setTestingId] = useState<string | null>(null);
   const [installing, setInstalling] = useState(false);
   const [installLog, setInstallLog] = useState<string[]>([]);
+  const [dialogTestStatus, setDialogTestStatus] = useState<'idle' | 'testing' | 'online' | 'offline'>('idle');
 
   const openCreate = () => {
     setEditingServer(null);
     setForm(defaultForm);
+    setDialogTestStatus('idle');
     setDialogOpen(true);
   };
 
@@ -90,6 +92,48 @@ const MediaServerSettings = () => {
     setDialogOpen(false);
     setEditingServer(null);
     setForm(defaultForm);
+    setDialogTestStatus('idle');
+  };
+
+  const handleDialogTest = async () => {
+    if (!form.ip_address.trim()) {
+      toast.error('Informe o endereço IP para testar');
+      return;
+    }
+    setDialogTestStatus('testing');
+    try {
+      const testUrl = `http://${form.ip_address}:8001/api/media-servers/test`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      const response = await fetch(testUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ip_address: form.ip_address,
+          hls_base_port: form.hls_base_port,
+          rtmp_base_port: form.rtmp_base_port,
+          os: form.os,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.online) {
+          setDialogTestStatus('online');
+          toast.success(`✅ Servidor online! RTMP: ${result.rtmp ? '✓' : '✗'} | HLS: ${result.hls ? '✓' : '✗'}`);
+        } else {
+          setDialogTestStatus('offline');
+          toast.error(`❌ MediaMTX não respondeu. RTMP: ${result.rtmp ? '✓' : '✗'} | HLS: ${result.hls ? '✓' : '✗'}`);
+        }
+      } else {
+        setDialogTestStatus('offline');
+        toast.error(`❌ Auth-server não acessível (HTTP ${response.status})`);
+      }
+    } catch {
+      setDialogTestStatus('offline');
+      toast.error(`❌ Servidor não acessível em ${form.ip_address}:8001`);
+    }
   };
 
   const handleSave = (andInstall = false) => {
@@ -372,7 +416,35 @@ const MediaServerSettings = () => {
               <div>
                 <Label className="text-xs">Porta RTMP</Label>
                 <Input type="number" value={form.rtmp_base_port} onChange={e => setForm(f => ({ ...f, rtmp_base_port: parseInt(e.target.value) || 1935 }))} />
-              </div>
+            </div>
+            {/* Test connection inside dialog */}
+            <div className="flex items-center gap-3 pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleDialogTest}
+                disabled={!form.ip_address.trim() || dialogTestStatus === 'testing'}
+                className="gap-1.5"
+              >
+                {dialogTestStatus === 'testing' ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <PlayCircle className="w-3.5 h-3.5" />
+                )}
+                Testar Conexão
+              </Button>
+              {dialogTestStatus === 'online' && (
+                <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
+                  ✅ Online
+                </Badge>
+              )}
+              {dialogTestStatus === 'offline' && (
+                <Badge className="bg-destructive/20 text-destructive border-destructive/30 text-xs">
+                  ❌ Offline
+                </Badge>
+              )}
+            </div>
               <div>
                 <Label className="text-xs">Porta HLS</Label>
                 <Input type="number" value={form.hls_base_port} onChange={e => setForm(f => ({ ...f, hls_base_port: parseInt(e.target.value) || 8888 }))} />
