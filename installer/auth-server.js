@@ -353,7 +353,7 @@ const server = http.createServer(async (req, res) => {
       try {
         // Buscar cameras com analytics habilitados
         const camResult = await pool.query(`
-          SELECT c.id, c.name, c.stream_key, c.analytics, c.snapshot_url,
+          SELECT c.id, c.name, c.stream_key, c.stream_url, c.analytics, c.snapshot_url,
                  c.client_id, cl.name as client_name
           FROM cameras c
           LEFT JOIN clients cl ON c.client_id = cl.id
@@ -377,12 +377,26 @@ const server = http.createServer(async (req, res) => {
           }
         } catch {}
 
+        // Ler SUPABASE_URL e ANON_KEY do .env se disponível
+        let supabaseUrl = '';
+        let supabaseAnonKey = '';
+        try {
+          const envPath = pathMod.join(__dirname, '..', '.env');
+          if (fs.existsSync(envPath)) {
+            const envContent = fs.readFileSync(envPath, 'utf-8');
+            const urlMatch = envContent.match(/VITE_SUPABASE_URL=(.+)/);
+            const keyMatch = envContent.match(/VITE_SUPABASE_PUBLISHABLE_KEY=(.+)/);
+            if (urlMatch) supabaseUrl = urlMatch[1].trim();
+            if (keyMatch) supabaseAnonKey = keyMatch[1].trim();
+          }
+        } catch {}
+
         const results = [];
 
         for (const cam of camResult.rows) {
           const tmpFile = pathMod.join(os.tmpdir(), `nexus-analyze-${cam.id}.jpg`);
           try {
-            // Tentar capturar do HLS primeiro, depois snapshot_url
+            // Tentar capturar do HLS (stream RTMP/RTSP via MediaMTX) primeiro
             let sourceUrl = `http://${mediaIp}:${hlsPort}/${cam.stream_key}/`;
             let captured = false;
 
@@ -391,9 +405,18 @@ const server = http.createServer(async (req, res) => {
               if (fs.existsSync(tmpFile)) captured = true;
             } catch {}
 
+            // Fallback: usar snapshot_url se configurada
             if (!captured && cam.snapshot_url) {
               try {
                 execSync(`ffmpeg -y -i "${cam.snapshot_url}" -vframes 1 -q:v 2 -f image2 "${tmpFile}" 2>/dev/null`, { timeout: 15000 });
+                if (fs.existsSync(tmpFile)) captured = true;
+              } catch {}
+            }
+
+            // Fallback: usar stream_url direto (RTSP)
+            if (!captured && cam.stream_url) {
+              try {
+                execSync(`ffmpeg -y -rtsp_transport tcp -i "${cam.stream_url}" -vframes 1 -q:v 2 -f image2 "${tmpFile}" 2>/dev/null`, { timeout: 15000 });
                 if (fs.existsSync(tmpFile)) captured = true;
               } catch {}
             }
@@ -406,10 +429,64 @@ const server = http.createServer(async (req, res) => {
             const imageBase64 = fs.readFileSync(tmpFile).toString('base64');
             try { fs.unlinkSync(tmpFile); } catch {}
 
-            // Inserir evento de análise direto no banco (sem chamar edge function)
-            // Salvar snapshot base64 para análise posterior via analytics-service
-            // Por enquanto, registrar que foi capturado
-            results.push({ camera: cam.name, status: 'captured', stream_key: cam.stream_key });
+            // Enviar para a edge function analyze-camera para análise IA
+            if (supabaseUrl && supabaseAnonKey) {
+              try {
+                const analyzeUrl = `${supabaseUrl}/functions/v1/analyze-camera`;
+                const fetchModule = require('https');
+                const postData = JSON.stringify({
+                  image_base64: imageBase64,
+                  camera_id: cam.id,
+                  camera_name: cam.name,
+                  client_id: cam.client_id || null,
+                  client_name: cam.client_name || null,
+                  enabled_analytics: cam.analytics || [],
+                });
+
+                const analyzeResp = await new Promise((resolve, reject) => {
+                  const url = new URL(analyzeUrl);
+                  const reqOpts = {
+                    hostname: url.hostname,
+                    port: url.port || 443,
+                    path: url.pathname,
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`,
+                      'apikey': supabaseAnonKey,
+                      'Content-Length': Buffer.byteLength(postData),
+                    },
+                  };
+                  const r = fetchModule.request(reqOpts, (response) => {
+                    let body = '';
+                    response.on('data', (chunk) => body += chunk);
+                    response.on('end', () => {
+                      try { resolve(JSON.parse(body)); } catch { resolve({ error: body }); }
+                    });
+                  });
+                  r.on('error', reject);
+                  r.setTimeout(30000, () => { r.destroy(); reject(new Error('Timeout')); });
+                  r.write(postData);
+                  r.end();
+                });
+
+                results.push({
+                  camera: cam.name,
+                  status: 'ok',
+                  detections: analyzeResp.detections_count || 0,
+                });
+              } catch (aiErr) {
+                console.error(`AI analysis failed for ${cam.name}:`, aiErr.message);
+                results.push({ camera: cam.name, status: 'error', error: 'AI analysis failed' });
+              }
+            } else {
+              results.push({ camera: cam.name, status: 'captured', reason: 'no_supabase_config' });
+            }
+
+            // Delay entre cameras
+            if (camResult.rows.indexOf(cam) < camResult.rows.length - 1) {
+              await new Promise(r => setTimeout(r, 2000));
+            }
 
           } catch (err) {
             try { fs.unlinkSync(tmpFile); } catch {}
@@ -417,7 +494,7 @@ const server = http.createServer(async (req, res) => {
           }
         }
 
-        return sendJSON(res, 200, { analyzed: results.filter(r => r.status === 'captured').length, total: camResult.rows.length, results });
+        return sendJSON(res, 200, { analyzed: results.filter(r => r.status === 'ok').length, total: camResult.rows.length, results });
       } catch (err) {
         return sendJSON(res, 500, { error: 'Auto-analyze failed: ' + err.message });
       }
