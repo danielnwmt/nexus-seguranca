@@ -599,6 +599,17 @@ async function runAnalysisCycle(token) {
 
 let analysisLoop = null;
 
+// Gerar token de serviço interno para o worker (não precisa de login)
+function createServiceToken() {
+  const now = Math.floor(Date.now() / 1000);
+  return createJWT({
+    sub: 'system-analytics-worker',
+    role: 'service_role',
+    iat: now,
+    exp: now + 86400 * 365, // 1 year
+  });
+}
+
 function startContinuousAnalysis(token, interval) {
   if (analysisState.running) {
     console.log('⚠️ Análise contínua já está rodando');
@@ -650,7 +661,49 @@ function getAnalysisStatus() {
   };
 }
 
+// Auto-start: iniciar análise contínua automaticamente ao boot
+async function autoStartAnalysis() {
+  // Aguardar 10s para garantir que o banco e MediaMTX estejam prontos
+  await new Promise(r => setTimeout(r, 10000));
+
+  try {
+    // Verificar se há câmeras com analíticos
+    const camResult = await pool.query(`
+      SELECT COUNT(*) as count FROM cameras
+      WHERE status = 'online'
+        AND analytics IS NOT NULL
+        AND array_length(analytics, 1) > 0
+    `);
+
+    const camCount = parseInt(camResult.rows[0]?.count || '0');
+    if (camCount === 0) {
+      console.log('ℹ️ Nenhuma câmera com analíticos habilitados. Worker aguardando...');
+      // Verificar novamente a cada 60 segundos
+      setTimeout(autoStartAnalysis, 60000);
+      return;
+    }
+
+    // Verificar se .env tem as credenciais Supabase
+    const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.log('⚠️ Supabase não configurado no .env - análise automática desabilitada');
+      return;
+    }
+
+    // Gerar token de serviço e iniciar
+    const serviceToken = createServiceToken();
+    console.log(`🤖 Auto-start: ${camCount} câmeras com analíticos encontradas`);
+    startContinuousAnalysis(serviceToken, 3);
+  } catch (err) {
+    console.error('Auto-start error:', err.message);
+    // Tentar novamente em 30s
+    setTimeout(autoStartAnalysis, 30000);
+  }
+}
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Nexus Auth + API Gateway rodando em http://localhost:${PORT}`);
   console.log(`PostgREST em ${POSTGREST_URL}`);
+  // Iniciar análise contínua automaticamente
+  autoStartAnalysis();
 });
