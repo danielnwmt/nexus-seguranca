@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Wifi, Server, Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
+import { Wifi, Server, Plus, Pencil, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { toast } from 'sonner';
 
@@ -32,88 +32,40 @@ const defaultForm = {
   status: 'active',
 };
 
-// Helper: resolve base URL do auth-server local
-function getLocalApiBase() {
-  const { hostname } = window.location;
-  return `http://${hostname}:8001`;
-}
-
 const MediaServerSettings = () => {
-  const qc = useQueryClient();
   const { data: company } = useCompanySettings();
+  const { data: servers = [], isLoading } = useTableQuery('media_servers');
+  const insertMutation = useInsertMutation('media_servers');
+  const updateMutation = useUpdateMutation('media_servers');
+  const deleteMutation = useDeleteMutation('media_servers');
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingServer, setEditingServer] = useState<MediaServer | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncWarning, setSyncWarning] = useState<string | null>(null);
 
-  const apiBase = getLocalApiBase();
-
-  const { data: servers = [], isLoading } = useQuery({
-    queryKey: ['media_servers'],
-    queryFn: async () => {
-      const res = await fetch(`${apiBase}/api/media-servers`);
-      if (!res.ok) throw new Error('Não foi possível conectar ao servidor local');
-      return res.json() as Promise<MediaServer[]>;
-    },
-  });
-
-  const saveMutation = useMutation({
-    mutationFn: async (values: typeof defaultForm & { id?: string }) => {
-      const url = values.id
-        ? `${apiBase}/api/media-servers/${values.id}`
-        : `${apiBase}/api/media-servers`;
-      const method = values.id ? 'PUT' : 'POST';
-      const { id, ...body } = values as any;
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Erro ao salvar servidor');
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['media_servers'] });
-      toast.success(editingServer ? 'Servidor atualizado' : 'Servidor cadastrado');
-      closeDialog();
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch(`${apiBase}/api/media-servers/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Erro ao remover servidor');
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['media_servers'] });
-      toast.success('Servidor removido');
-      setDeleteId(null);
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  const syncMutation = useMutation({
-    mutationFn: async () => {
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncWarning(null);
+    try {
       const serverIp = company?.media_server_ip || window.location.hostname;
       const syncUrl = `http://${serverIp}:8001/api/sync/media-servers`;
-      const res = await fetch(syncUrl, { method: 'POST' });
-      if (!res.ok) throw new Error('Não foi possível conectar ao servidor local');
-      return res.json();
-    },
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['media_servers'] });
+      const res = await fetch(syncUrl, { method: 'POST', signal: AbortSignal.timeout(5000) });
+      if (!res.ok) throw new Error('Servidor local indisponível');
+      const data = await res.json();
       if (data.error) {
-        toast.error(data.error);
+        setSyncWarning(data.error);
       } else {
         toast.success(`${data.synced} servidor(es) sincronizado(s)`);
       }
-    },
-    onError: (e: any) => toast.error('Erro ao sincronizar: ' + e.message),
-  });
+    } catch {
+      setSyncWarning('Não foi possível conectar ao servidor local (porta 8001). A sincronização só funciona quando o sistema está instalado no servidor. Você pode cadastrar servidores manualmente.');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const openCreate = () => {
     setEditingServer(null);
@@ -146,8 +98,28 @@ const MediaServerSettings = () => {
       toast.error('Informe o endereço IP');
       return;
     }
-    saveMutation.mutate(editingServer ? { ...form, id: editingServer.id } : form);
+    if (editingServer) {
+      updateMutation.mutate({ id: editingServer.id, ...form } as any, {
+        onSuccess: () => { toast.success('Servidor atualizado'); closeDialog(); },
+        onError: (e: any) => toast.error(e.message),
+      });
+    } else {
+      insertMutation.mutate(form as any, {
+        onSuccess: () => { toast.success('Servidor cadastrado'); closeDialog(); },
+        onError: (e: any) => toast.error(e.message),
+      });
+    }
   };
+
+  const handleDelete = () => {
+    if (!deleteId) return;
+    deleteMutation.mutate(deleteId, {
+      onSuccess: () => { toast.success('Servidor removido'); setDeleteId(null); },
+      onError: (e: any) => toast.error(e.message),
+    });
+  };
+
+  const serverList = servers as unknown as MediaServer[];
 
   return (
     <>
@@ -164,8 +136,8 @@ const MediaServerSettings = () => {
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} className="gap-1.5">
-                <RefreshCw className={`w-3.5 h-3.5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+              <Button size="sm" variant="outline" onClick={handleSync} disabled={syncing} className="gap-1.5">
+                <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
                 Sincronizar
               </Button>
               <Button size="sm" onClick={openCreate} className="gap-1.5">
@@ -176,17 +148,29 @@ const MediaServerSettings = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
+          {/* Sync warning */}
+          {syncWarning && (
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-400">{syncWarning}</p>
+            </div>
+          )}
+
           {isLoading ? (
             <p className="text-xs text-muted-foreground">Carregando...</p>
-          ) : servers.length === 0 ? (
-            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
-              <p className="text-xs text-destructive">
-                ⚠️ Nenhum servidor cadastrado. Clique em "Novo Servidor" ou instale o sistema para registro automático.
+          ) : serverList.length === 0 ? (
+            <div className="bg-muted/50 border border-border rounded-lg p-4 text-center">
+              <Wifi className="w-8 h-8 mx-auto mb-2 opacity-50 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Nenhum servidor cadastrado.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Clique em "Novo Servidor" para cadastrar manualmente ou instale o sistema para registro automático.
               </p>
             </div>
           ) : (
             <div className="grid gap-3">
-              {servers.map(server => (
+              {serverList.map(server => (
                 <div key={server.id} className="bg-muted/50 rounded-lg p-3 border border-border space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -283,8 +267,8 @@ const MediaServerSettings = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={closeDialog}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? 'Salvando...' : editingServer ? 'Salvar' : 'Cadastrar'}
+            <Button onClick={handleSave} disabled={insertMutation.isPending || updateMutation.isPending}>
+              {(insertMutation.isPending || updateMutation.isPending) ? 'Salvando...' : editingServer ? 'Salvar' : 'Cadastrar'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -299,7 +283,7 @@ const MediaServerSettings = () => {
           <p className="text-sm text-muted-foreground">Esta ação não pode ser desfeita.</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteId(null)}>Cancelar</Button>
-            <Button variant="destructive" onClick={() => deleteId && deleteMutation.mutate(deleteId)} disabled={deleteMutation.isPending}>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>
               {deleteMutation.isPending ? 'Removendo...' : 'Remover'}
             </Button>
           </DialogFooter>
