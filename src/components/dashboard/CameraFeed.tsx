@@ -6,6 +6,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import HlsPlayer from './HlsPlayer';
 import RecordingsViewer from '@/components/cameras/RecordingsViewer';
 import { useAnalyzeCamera } from '@/hooks/useAnalyzeCamera';
+import { getLocalApiBase, isLocalInstallation } from '@/hooks/useLocalApi';
+import { useToast } from '@/hooks/use-toast';
 
 interface CameraFeedProps {
   camera: CameraType;
@@ -21,8 +23,10 @@ const statusConfig = {
 };
 
 const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
+  const { toast } = useToast();
   const status = statusConfig[camera.status];
   const [isRecording, setIsRecording] = useState(camera.status === 'recording');
+  const [isRecordingLoading, setIsRecordingLoading] = useState(false);
   const [isViewing, setIsViewing] = useState(false);
   const [showRecordings, setShowRecordings] = useState(false);
   const videoContainerRef = useRef<HTMLDivElement>(null);
@@ -63,6 +67,59 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
     };
   }, [isViewing, camera.analytics, handleAnalyze, analyzing]);
 
+  // Handle recording start/stop via local API
+  const handleToggleRecording = useCallback(async () => {
+    if (!isLocalInstallation()) {
+      toast({ title: 'Gravação disponível apenas na instalação local', variant: 'destructive' });
+      return;
+    }
+    setIsRecordingLoading(true);
+    try {
+      const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+
+      if (isRecording) {
+        // Stop recording
+        const resp = await fetch(`${getLocalApiBase()}/api/cameras/recording/stop`, {
+          method: 'POST', headers,
+          body: JSON.stringify({ camera_id: camera.id }),
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          setIsRecording(false);
+          toast({ title: 'Gravação finalizada', description: `Duração: ${data.duration_seconds}s • ${data.file_size_mb} MB` });
+        } else {
+          toast({ title: 'Erro ao parar gravação', description: data.error, variant: 'destructive' });
+        }
+      } else {
+        // Start recording
+        const resp = await fetch(`${getLocalApiBase()}/api/cameras/recording/start`, {
+          method: 'POST', headers,
+          body: JSON.stringify({
+            camera_id: camera.id,
+            stream_key: camera.streamUrl?.split('/').filter(Boolean).pop() || camera.id,
+            camera_name: camera.name,
+            client_id: camera.clientId,
+            client_name: camera.clientName,
+            storage_path: camera.storagePath || '',
+          }),
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          setIsRecording(true);
+          toast({ title: 'Gravação iniciada', description: camera.name });
+        } else {
+          toast({ title: 'Erro ao iniciar gravação', description: data.error, variant: 'destructive' });
+        }
+      }
+    } catch (err: any) {
+      toast({ title: 'Erro de conexão com servidor local', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsRecordingLoading(false);
+    }
+  }, [isRecording, camera, toast]);
+
   // Build HLS URL from stream info
   // MediaMTX serves HLS at http://<server>:8888/<path>/
   // The camera name (slugified) is used as the path
@@ -73,8 +130,6 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
     // If it's an http URL pointing to MediaMTX HLS
     if (camera.streamUrl.startsWith('http')) return camera.streamUrl;
     // Extract server from RTSP/RTMP URL and build HLS path
-    // e.g. rtsp://192.168.1.100:554/cam01 -> we need the MediaMTX HLS URL
-    // Convention: use the path segment as MediaMTX stream name
     try {
       const url = new URL(camera.streamUrl);
       const streamPath = url.pathname.replace(/^\//, '') || camera.id;
@@ -156,10 +211,11 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => setIsRecording(!isRecording)}
+                  onClick={handleToggleRecording}
+                  disabled={isRecordingLoading}
                   className={`w-7 h-7 rounded flex items-center justify-center transition-colors ${isRecording ? 'bg-destructive/80 text-destructive-foreground' : 'bg-background/80 text-muted-foreground hover:text-foreground'}`}
                 >
-                  {isRecording ? <Square className="w-3 h-3" /> : <Circle className="w-3 h-3 fill-current" />}
+                  {isRecordingLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : isRecording ? <Square className="w-3 h-3" /> : <Circle className="w-3 h-3 fill-current" />}
                 </button>
               </TooltipTrigger>
               <TooltipContent>{isRecording ? 'Parar Gravação' : 'Iniciar Gravação'}</TooltipContent>
