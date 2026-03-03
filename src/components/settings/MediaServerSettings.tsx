@@ -202,15 +202,26 @@ const MediaServerSettings = () => {
     setInstallLog([]);
     try {
       const apiBase = `http://${ip}:8001`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120000); // 2 min timeout
+
       const res = await fetch(`${apiBase}/api/media-servers/install`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ os: osType }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Erro desconhecido' }));
-        toast.error(`Falha na instalação: ${err.error}`);
+        let errorMsg = `Erro HTTP ${res.status}`;
+        try {
+          const err = await res.json();
+          errorMsg = err.error || err.message || errorMsg;
+          if (err.details) errorMsg += ` — ${err.details}`;
+        } catch {}
+        setInstallLog(prev => [...prev, `[error] ❌ Falha na instalação: ${errorMsg}`]);
+        toast.error(`Falha na instalação: ${errorMsg}`);
         setInstalling(false);
         return;
       }
@@ -218,6 +229,7 @@ const MediaServerSettings = () => {
       // Stream SSE response
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
+      let hasError = false;
       if (reader) {
         while (true) {
           const { done, value } = await reader.read();
@@ -227,7 +239,11 @@ const MediaServerSettings = () => {
           for (const line of lines) {
             try {
               const event = JSON.parse(line.replace('data: ', ''));
-              setInstallLog(prev => [...prev, `[${event.status}] ${event.message}`]);
+              const icon = event.status === 'error' ? '❌' : event.status === 'success' ? '✅' : 'ℹ️';
+              setInstallLog(prev => [...prev, `[${event.status}] ${icon} ${event.message}`]);
+              if (event.status === 'error') {
+                hasError = true;
+              }
               if (event.step === 'complete') {
                 if (event.status === 'success') {
                   toast.success('MediaMTX instalado com sucesso!');
@@ -239,8 +255,15 @@ const MediaServerSettings = () => {
           }
         }
       }
+      if (!hasError && installLog.length === 0) {
+        setInstallLog(prev => [...prev, `[info] ℹ️ Resposta do servidor encerrada sem eventos.`]);
+      }
     } catch (e: any) {
-      toast.error(`Não foi possível conectar ao servidor ${ip}:8001`);
+      const errorDetail = e.name === 'AbortError'
+        ? `Tempo limite excedido (120s) ao conectar em ${ip}:8001`
+        : `Não foi possível conectar ao servidor ${ip}:8001 — ${e.message || 'verifique se o serviço está rodando'}`;
+      setInstallLog(prev => [...prev, `[error] ❌ ${errorDetail}`]);
+      toast.error(errorDetail);
     } finally {
       setInstalling(false);
     }
@@ -464,16 +487,27 @@ const MediaServerSettings = () => {
           </div>
           {/* Install log */}
           {(installing || installLog.length > 0) && (
-            <div className="bg-muted/50 border border-border rounded-lg p-3 max-h-40 overflow-y-auto">
+            <div className="bg-muted/50 border border-border rounded-lg p-3 max-h-48 overflow-y-auto">
               <p className="text-xs font-medium text-foreground mb-1 flex items-center gap-1.5">
                 {installing && <Loader2 className="w-3 h-3 animate-spin" />}
                 Log de Instalação
               </p>
               {installLog.map((line, i) => (
-                <p key={i} className={`text-[11px] font-mono ${line.includes('[error]') ? 'text-destructive' : line.includes('[success]') ? 'text-emerald-400' : 'text-muted-foreground'}`}>{line}</p>
+                <p key={i} className={`text-[11px] font-mono whitespace-pre-wrap ${
+                  line.includes('[error]') ? 'text-destructive font-semibold' 
+                  : line.includes('[success]') ? 'text-emerald-400' 
+                  : 'text-muted-foreground'
+                }`}>{line}</p>
               ))}
               {installLog.length === 0 && installing && (
                 <p className="text-[11px] text-muted-foreground">Aguardando resposta do servidor...</p>
+              )}
+              {!installing && installLog.some(l => l.includes('[error]')) && (
+                <div className="mt-2 p-2 rounded bg-destructive/10 border border-destructive/30">
+                  <p className="text-[11px] text-destructive font-medium">
+                    ⚠️ A instalação encontrou erros. Verifique os logs acima e tente novamente.
+                  </p>
+                </div>
               )}
             </div>
           )}
