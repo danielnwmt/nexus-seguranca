@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
+import { updateUserPassword } from '@/lib/localAuth';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -19,6 +21,7 @@ const ResetPassword = () => {
   const [isRecovery, setIsRecovery] = useState(false);
   const [leakedWarning, setLeakedWarning] = useState('');
   const [checkingLeak, setCheckingLeak] = useState(false);
+  const isLocal = isLocalInstallation();
 
   useEffect(() => {
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -26,14 +29,15 @@ const ResetPassword = () => {
       setIsRecovery(true);
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setIsRecovery(true);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    if (!isLocal) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setIsRecovery(true);
+        }
+      });
+      return () => subscription.unsubscribe();
+    }
+  }, [isLocal]);
 
   const validatePassword = (pass: string): string | null => {
     if (pass.length < 8) return 'A senha deve ter pelo menos 8 caracteres';
@@ -45,12 +49,14 @@ const ResetPassword = () => {
   };
 
   const checkLeakedPassword = async (pass: string): Promise<boolean> => {
+    // Skip leak check on local installations (no cloud functions available)
+    if (isLocal) return false;
     try {
       setCheckingLeak(true);
       const { data, error } = await supabase.functions.invoke('check-password', {
         body: { password: pass },
       });
-      if (error) return false; // Don't block if service is down
+      if (error) return false;
       if (data?.leaked) {
         setLeakedWarning(
           `Esta senha foi encontrada em ${data.count.toLocaleString()} vazamentos de dados. Escolha outra senha.`
@@ -82,18 +88,14 @@ const ResetPassword = () => {
       return;
     }
 
-    // Check leaked password
     const isLeaked = await checkLeakedPassword(password);
     if (isLeaked) return;
 
     setLoading(true);
-    const { error: updateError } = await supabase.auth.updateUser({
-      password,
-      data: { force_password_change: false },
-    });
+    const { error: updateError } = await updateUserPassword(password);
 
     if (updateError) {
-      setError(updateError.message);
+      setError(updateError);
     } else {
       toast.success('Senha definida com sucesso!');
       navigate('/');

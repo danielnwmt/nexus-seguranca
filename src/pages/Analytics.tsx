@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTableQuery } from '@/hooks/useSupabaseQuery';
 import { supabase } from '@/integrations/supabase/client';
+import { isLocalInstallation } from '@/hooks/useLocalApi';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -74,8 +75,14 @@ const Analytics = () => {
     }
     setToggling(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
+      let token: string;
+      if (isLocalInstallation()) {
+        const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+        token = session.access_token || '';
+      } else {
+        const { data: sessionData } = await supabase.auth.getSession();
+        token = sessionData?.session?.access_token || '';
+      }
       if (!token) { toast({ title: 'Faça login novamente', variant: 'destructive' }); return; }
 
       const endpoint = analysisStatus?.running ? 'stop' : 'start';

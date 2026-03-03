@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { RefreshCw, CheckCircle2, AlertCircle, Loader2, GitBranch, Clock, Circle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { isLocalInstallation } from '@/hooks/useLocalApi';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -91,8 +92,14 @@ const SystemUpdate = () => {
         return;
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
-      const accessToken = session?.access_token || '';
+      let accessToken: string;
+      if (isLocalInstallation()) {
+        const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+        accessToken = session.access_token || '';
+      } else {
+        const { data: { session } } = await supabase.auth.getSession();
+        accessToken = session?.access_token || '';
+      }
 
       const urls = [
         `${systemApiBase}/update`,
