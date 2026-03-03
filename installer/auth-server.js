@@ -868,6 +868,169 @@ WantedBy=multi-user.target
       }
     }
 
+    // ---- GRAVAÇÃO: Iniciar/Parar gravação via FFmpeg ----
+    // Armazena processos de gravação ativos: { [cameraId]: { process, filePath, startTime, ... } }
+    if (!global._activeRecordings) global._activeRecordings = {};
+
+    if (path === '/api/cameras/recording/start' && req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+
+      const { camera_id, stream_key, camera_name, client_id, client_name, storage_path } = await readBody(req);
+      if (!camera_id || !stream_key) return sendJSON(res, 400, { error: 'camera_id and stream_key required' });
+
+      // Verificar se já está gravando
+      if (global._activeRecordings[camera_id]) {
+        return sendJSON(res, 409, { error: 'Gravação já em andamento para esta câmera' });
+      }
+
+      try {
+        // Buscar IP do media server
+        let mediaIp = '127.0.0.1';
+        let hlsPort = 8888;
+        try {
+          const msResult = await pool.query(`SELECT ip_address, hls_base_port FROM media_servers WHERE status = 'online' LIMIT 1`);
+          if (msResult.rows.length > 0) {
+            mediaIp = msResult.rows[0].ip_address || '127.0.0.1';
+            hlsPort = msResult.rows[0].hls_base_port || 8888;
+          }
+        } catch {}
+
+        const sourceUrl = `http://${mediaIp}:${hlsPort}/${stream_key}/`;
+
+        // Definir pasta de destino
+        const baseDir = storage_path || '/opt/nexus-monitoramento/recordings';
+        const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const recDir = pathMod.join(baseDir, camera_id, dateStr);
+        if (!fs.existsSync(recDir)) fs.mkdirSync(recDir, { recursive: true });
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const fileName = `${stream_key}_${timestamp}.mp4`;
+        const filePath = pathMod.join(recDir, fileName);
+
+        const startTime = new Date();
+
+        // Iniciar FFmpeg em background
+        const { spawn } = require('child_process');
+        const ffmpegArgs = [
+          '-y',
+          '-i', sourceUrl,
+          '-c', 'copy',        // Sem re-encoding (rápido)
+          '-movflags', '+frag_keyframe+empty_moov+faststart',
+          '-f', 'mp4',
+          filePath
+        ];
+
+        const ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
+          detached: false,
+          stdio: ['ignore', 'ignore', 'ignore'],
+        });
+
+        ffmpegProcess.on('error', (err) => {
+          console.error(`FFmpeg recording error for ${camera_name}:`, err);
+          delete global._activeRecordings[camera_id];
+        });
+
+        ffmpegProcess.on('exit', (code) => {
+          console.log(`FFmpeg recording ended for ${camera_name} (code ${code})`);
+          // Se saiu sem ser pelo stop, limpar
+          if (global._activeRecordings[camera_id]) {
+            delete global._activeRecordings[camera_id];
+          }
+        });
+
+        global._activeRecordings[camera_id] = {
+          process: ffmpegProcess,
+          filePath,
+          startTime,
+          cameraName: camera_name,
+          clientId: client_id,
+          clientName: client_name,
+        };
+
+        return sendJSON(res, 200, {
+          status: 'recording',
+          camera_id,
+          file_path: filePath,
+          start_time: startTime.toISOString(),
+        });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Falha ao iniciar gravação: ' + err.message });
+      }
+    }
+
+    if (path === '/api/cameras/recording/stop' && req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+
+      const { camera_id } = await readBody(req);
+      if (!camera_id) return sendJSON(res, 400, { error: 'camera_id required' });
+
+      const rec = global._activeRecordings[camera_id];
+      if (!rec) {
+        return sendJSON(res, 404, { error: 'Nenhuma gravação ativa para esta câmera' });
+      }
+
+      try {
+        // Enviar SIGINT para FFmpeg (encerra graciosamente)
+        rec.process.kill('SIGINT');
+
+        const endTime = new Date();
+        const durationSeconds = Math.round((endTime.getTime() - rec.startTime.getTime()) / 1000);
+
+        // Calcular tamanho do arquivo
+        let fileSizeMb = 0;
+        try {
+          await new Promise(r => setTimeout(r, 1000)); // Esperar FFmpeg finalizar
+          if (fs.existsSync(rec.filePath)) {
+            const stats = fs.statSync(rec.filePath);
+            fileSizeMb = Math.round(stats.size / (1024 * 1024) * 10) / 10;
+          }
+        } catch {}
+
+        // Registrar gravação no banco
+        try {
+          await pool.query(
+            `INSERT INTO recordings (camera_id, camera_name, client_id, client_name, start_time, end_time, duration_seconds, file_size_mb, file_path, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'completed')`,
+            [camera_id, rec.cameraName, rec.clientId, rec.clientName, rec.startTime.toISOString(), endTime.toISOString(), durationSeconds, fileSizeMb, rec.filePath]
+          );
+        } catch (dbErr) {
+          console.error('Erro ao salvar gravação no banco:', dbErr);
+        }
+
+        delete global._activeRecordings[camera_id];
+
+        return sendJSON(res, 200, {
+          status: 'stopped',
+          camera_id,
+          file_path: rec.filePath,
+          duration_seconds: durationSeconds,
+          file_size_mb: fileSizeMb,
+        });
+      } catch (err) {
+        delete global._activeRecordings[camera_id];
+        return sendJSON(res, 500, { error: 'Falha ao parar gravação: ' + err.message });
+      }
+    }
+
+    if (path === '/api/cameras/recording/status' && req.method === 'GET') {
+      const active = Object.entries(global._activeRecordings || {}).map(([id, rec]) => ({
+        camera_id: id,
+        camera_name: (rec as any).cameraName,
+        start_time: (rec as any).startTime.toISOString(),
+        file_path: (rec as any).filePath,
+        duration_seconds: Math.round((Date.now() - (rec as any).startTime.getTime()) / 1000),
+      }));
+      return sendJSON(res, 200, { active_recordings: active });
+    }
+
     // ---- AUTO-ANALYZE CONTÍNUO: Controle ----
     if (path === '/api/analytics/start' && req.method === 'POST') {
       const authHeader = req.headers.authorization;
