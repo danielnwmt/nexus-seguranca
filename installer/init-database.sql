@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS public.clients (
   status TEXT DEFAULT 'active',
   monthly_fee NUMERIC,
   payment_due_day INTEGER,
+  storage_server_id UUID,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -85,10 +86,15 @@ CREATE TABLE IF NOT EXISTS public.cameras (
   name TEXT NOT NULL,
   client_id UUID REFERENCES public.clients(id) ON DELETE SET NULL,
   stream_url TEXT,
+  stream_key TEXT NOT NULL DEFAULT '',
+  snapshot_url TEXT,
   protocol TEXT DEFAULT 'RTSP',
   status TEXT DEFAULT 'online',
   location TEXT,
   resolution TEXT,
+  brand TEXT,
+  video_encoding TEXT,
+  max_bitrate INTEGER,
   storage_path TEXT,
   retention_days INTEGER DEFAULT 30,
   analytics TEXT[],
@@ -102,6 +108,9 @@ CREATE TABLE IF NOT EXISTS public.guards (
   cpf TEXT,
   phone TEXT,
   email TEXT,
+  cnv TEXT,
+  city TEXT,
+  state TEXT,
   shift TEXT DEFAULT 'day',
   status TEXT DEFAULT 'active',
   client_ids TEXT[],
@@ -192,6 +201,17 @@ CREATE TABLE IF NOT EXISTS public.media_servers (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Garantir colunas em instalacoes existentes (ALTER ADD IF NOT EXISTS)
+ALTER TABLE public.cameras ADD COLUMN IF NOT EXISTS stream_key TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.cameras ADD COLUMN IF NOT EXISTS snapshot_url TEXT;
+ALTER TABLE public.cameras ADD COLUMN IF NOT EXISTS brand TEXT;
+ALTER TABLE public.cameras ADD COLUMN IF NOT EXISTS video_encoding TEXT;
+ALTER TABLE public.cameras ADD COLUMN IF NOT EXISTS max_bitrate INTEGER;
+ALTER TABLE public.guards ADD COLUMN IF NOT EXISTS cnv TEXT;
+ALTER TABLE public.guards ADD COLUMN IF NOT EXISTS city TEXT;
+ALTER TABLE public.guards ADD COLUMN IF NOT EXISTS state TEXT;
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS storage_server_id UUID;
 
 -- Garantir coluna os em instalacoes existentes
 ALTER TABLE public.media_servers ADD COLUMN IF NOT EXISTS os TEXT NOT NULL DEFAULT 'linux';
@@ -287,6 +307,15 @@ CREATE TABLE IF NOT EXISTS public.auth_rate_limits (
   locked_until TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.bank_configs_audit (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  bank_config_id TEXT NOT NULL,
+  action TEXT NOT NULL,
+  user_id TEXT,
+  ip_address TEXT,
+  accessed_at TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS public.user_roles (
@@ -429,6 +458,7 @@ ALTER TABLE public.installers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.patrol_routes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bank_configs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.auth_rate_limits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bank_configs_audit ENABLE ROW LEVEL SECURITY;
 
 -- Politicas: usuarios autenticados podem tudo (DROP + CREATE para idempotencia)
 DROP POLICY IF EXISTS "auth_all_clients" ON public.clients;
@@ -481,6 +511,9 @@ CREATE POLICY "auth_all_bank_configs" ON public.bank_configs FOR ALL USING (auth
 
 DROP POLICY IF EXISTS "auth_all_rate_limits" ON public.auth_rate_limits;
 CREATE POLICY "auth_all_rate_limits" ON public.auth_rate_limits FOR ALL USING (false);
+
+DROP POLICY IF EXISTS "auth_all_bank_audit" ON public.bank_configs_audit;
+CREATE POLICY "auth_all_bank_audit" ON public.bank_configs_audit FOR ALL USING (auth.uid() IS NOT NULL);
 
 -- 8. Permissoes para PostgREST
 GRANT USAGE ON SCHEMA public TO anon, authenticated;

@@ -47,6 +47,9 @@ echo ""
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Configurar safe.directory para evitar erro "dubious ownership"
+git config --global --add safe.directory "$INSTALL_DIR"
+
 # ----------------------------------------------------------
 # 1. Atualizar sistema e instalar dependencias basicas
 # ----------------------------------------------------------
