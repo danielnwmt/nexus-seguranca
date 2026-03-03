@@ -292,7 +292,8 @@ CREATE TABLE IF NOT EXISTS public.auth_rate_limits (
 CREATE TABLE IF NOT EXISTS public.user_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL,
-  role app_role DEFAULT 'admin'
+  role app_role DEFAULT 'admin',
+  UNIQUE(user_id, role)
 );
 
 -- 5. Funcoes auxiliares
@@ -507,6 +508,11 @@ ON CONFLICT (email) DO UPDATE SET
   encrypted_password = crypt('1234', gen_salt('bf')),
   raw_user_meta_data = '{"force_password_change": true}'::jsonb,
   updated_at = now();
+
+-- Garantir que o admin tem role (trigger pode nao disparar em ON CONFLICT UPDATE)
+INSERT INTO public.user_roles (user_id, role)
+SELECT id, 'admin'::app_role FROM auth.users WHERE email = 'admin@protenexus.com'
+ON CONFLICT DO NOTHING;
 
 -- 10. Funcao de login (retorna JWT claims)
 CREATE OR REPLACE FUNCTION public.login(email TEXT, pass TEXT)
