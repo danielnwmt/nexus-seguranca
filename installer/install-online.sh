@@ -41,6 +41,9 @@ if ! command -v git &> /dev/null; then
   apt-get update -qq && apt-get install -y -qq git > /dev/null 2>&1
 fi
 
+# Configurar safe.directory para evitar erro "dubious ownership"
+git config --global --add safe.directory "$INSTALL_DIR"
+
 # Clonar repositorio
 if [ -d "$INSTALL_DIR/.git" ]; then
   echo -e "${GREEN}>> Repositorio ja existe. Atualizando...${NC}"
