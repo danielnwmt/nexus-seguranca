@@ -186,9 +186,19 @@ const Settings = () => {
   const fetchUsers = useCallback(async () => {
     setUsersLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('manage-users', { method: 'GET' });
-      if (error) throw error;
-      setUsers(data || []);
+      if (isLocalInstallation()) {
+        const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+        const res = await fetch(`${getLocalApiBase()}/api/local/manage-users`, {
+          headers: { 'Authorization': `Bearer ${session.access_token || ''}` },
+        });
+        if (!res.ok) throw new Error('Erro ao carregar usuários');
+        const data = await res.json();
+        setUsers(data || []);
+      } else {
+        const { data, error } = await supabase.functions.invoke('manage-users', { method: 'GET' });
+        if (error) throw error;
+        setUsers(data || []);
+      }
     } catch {
       toast({ title: 'Erro ao carregar usuários', variant: 'destructive' });
     } finally {
@@ -211,14 +221,34 @@ const Settings = () => {
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [resettingPassword, setResettingPassword] = useState<string | null>(null);
 
+  // Helper para chamadas de gerenciamento de usuários (local ou cloud)
+  const invokeManageUsers = async (body: Record<string, unknown>) => {
+    if (isLocalInstallation()) {
+      const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+      const res = await fetch(`${getLocalApiBase()}/api/local/manage-users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token || ''}`,
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro');
+      return data;
+    } else {
+      const { data, error } = await supabase.functions.invoke('manage-users', { body });
+      if (error) throw error;
+      return data;
+    }
+  };
+
   const handleResetPassword = async (targetUserId: string) => {
     setResettingPassword(targetUserId);
     try {
-      const { data, error } = await supabase.functions.invoke('manage-users', {
-        body: { action: 'reset_password', user_id: targetUserId },
-      });
-      if (error || data?.error) {
-        toast({ title: data?.error || 'Erro ao redefinir senha', variant: 'destructive' });
+      const data = await invokeManageUsers({ action: 'reset_password', user_id: targetUserId });
+      if (data?.error) {
+        toast({ title: data.error, variant: 'destructive' });
         return;
       }
       setResetPasswordResult({ userId: targetUserId, password: data.temporary_password });
@@ -250,14 +280,12 @@ const Settings = () => {
     setUsersSaving(true);
     try {
       if (editingUser) {
-        await supabase.functions.invoke('manage-users', {
-          body: {
-            action: 'update',
-            user_id: editingUser.id,
-            name: userForm.name,
-            level: userForm.level,
-            active: userForm.active,
-          },
+        await invokeManageUsers({
+          action: 'update',
+          user_id: editingUser.id,
+          name: userForm.name,
+          level: userForm.level,
+          active: userForm.active,
         });
         toast({ title: 'Usuário atualizado' });
       } else {
@@ -266,17 +294,15 @@ const Settings = () => {
           setUsersSaving(false);
           return;
         }
-        const { data, error } = await supabase.functions.invoke('manage-users', {
-          body: {
-            action: 'create',
-            email: userForm.email,
-            password: userForm.password,
-            name: userForm.name,
-            level: userForm.level,
-          },
+        const data = await invokeManageUsers({
+          action: 'create',
+          email: userForm.email,
+          password: userForm.password,
+          name: userForm.name,
+          level: userForm.level,
         });
-        if (error || data?.error) {
-          toast({ title: data?.error || 'Erro ao criar usuário', variant: 'destructive' });
+        if (data?.error) {
+          toast({ title: data.error, variant: 'destructive' });
           setUsersSaving(false);
           return;
         }
@@ -293,11 +319,9 @@ const Settings = () => {
 
   const handleDeleteUser = async (id: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('manage-users', {
-        body: { action: 'delete', user_id: id },
-      });
-      if (error || data?.error) {
-        toast({ title: data?.error || 'Erro ao remover', variant: 'destructive' });
+      const data = await invokeManageUsers({ action: 'delete', user_id: id });
+      if (data?.error) {
+        toast({ title: data.error, variant: 'destructive' });
         return;
       }
       toast({ title: 'Usuário removido', variant: 'destructive' });
