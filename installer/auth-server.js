@@ -533,6 +533,142 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { return sendJSON(res, 500, { error: e.message }); }
     }
 
+    // ---- CRUD LOCAL: manage-users ----
+    if (path === '/api/local/manage-users' && req.method === 'GET') {
+      // Verificar autenticação
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+
+      // Verificar se é admin
+      const adminCheck = await pool.query(
+        "SELECT role FROM user_roles WHERE user_id = $1 AND role = 'admin'", [payload.sub]
+      );
+      if (adminCheck.rows.length === 0) return sendJSON(res, 403, { error: 'Admin access required' });
+
+      try {
+        const usersResult = await pool.query('SELECT id, email, raw_user_meta_data, created_at, banned_until FROM auth.users ORDER BY created_at DESC');
+        const rolesResult = await pool.query('SELECT * FROM user_roles');
+
+        const users = usersResult.rows.map(u => {
+          const userRole = rolesResult.rows.find(r => r.user_id === u.id);
+          return {
+            id: u.id,
+            email: u.email,
+            name: (u.raw_user_meta_data && u.raw_user_meta_data.name) || u.email.split('@')[0] || '',
+            level: userRole ? userRole.role : 'n1',
+            active: !u.banned_until || new Date(u.banned_until) < new Date(),
+            created_at: u.created_at,
+          };
+        });
+        return sendJSON(res, 200, users);
+      } catch (e) { return sendJSON(res, 500, { error: e.message }); }
+    }
+
+    if (path === '/api/local/manage-users' && req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+
+      const adminCheck = await pool.query(
+        "SELECT role FROM user_roles WHERE user_id = $1 AND role = 'admin'", [payload.sub]
+      );
+      if (adminCheck.rows.length === 0) return sendJSON(res, 403, { error: 'Admin access required' });
+
+      const body = await readBody(req);
+      if (!body.action) return sendJSON(res, 400, { error: 'Action required' });
+
+      try {
+        if (body.action === 'create') {
+          const { email, password, name, level } = body;
+          if (!email || !password) return sendJSON(res, 400, { error: 'Email and password required' });
+          if (password.length < 8) return sendJSON(res, 400, { error: 'Password must be at least 8 characters' });
+
+          const validLevels = ['admin', 'n1', 'n2', 'n3'];
+          const userLevel = validLevels.includes(level) ? level : 'n1';
+
+          const result = await pool.query(
+            `INSERT INTO auth.users (email, encrypted_password, email_confirmed_at, raw_user_meta_data)
+             VALUES ($1, crypt($2, gen_salt('bf')), NOW(), $3::jsonb) RETURNING id`,
+            [email, password, JSON.stringify({ name: (name || '').slice(0, 100), force_password_change: true })]
+          );
+          const newUserId = result.rows[0].id;
+
+          // Inserir role
+          await pool.query(
+            'INSERT INTO user_roles (user_id, role) VALUES ($1, $2) ON CONFLICT (user_id, role) DO NOTHING',
+            [newUserId, userLevel]
+          );
+
+          return sendJSON(res, 200, { success: true, user_id: newUserId });
+        }
+
+        if (body.action === 'update') {
+          const { user_id, name, level, active } = body;
+          if (!user_id) return sendJSON(res, 400, { error: 'User ID required' });
+
+          if (user_id === payload.sub && level !== 'admin') {
+            return sendJSON(res, 400, { error: 'Cannot demote yourself' });
+          }
+
+          // Atualizar metadata
+          await pool.query(
+            `UPDATE auth.users SET raw_user_meta_data = jsonb_set(COALESCE(raw_user_meta_data, '{}'), '{name}', $1::jsonb), 
+             banned_until = $2,
+             updated_at = NOW() WHERE id = $3`,
+            [JSON.stringify((name || '').slice(0, 100)), active === false ? '2099-01-01' : null, user_id]
+          );
+
+          // Atualizar role
+          const validLevels = ['admin', 'n1', 'n2', 'n3'];
+          if (level && validLevels.includes(level)) {
+            await pool.query(
+              `INSERT INTO user_roles (user_id, role) VALUES ($1, $2) 
+               ON CONFLICT (user_id) DO UPDATE SET role = $2`,
+              [user_id, level]
+            );
+          }
+
+          return sendJSON(res, 200, { success: true });
+        }
+
+        if (body.action === 'reset_password') {
+          const { user_id } = body;
+          if (!user_id) return sendJSON(res, 400, { error: 'User ID required' });
+
+          const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+          let tempPassword = 'A1!';
+          for (let i = 0; i < 12; i++) tempPassword += chars[Math.floor(Math.random() * chars.length)];
+
+          await pool.query(
+            `UPDATE auth.users SET encrypted_password = crypt($1, gen_salt('bf')),
+             raw_user_meta_data = jsonb_set(COALESCE(raw_user_meta_data, '{}'), '{force_password_change}', 'true'),
+             updated_at = NOW() WHERE id = $2`,
+            [tempPassword, user_id]
+          );
+
+          return sendJSON(res, 200, { success: true, temporary_password: tempPassword });
+        }
+
+        if (body.action === 'delete') {
+          const { user_id } = body;
+          if (!user_id) return sendJSON(res, 400, { error: 'User ID required' });
+          if (user_id === payload.sub) return sendJSON(res, 400, { error: 'Cannot delete yourself' });
+
+          await pool.query('DELETE FROM user_roles WHERE user_id = $1', [user_id]);
+          await pool.query('DELETE FROM auth.users WHERE id = $1', [user_id]);
+
+          return sendJSON(res, 200, { success: true });
+        }
+
+        return sendJSON(res, 400, { error: 'Unknown action' });
+      } catch (e) { return sendJSON(res, 500, { error: e.message }); }
+    }
+
     // ---- INSTALAR MediaMTX via SSE ----
     if (path === '/api/media-servers/install' && req.method === 'POST') {
       const body = await readBody(req);
