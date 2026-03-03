@@ -15,6 +15,33 @@ function getLocalHeaders(extra?: Record<string, string>): Record<string, string>
   return headers;
 }
 
+function getLocalRestCandidates(path: string) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const direct = `${getLocalApiBase()}/rest/v1${normalizedPath}`;
+  const sameOrigin = `/rest/v1${normalizedPath}`;
+  return direct === sameOrigin ? [direct] : [direct, sameOrigin];
+}
+
+async function fetchLocalRest(path: string, init?: RequestInit): Promise<Response> {
+  const candidates = getLocalRestCandidates(path);
+  let lastError: unknown = null;
+
+  for (let i = 0; i < candidates.length; i++) {
+    const url = candidates[i];
+    try {
+      const res = await fetch(url, init);
+      if (res.ok || i === candidates.length - 1) return res;
+      if (![404, 405, 500, 502, 503, 504].includes(res.status)) return res;
+    } catch (err) {
+      lastError = err;
+      if (i === candidates.length - 1) throw err;
+    }
+  }
+
+  if (lastError) throw lastError;
+  throw new Error('Falha de rede no backend local');
+}
+
 /**
  * Hook genérico para buscar dados de uma tabela.
  * Em instalações locais, usa o proxy PostgREST via auth-server (porta 8001).
@@ -29,8 +56,8 @@ export function useTableQuery<T = any>(table: TableName, orderBy = 'created_at',
     queryKey: isLocal ? ['local', table] : [table],
     queryFn: async () => {
       if (isLocal) {
-        const res = await fetch(
-          `${getLocalApiBase()}/rest/v1/${table}?select=*&order=${orderBy}.${ascending ? 'asc' : 'desc'}`,
+        const res = await fetchLocalRest(
+          `/${table}?select=*&order=${orderBy}.${ascending ? 'asc' : 'desc'}`,
           { headers: getLocalHeaders() }
         );
         if (!res.ok) throw new Error(`Erro ao buscar ${table}`);
@@ -86,8 +113,8 @@ export function usePaginatedQuery<T = any>(
           }
         }
 
-        const res = await fetch(
-          `${getLocalApiBase()}/rest/v1/${table}?${params.toString()}`,
+        const res = await fetchLocalRest(
+          `/${table}?${params.toString()}`,
           { headers: getLocalHeaders({ 'Prefer': 'count=exact' }) }
         );
         if (!res.ok) throw new Error(`Erro ao buscar ${table}`);
@@ -137,7 +164,7 @@ export function useInsertMutation(table: TableName) {
   return useMutation({
     mutationFn: async (row: Record<string, unknown>) => {
       if (isLocal) {
-        const res = await fetch(`${getLocalApiBase()}/rest/v1/${table}`, {
+        const res = await fetchLocalRest(`/${table}`, {
           method: 'POST',
           headers: getLocalHeaders({ 'Prefer': 'return=representation' }),
           body: JSON.stringify(row),
@@ -166,7 +193,7 @@ export function useUpdateMutation(table: TableName) {
   return useMutation({
     mutationFn: async ({ id, ...updates }: Record<string, unknown> & { id: string }) => {
       if (isLocal) {
-        const res = await fetch(`${getLocalApiBase()}/rest/v1/${table}?id=eq.${id}`, {
+        const res = await fetchLocalRest(`/${table}?id=eq.${id}`, {
           method: 'PATCH',
           headers: getLocalHeaders({ 'Prefer': 'return=representation' }),
           body: JSON.stringify(updates),
@@ -195,7 +222,7 @@ export function useDeleteMutation(table: TableName) {
   return useMutation({
     mutationFn: async (id: string) => {
       if (isLocal) {
-        const res = await fetch(`${getLocalApiBase()}/rest/v1/${table}?id=eq.${id}`, {
+        const res = await fetchLocalRest(`/${table}?id=eq.${id}`, {
           method: 'DELETE',
           headers: getLocalHeaders(),
         });
