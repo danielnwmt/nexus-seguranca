@@ -4,6 +4,17 @@ import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 
 type TableName = 'clients' | 'cameras' | 'guards' | 'alarms' | 'invoices' | 'storage_servers' | 'installers' | 'service_orders' | 'bills' | 'media_servers';
 
+function getLocalHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extra };
+  try {
+    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    if (session.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+  } catch {}
+  return headers;
+}
+
 /**
  * Hook genérico para buscar dados de uma tabela.
  * Em instalações locais, usa o proxy PostgREST via auth-server (porta 8001).
@@ -20,7 +31,7 @@ export function useTableQuery<T = any>(table: TableName, orderBy = 'created_at',
       if (isLocal) {
         const res = await fetch(
           `${getLocalApiBase()}/rest/v1/${table}?select=*&order=${orderBy}.${ascending ? 'asc' : 'desc'}`,
-          { headers: { 'Content-Type': 'application/json' } }
+          { headers: getLocalHeaders() }
         );
         if (!res.ok) throw new Error(`Erro ao buscar ${table}`);
         return res.json() as Promise<T[]>;
@@ -77,12 +88,7 @@ export function usePaginatedQuery<T = any>(
 
         const res = await fetch(
           `${getLocalApiBase()}/rest/v1/${table}?${params.toString()}`,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Prefer': 'count=exact',
-            },
-          }
+          { headers: getLocalHeaders({ 'Prefer': 'count=exact' }) }
         );
         if (!res.ok) throw new Error(`Erro ao buscar ${table}`);
         const data = await res.json() as T[];
@@ -133,10 +139,7 @@ export function useInsertMutation(table: TableName) {
       if (isLocal) {
         const res = await fetch(`${getLocalApiBase()}/rest/v1/${table}`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Prefer': 'return=representation',
-          },
+          headers: getLocalHeaders({ 'Prefer': 'return=representation' }),
           body: JSON.stringify(row),
         });
         if (!res.ok) {
@@ -165,10 +168,7 @@ export function useUpdateMutation(table: TableName) {
       if (isLocal) {
         const res = await fetch(`${getLocalApiBase()}/rest/v1/${table}?id=eq.${id}`, {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Prefer': 'return=representation',
-          },
+          headers: getLocalHeaders({ 'Prefer': 'return=representation' }),
           body: JSON.stringify(updates),
         });
         if (!res.ok) {
@@ -197,6 +197,7 @@ export function useDeleteMutation(table: TableName) {
       if (isLocal) {
         const res = await fetch(`${getLocalApiBase()}/rest/v1/${table}?id=eq.${id}`, {
           method: 'DELETE',
+          headers: getLocalHeaders(),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({ message: 'Erro ao remover' }));

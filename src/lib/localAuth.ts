@@ -62,9 +62,12 @@ export async function updateUserPassword(password: string): Promise<{ error: str
  */
 export async function fetchTableData(table: string): Promise<any[]> {
   if (isLocalInstallation()) {
+    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
     const res = await fetch(
       `${getLocalApiBase()}/rest/v1/${table}?select=*`,
-      { headers: { 'Content-Type': 'application/json' } }
+      { headers }
     );
     if (!res.ok) return [];
     return res.json();
@@ -79,13 +82,15 @@ export async function fetchTableData(table: string): Promise<any[]> {
  */
 export async function upsertTableData(table: string, row: Record<string, unknown>): Promise<{ error: boolean }> {
   if (isLocalInstallation()) {
-    // Try PATCH first (upsert via PostgREST)
+    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates,return=representation',
+    };
+    if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
     const res = await fetch(`${getLocalApiBase()}/rest/v1/${table}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates,return=representation',
-      },
+      headers,
       body: JSON.stringify(row),
     });
     return { error: !res.ok };
@@ -99,9 +104,12 @@ export async function upsertTableData(table: string, row: Record<string, unknown
  */
 export async function countTableRows(table: string): Promise<number> {
   if (isLocalInstallation()) {
+    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Prefer': 'count=exact' };
+    if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
     const res = await fetch(
       `${getLocalApiBase()}/rest/v1/${table}?select=id&limit=1`,
-      { headers: { 'Content-Type': 'application/json', 'Prefer': 'count=exact' } }
+      { headers }
     );
     const contentRange = res.headers.get('content-range');
     if (contentRange) {
