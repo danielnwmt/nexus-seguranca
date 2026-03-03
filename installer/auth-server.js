@@ -561,7 +561,7 @@ const server = http.createServer(async (req, res) => {
             try {
               const arch = execSync('dpkg --print-architecture 2>/dev/null || echo amd64').toString().trim();
               const mtxArch = arch === 'arm64' ? 'arm64v8' : 'amd64';
-              execSync(`wget -q https://github.com/bluenviron/mediamtx/releases/latest/download/mediamtx_v1.12.2_linux_${mtxArch}.tar.gz -O /tmp/mediamtx.tar.gz`, { timeout: 60000 });
+              execSync(`wget -q https://github.com/bluenviron/mediamtx/releases/download/v1.9.3/mediamtx_v1.9.3_linux_${mtxArch}.tar.gz -O /tmp/mediamtx.tar.gz`, { timeout: 120000 });
               sendEvent('download', 'success', 'Download concluído');
               
               sendEvent('extract', 'info', 'Extraindo e instalando...');
