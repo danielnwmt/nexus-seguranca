@@ -540,7 +540,7 @@ const server = http.createServer(async (req, res) => {
       if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
       const token = authHeader.replace('Bearer ', '');
       const payload = verifyJWT(token);
-      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+      if (!payload?.sub) return sendJSON(res, 401, { error: 'Invalid token' });
 
       // Verificar se é admin
       const adminCheck = await pool.query(
@@ -549,17 +549,18 @@ const server = http.createServer(async (req, res) => {
       if (adminCheck.rows.length === 0) return sendJSON(res, 403, { error: 'Admin access required' });
 
       try {
-        const usersResult = await pool.query('SELECT id, email, raw_user_meta_data, created_at, banned_until FROM auth.users ORDER BY created_at DESC');
-        const rolesResult = await pool.query('SELECT * FROM user_roles');
+        const usersResult = await pool.query('SELECT id, email, raw_user_meta_data, created_at FROM auth.users ORDER BY created_at DESC');
+        const rolesResult = await pool.query('SELECT user_id, role FROM user_roles');
 
         const users = usersResult.rows.map(u => {
           const userRole = rolesResult.rows.find(r => r.user_id === u.id);
+          const meta = u.raw_user_meta_data || {};
           return {
             id: u.id,
             email: u.email,
-            name: (u.raw_user_meta_data && u.raw_user_meta_data.name) || u.email.split('@')[0] || '',
+            name: meta.name || u.email.split('@')[0] || '',
             level: userRole ? userRole.role : 'n1',
-            active: !u.banned_until || new Date(u.banned_until) < new Date(),
+            active: meta.active !== false,
             created_at: u.created_at,
           };
         });
@@ -572,7 +573,7 @@ const server = http.createServer(async (req, res) => {
       if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
       const token = authHeader.replace('Bearer ', '');
       const payload = verifyJWT(token);
-      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+      if (!payload?.sub) return sendJSON(res, 401, { error: 'Invalid token' });
 
       const adminCheck = await pool.query(
         "SELECT role FROM user_roles WHERE user_id = $1 AND role = 'admin'", [payload.sub]
@@ -594,15 +595,13 @@ const server = http.createServer(async (req, res) => {
           const result = await pool.query(
             `INSERT INTO auth.users (email, encrypted_password, email_confirmed_at, raw_user_meta_data)
              VALUES ($1, crypt($2, gen_salt('bf')), NOW(), $3::jsonb) RETURNING id`,
-            [email, password, JSON.stringify({ name: (name || '').slice(0, 100), force_password_change: true })]
+            [email, password, JSON.stringify({ name: (name || '').slice(0, 100), force_password_change: true, active: true })]
           );
           const newUserId = result.rows[0].id;
 
-          // Inserir role
-          await pool.query(
-            'INSERT INTO user_roles (user_id, role) VALUES ($1, $2) ON CONFLICT (user_id, role) DO NOTHING',
-            [newUserId, userLevel]
-          );
+          // Garantir uma única role para o usuário
+          await pool.query('DELETE FROM user_roles WHERE user_id = $1', [newUserId]);
+          await pool.query('INSERT INTO user_roles (user_id, role) VALUES ($1, $2)', [newUserId, userLevel]);
 
           return sendJSON(res, 200, { success: true, user_id: newUserId });
         }
@@ -615,22 +614,20 @@ const server = http.createServer(async (req, res) => {
             return sendJSON(res, 400, { error: 'Cannot demote yourself' });
           }
 
-          // Atualizar metadata
+          // Atualizar metadata (schema local não possui banned_until)
           await pool.query(
-            `UPDATE auth.users SET raw_user_meta_data = jsonb_set(COALESCE(raw_user_meta_data, '{}'), '{name}', $1::jsonb), 
-             banned_until = $2,
-             updated_at = NOW() WHERE id = $3`,
-            [JSON.stringify((name || '').slice(0, 100)), active === false ? '2099-01-01' : null, user_id]
+            `UPDATE auth.users
+             SET raw_user_meta_data = COALESCE(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object('name', $1::text, 'active', $2::boolean),
+                 updated_at = NOW()
+             WHERE id = $3`,
+            [(name || '').slice(0, 100), active !== false, user_id]
           );
 
-          // Atualizar role
+          // Atualizar role com modelo de role única
           const validLevels = ['admin', 'n1', 'n2', 'n3'];
           if (level && validLevels.includes(level)) {
-            await pool.query(
-              `INSERT INTO user_roles (user_id, role) VALUES ($1, $2) 
-               ON CONFLICT (user_id) DO UPDATE SET role = $2`,
-              [user_id, level]
-            );
+            await pool.query('DELETE FROM user_roles WHERE user_id = $1', [user_id]);
+            await pool.query('INSERT INTO user_roles (user_id, role) VALUES ($1, $2)', [user_id, level]);
           }
 
           return sendJSON(res, 200, { success: true });
