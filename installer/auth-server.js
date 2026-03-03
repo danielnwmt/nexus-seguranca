@@ -608,6 +608,15 @@ WantedBy=multi-user.target
             fs.writeFileSync('/tmp/mediamtx.service', serviceContent);
             execSync('sudo mv /tmp/mediamtx.service /etc/systemd/system/mediamtx.service && sudo systemctl daemon-reload && sudo systemctl enable mediamtx && sudo systemctl start mediamtx', { timeout: 15000 });
             sendEvent('service', 'success', 'Serviço MediaMTX criado e iniciado');
+
+            // Liberar portas no firewall
+            sendEvent('firewall', 'info', 'Liberando portas no firewall...');
+            try {
+              execSync('sudo ufw allow 1935/tcp comment "RTMP MediaMTX" && sudo ufw allow 8554/tcp comment "RTSP MediaMTX" && sudo ufw allow 8888/tcp comment "HLS MediaMTX" && sudo ufw allow 8889/tcp comment "WebRTC MediaMTX" && sudo ufw reload', { timeout: 15000 });
+              sendEvent('firewall', 'success', 'Portas 1935, 8554, 8888, 8889 liberadas');
+            } catch (e) {
+              sendEvent('firewall', 'warn', 'Não foi possível liberar portas automaticamente: ' + e.message);
+            }
           } catch (e) {
             sendEvent('service', 'error', 'Falha ao criar serviço: ' + e.message);
           }

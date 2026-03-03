@@ -223,48 +223,10 @@ npm install pg > /dev/null 2>&1
 ok "Auth Server configurado"
 
 # ----------------------------------------------------------
-# 8. Instalar MediaMTX (Servidor de Midia)
+# 8. MediaMTX (Servidor de Midia) - Instalado via painel web
 # ----------------------------------------------------------
-step "Instalando MediaMTX (servidor de midia)..."
-
-MEDIAMTX_DIR="$INSTALL_DIR/mediamtx"
-MEDIAMTX_BIN="$MEDIAMTX_DIR/mediamtx"
-
-if [ -f "$MEDIAMTX_BIN" ]; then
-  ok "MediaMTX ja instalado"
-else
-  mkdir -p "$MEDIAMTX_DIR"
-  ARCH=$(uname -m)
-  if [ "$ARCH" = "x86_64" ]; then
-    MEDIAMTX_URL="https://github.com/bluenviron/mediamtx/releases/download/v1.9.3/mediamtx_v1.9.3_linux_amd64.tar.gz"
-  elif [ "$ARCH" = "aarch64" ]; then
-    MEDIAMTX_URL="https://github.com/bluenviron/mediamtx/releases/download/v1.9.3/mediamtx_v1.9.3_linux_arm64v8.tar.gz"
-  else
-    err "Arquitetura $ARCH nao suportada para MediaMTX"
-  fi
-
-  wget -q "$MEDIAMTX_URL" -O /tmp/mediamtx.tar.gz
-  tar xf /tmp/mediamtx.tar.gz -C "$MEDIAMTX_DIR"
-  rm -f /tmp/mediamtx.tar.gz
-  chmod +x "$MEDIAMTX_BIN"
-  ok "MediaMTX instalado"
-fi
-
-# Copiar config personalizada
-MEDIAMTX_CFG_SRC="$SCRIPT_DIR/installer/mediamtx.yml"
-[ ! -f "$MEDIAMTX_CFG_SRC" ] && MEDIAMTX_CFG_SRC="$INSTALL_DIR/installer/mediamtx.yml"
-if [ -f "$MEDIAMTX_CFG_SRC" ]; then
-  cp "$MEDIAMTX_CFG_SRC" "$MEDIAMTX_DIR/mediamtx.yml"
-  ok "Configuracao MediaMTX copiada"
-fi
-
-# Registrar servidor de midia no banco automaticamente
-sudo -u postgres psql -d nexus -c "
-  INSERT INTO public.media_servers (name, ip_address, instances, rtmp_base_port, hls_base_port, webrtc_base_port, status, os)
-  VALUES ('Servidor Local', '$LOCAL_IP', 1, 1935, 8888, 8889, 'active', 'linux')
-  ON CONFLICT DO NOTHING;
-" > /dev/null 2>&1 || warn "Nao foi possivel registrar servidor de midia automaticamente"
-ok "Servidor de midia registrado (IP: $LOCAL_IP)"
+step "MediaMTX sera instalado via painel web apos o login..."
+ok "Acesse Configuracoes > Servidores de Midia > Cadastrar e Instalar"
 
 # ----------------------------------------------------------
 # 8.2 Instalar ffmpeg (para captura de frames IA)
@@ -406,10 +368,7 @@ step "Configurando firewall..."
 ufw allow $PORT/tcp > /dev/null 2>&1
 ufw allow $API_PORT/tcp comment "Auth API" > /dev/null 2>&1
 ufw allow $POSTGREST_PORT/tcp comment "PostgREST API" > /dev/null 2>&1
-ufw allow 1935/tcp comment "RTMP MediaMTX" > /dev/null 2>&1
-ufw allow 8554/tcp comment "RTSP MediaMTX" > /dev/null 2>&1
-ufw allow 8888/tcp comment "HLS MediaMTX" > /dev/null 2>&1
-ufw allow 8889/tcp comment "WebRTC MediaMTX" > /dev/null 2>&1
+# Portas MediaMTX serao liberadas quando instalado via painel web
 ufw --force enable > /dev/null 2>&1
 ufw reload > /dev/null 2>&1
 ok "Portas liberadas: $PORT, $API_PORT, $POSTGREST_PORT, 1935, 8554, 8888, 8889"
@@ -458,24 +417,7 @@ User=root
 WantedBy=multi-user.target
 EOF
 
-# MediaMTX
-cat > /etc/systemd/system/nexus-mediamtx.service << EOF
-[Unit]
-Description=Nexus - MediaMTX (Servidor de Midia RTMP/RTSP/HLS)
-After=network.target
-
-[Service]
-Type=simple
-WorkingDirectory=$MEDIAMTX_DIR
-ExecStart=$MEDIAMTX_BIN $MEDIAMTX_DIR/mediamtx.yml
-Restart=always
-RestartSec=5
-User=nobody
-LimitNOFILE=65536
-
-[Install]
-WantedBy=multi-user.target
-EOF
+# MediaMTX - servico criado via painel web (Cadastrar e Instalar)
 
 # Analytics IA
 cat > /etc/systemd/system/nexus-analytics.service << EOF
@@ -508,10 +450,10 @@ EOF
 
 # Recarregar e ativar
 systemctl daemon-reload
-systemctl enable nexus-postgrest nexus-auth nexus-mediamtx nexus-analytics > /dev/null 2>&1
+systemctl enable nexus-postgrest nexus-auth nexus-analytics > /dev/null 2>&1
 systemctl start nexus-postgrest
 systemctl start nexus-auth
-systemctl start nexus-mediamtx
+# MediaMTX iniciado via painel web
 systemctl start nexus-analytics
 ok "4 servicos criados e iniciados (inicio automatico)"
 
@@ -526,15 +468,16 @@ echo "Iniciando Nexus Monitoramento..."
 sudo systemctl start postgresql
 sudo systemctl start nexus-postgrest
 sudo systemctl start nexus-auth
-sudo systemctl start nexus-mediamtx
 sudo systemctl start nexus-analytics
 sudo systemctl start nginx
+# Iniciar MediaMTX se estiver instalado
+if systemctl list-unit-files | grep -q mediamtx; then
+  sudo systemctl start mediamtx
+  echo "MediaMTX iniciado"
+fi
 echo "Todos os servicos iniciados!"
 echo ""
 echo "Frontend:    http://localhost:PORT_PLACEHOLDER"
-echo "RTMP:        rtmp://localhost:1935/{camera}"
-echo "HLS:         http://localhost:8888/{camera}/"
-echo "Analytics IA: ATIVO (analise em tempo real)"
 SCRIPT
 sed -i "s|PORT_PLACEHOLDER|$PORT|" "$INSTALL_DIR/iniciar-nexus.sh"
 
@@ -542,7 +485,9 @@ cat > "$INSTALL_DIR/parar-nexus.sh" << 'SCRIPT'
 #!/bin/bash
 echo "Parando Nexus Monitoramento..."
 sudo systemctl stop nexus-analytics
-sudo systemctl stop nexus-mediamtx
+if systemctl list-unit-files | grep -q mediamtx; then
+  sudo systemctl stop mediamtx
+fi
 sudo systemctl stop nexus-auth
 sudo systemctl stop nexus-postgrest
 echo "Servicos parados."
@@ -552,7 +497,7 @@ cat > "$INSTALL_DIR/status-nexus.sh" << 'SCRIPT'
 #!/bin/bash
 echo "========== STATUS NEXUS MONITORAMENTO =========="
 echo ""
-for svc in postgresql nginx nexus-postgrest nexus-auth nexus-mediamtx nexus-analytics; do
+for svc in postgresql nginx nexus-postgrest nexus-auth nexus-analytics mediamtx; do
   STATUS=$(systemctl is-active "$svc" 2>/dev/null)
   if [ "$STATUS" = "active" ]; then
     echo -e "  \033[0;32m● $svc\033[0m"
@@ -629,16 +574,11 @@ echo -e "  ${CYAN}COMPONENTES INSTALADOS:${NC}"
 echo -e "  - PostgreSQL........: localhost:5432"
 echo -e "  - PostgREST (API)...: localhost:$POSTGREST_PORT"
 echo -e "  - Auth Server.......: localhost:$API_PORT"
-echo -e "  - MediaMTX (Midia)..: RTMP :1935 | RTSP :8554 | HLS :8888"
 echo -e "  - Nginx (Frontend)..: localhost:$PORT"
 echo ""
 echo -e "  ${CYAN}SERVIDOR DE MIDIA (MediaMTX):${NC}"
-echo -e "  Enviar stream RTMP:"
-echo -e "    rtmp://$LOCAL_IP:1935/{nome_camera}"
-echo -e "  Enviar stream RTSP:"
-echo -e "    rtsp://$LOCAL_IP:8554/{nome_camera}"
-echo -e "  Assistir no browser (HLS):"
-echo -e "    http://$LOCAL_IP:8888/{nome_camera}/"
+echo -e "  Instale via painel web: Configuracoes > Servidores de Midia"
+echo -e "  Use o botao 'Cadastrar e Instalar' para instalacao automatica"
 echo ""
 echo -e "  ${CYAN}ACESSO:${NC}"
 echo -e "  URL:    http://$LOCAL_IP:$PORT"
@@ -654,7 +594,6 @@ echo ""
 echo -e "  ${CYAN}SERVICOS SYSTEMD:${NC}"
 echo -e "  sudo systemctl status nexus-postgrest"
 echo -e "  sudo systemctl status nexus-auth"
-echo -e "  sudo systemctl status nexus-mediamtx"
 echo ""
 echo -e "  ${YELLOW}⚠️  Troque a senha do admin apos o primeiro login!${NC}"
 echo ""
