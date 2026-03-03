@@ -320,9 +320,8 @@ CREATE TABLE IF NOT EXISTS public.bank_configs_audit (
 
 CREATE TABLE IF NOT EXISTS public.user_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  role app_role DEFAULT 'admin',
-  UNIQUE(user_id, role)
+  user_id UUID NOT NULL UNIQUE,
+  role app_role DEFAULT 'n1'
 );
 
 -- 5. Funcoes auxiliares
@@ -391,9 +390,11 @@ DECLARE
 BEGIN
   SELECT COUNT(*) INTO user_count FROM public.user_roles;
   IF user_count = 0 THEN
-    INSERT INTO public.user_roles (user_id, role) VALUES (NEW.id, 'admin');
+    INSERT INTO public.user_roles (user_id, role) VALUES (NEW.id, 'admin')
+    ON CONFLICT (user_id) DO UPDATE SET role = 'admin';
   ELSE
-    INSERT INTO public.user_roles (user_id, role) VALUES (NEW.id, 'n1');
+    INSERT INTO public.user_roles (user_id, role) VALUES (NEW.id, 'n1')
+    ON CONFLICT (user_id) DO NOTHING;
   END IF;
   RETURN NEW;
 END;
@@ -545,7 +546,7 @@ ON CONFLICT (email) DO UPDATE SET
 -- Garantir que o admin tem role (trigger pode nao disparar em ON CONFLICT UPDATE)
 INSERT INTO public.user_roles (user_id, role)
 SELECT id, 'admin'::app_role FROM auth.users WHERE email = 'admin@protenexus.com'
-ON CONFLICT DO NOTHING;
+ON CONFLICT (user_id) DO UPDATE SET role = 'admin'::app_role;
 
 -- 10. Funcao de login (retorna JWT claims)
 CREATE OR REPLACE FUNCTION public.login(email TEXT, pass TEXT)

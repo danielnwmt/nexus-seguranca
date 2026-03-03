@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { isLocalInstallation } from '@/hooks/useLocalApi';
 import { useTableQuery, usePaginatedQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
 import ClientCameraViewer from '@/components/clients/ClientCameraViewer';
 
@@ -69,6 +70,8 @@ const Clients = () => {
   const totalCount = result?.count || 0;
 
   const createClientFolder = async (clientName: string, clientId: string) => {
+    // Skip storage folder creation on local installations (no Supabase Storage)
+    if (isLocalInstallation()) return;
     try {
       const folderName = clientName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       const placeholder = new Blob([''], { type: 'text/plain' });

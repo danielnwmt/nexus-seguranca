@@ -40,9 +40,19 @@ const Login = () => {
       setIsRateLimited(false);
       setRemainingAttempts(null);
       
-      // For local installations, check user_metadata from the auth response directly
+      // Check force_password_change for both local and cloud
       if (isLocalInstallation()) {
-        // User metadata is already set in context; redirect
+        const stored = localStorage.getItem('nexus-local-session');
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (parsed.user?.user_metadata?.force_password_change) {
+              navigate('/reset-password');
+              setLoading(false);
+              return;
+            }
+          } catch {}
+        }
         navigate('/');
       } else {
         const { data: { user } } = await supabase.auth.getUser();
