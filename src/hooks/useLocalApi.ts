@@ -31,19 +31,29 @@ function isLegacyTable(table: string): boolean {
  * Usa endpoints legados para media_servers/storage_servers
  * Usa proxy PostgREST (/rest/v1/) para todas as outras tabelas
  */
+function getLocalAuthHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extra };
+  try {
+    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    if (session.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+  } catch {}
+  return headers;
+}
+
 export function useLocalTableQuery<T = any>(table: string, orderBy = 'created_at', ascending = false) {
   return useQuery<T[]>({
     queryKey: ['local', table],
     queryFn: async () => {
       if (isLegacyTable(table)) {
-        const res = await fetch(`${getLocalApiBase()}/api/local/${LEGACY_ENDPOINTS[table]}`);
+        const res = await fetch(`${getLocalApiBase()}/api/local/${LEGACY_ENDPOINTS[table]}`, { headers: getLocalAuthHeaders() });
         if (!res.ok) throw new Error(`Erro ao buscar ${table}`);
         return res.json();
       }
-      // Usar proxy PostgREST
       const res = await fetch(
         `${getLocalApiBase()}/rest/v1/${table}?select=*&order=${orderBy}.${ascending ? 'asc' : 'desc'}`,
-        { headers: { 'Content-Type': 'application/json' } }
+        { headers: getLocalAuthHeaders() }
       );
       if (!res.ok) throw new Error(`Erro ao buscar ${table}`);
       return res.json();
@@ -98,12 +108,7 @@ export function useLocalPaginatedQuery<T = any>(
 
       const res = await fetch(
         `${getLocalApiBase()}/rest/v1/${table}?${params.toString()}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Prefer': 'count=exact',
-          },
-        }
+        { headers: getLocalAuthHeaders({ 'Prefer': 'count=exact' }) }
       );
       if (!res.ok) throw new Error(`Erro ao buscar ${table}`);
 
@@ -135,7 +140,7 @@ export function useLocalInsertMutation(table: string) {
       if (isLegacyTable(table)) {
         const res = await fetch(`${getLocalApiBase()}/api/local/${LEGACY_ENDPOINTS[table]}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getLocalAuthHeaders(),
           body: JSON.stringify(data),
         });
         if (!res.ok) {
@@ -144,13 +149,9 @@ export function useLocalInsertMutation(table: string) {
         }
         return res.json();
       }
-      // Proxy PostgREST
       const res = await fetch(`${getLocalApiBase()}/rest/v1/${table}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation',
-        },
+        headers: getLocalAuthHeaders({ 'Prefer': 'return=representation' }),
         body: JSON.stringify(data),
       });
       if (!res.ok) {
@@ -175,7 +176,7 @@ export function useLocalUpdateMutation(table: string) {
       if (isLegacyTable(table)) {
         const res = await fetch(`${getLocalApiBase()}/api/local/${LEGACY_ENDPOINTS[table]}/${id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getLocalAuthHeaders(),
           body: JSON.stringify(rest),
         });
         if (!res.ok) {
@@ -184,13 +185,9 @@ export function useLocalUpdateMutation(table: string) {
         }
         return res.json();
       }
-      // Proxy PostgREST
       const res = await fetch(`${getLocalApiBase()}/rest/v1/${table}?id=eq.${id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation',
-        },
+        headers: getLocalAuthHeaders({ 'Prefer': 'return=representation' }),
         body: JSON.stringify(rest),
       });
       if (!res.ok) {
@@ -216,7 +213,7 @@ export function useLocalPatchMutation(table: string) {
         const endpoint = LEGACY_ENDPOINTS[table];
         const res = await fetch(`${getLocalApiBase()}/api/local/${endpoint}/${id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getLocalAuthHeaders(),
           body: JSON.stringify(rest),
         });
         if (!res.ok) {
@@ -225,13 +222,9 @@ export function useLocalPatchMutation(table: string) {
         }
         return res.json();
       }
-      // Proxy PostgREST
       const res = await fetch(`${getLocalApiBase()}/rest/v1/${table}?id=eq.${id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation',
-        },
+        headers: getLocalAuthHeaders({ 'Prefer': 'return=representation' }),
         body: JSON.stringify(rest),
       });
       if (!res.ok) {
@@ -255,6 +248,7 @@ export function useLocalDeleteMutation(table: string) {
       if (isLegacyTable(table)) {
         const res = await fetch(`${getLocalApiBase()}/api/local/${LEGACY_ENDPOINTS[table]}/${id}`, {
           method: 'DELETE',
+          headers: getLocalAuthHeaders(),
         });
         if (!res.ok) {
           const err = await res.json();
@@ -262,9 +256,9 @@ export function useLocalDeleteMutation(table: string) {
         }
         return res.json();
       }
-      // Proxy PostgREST
       const res = await fetch(`${getLocalApiBase()}/rest/v1/${table}?id=eq.${id}`, {
         method: 'DELETE',
+        headers: getLocalAuthHeaders(),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: 'Erro ao remover' }));
