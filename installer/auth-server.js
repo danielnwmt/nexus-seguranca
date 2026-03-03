@@ -998,7 +998,7 @@ WantedBy=multi-user.target
 
     // ---- CREATE STORAGE PATH: Criar pasta de gravação no servidor ----
     if (path === '/api/storage/create-path' && req.method === 'POST') {
-      const body = await parseBody(req);
+      const body = await readBody(req);
       const { storage_path } = body;
       if (!storage_path || typeof storage_path !== 'string') {
         return sendJSON(res, 400, { error: 'Caminho inválido' });
