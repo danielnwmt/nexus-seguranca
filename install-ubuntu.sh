@@ -129,6 +129,13 @@ sudo -u postgres psql -d nexus -c "
     raw_user_meta_data = '{\"force_password_change\": true}'::jsonb,
     updated_at = now();
 " > /dev/null 2>&1
+
+# Garantir que o admin tem role na tabela user_roles
+sudo -u postgres psql -d nexus -c "
+  INSERT INTO public.user_roles (user_id, role)
+  SELECT id, 'admin'::app_role FROM auth.users WHERE email = '$ADMIN_EMAIL'
+  ON CONFLICT (user_id, role) DO NOTHING;
+" > /dev/null 2>&1
 ok "Usuario admin criado: $ADMIN_EMAIL / senha: $ADMIN_PASSWORD"
 
 # ----------------------------------------------------------
