@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
 import { supabase } from '@/integrations/supabase/client';
+import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import PatrolRouteMap from '@/components/guards/PatrolRouteMap';
 
@@ -87,9 +88,17 @@ const Guards = () => {
   const [transferTargetGuard, setTransferTargetGuard] = useState<string>('');
 
   // Fetch patrol routes
+  const isLocal = isLocalInstallation();
   const { data: patrolRoutes = [] } = useQuery({
-    queryKey: ['patrol_routes'],
+    queryKey: isLocal ? ['local', 'patrol_routes'] : ['patrol_routes'],
     queryFn: async () => {
+      if (isLocal) {
+        const res = await fetch(`${getLocalApiBase()}/rest/v1/patrol_routes?select=*&order=created_at.desc`, {
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) throw new Error('Erro ao buscar rotas');
+        return res.json();
+      }
       const { data, error } = await (supabase.from('patrol_routes') as any).select('*').order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
@@ -206,16 +215,26 @@ const Guards = () => {
       return;
     }
     try {
-      const { error } = await (supabase.from('patrol_routes') as any).insert({
+      const routeData = {
         guard_id: selectedGuardForRoute.id,
         client_id: selectedRouteClient || null,
         name: routeName,
         waypoints: routeWaypoints,
         city: selectedGuardForRoute?.city || null,
-      });
-      if (error) throw error;
+      };
+      if (isLocal) {
+        const res = await fetch(`${getLocalApiBase()}/rest/v1/patrol_routes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+          body: JSON.stringify(routeData),
+        });
+        if (!res.ok) throw new Error('Erro ao salvar rota');
+      } else {
+        const { error } = await (supabase.from('patrol_routes') as any).insert(routeData);
+        if (error) throw error;
+      }
       toast({ title: 'Rota de ronda salva com sucesso' });
-      queryClient.invalidateQueries({ queryKey: ['patrol_routes'] });
+      queryClient.invalidateQueries({ queryKey: isLocal ? ['local', 'patrol_routes'] : ['patrol_routes'] });
       setRouteDialogOpen(false);
     } catch {
       toast({ title: 'Erro ao salvar rota', variant: 'destructive' });
@@ -224,10 +243,15 @@ const Guards = () => {
 
   const handleDeleteRoute = async (routeId: string) => {
     try {
-      const { error } = await (supabase.from('patrol_routes') as any).delete().eq('id', routeId);
-      if (error) throw error;
+      if (isLocal) {
+        const res = await fetch(`${getLocalApiBase()}/rest/v1/patrol_routes?id=eq.${routeId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Erro ao remover');
+      } else {
+        const { error } = await (supabase.from('patrol_routes') as any).delete().eq('id', routeId);
+        if (error) throw error;
+      }
       toast({ title: 'Rota removida' });
-      queryClient.invalidateQueries({ queryKey: ['patrol_routes'] });
+      queryClient.invalidateQueries({ queryKey: isLocal ? ['local', 'patrol_routes'] : ['patrol_routes'] });
       if (viewRouteGuard?.routeId === routeId) setViewRouteGuard(null);
     } catch {
       toast({ title: 'Erro ao remover', variant: 'destructive' });
@@ -239,12 +263,22 @@ const Guards = () => {
     if (!transferRoute || !transferTargetGuard) return;
     try {
       const targetGuard = guards.find((g: any) => g.id === transferTargetGuard);
-      const { error } = await (supabase.from('patrol_routes') as any)
-        .update({ guard_id: transferTargetGuard, city: targetGuard?.city || transferRoute.city })
-        .eq('id', transferRoute.id);
-      if (error) throw error;
+      const updateData = { guard_id: transferTargetGuard, city: targetGuard?.city || transferRoute.city };
+      if (isLocal) {
+        const res = await fetch(`${getLocalApiBase()}/rest/v1/patrol_routes?id=eq.${transferRoute.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+          body: JSON.stringify(updateData),
+        });
+        if (!res.ok) throw new Error('Erro ao transferir');
+      } else {
+        const { error } = await (supabase.from('patrol_routes') as any)
+          .update(updateData)
+          .eq('id', transferRoute.id);
+        if (error) throw error;
+      }
       toast({ title: 'Rota transferida', description: `Rota transferida para ${targetGuard?.name}` });
-      queryClient.invalidateQueries({ queryKey: ['patrol_routes'] });
+      queryClient.invalidateQueries({ queryKey: isLocal ? ['local', 'patrol_routes'] : ['patrol_routes'] });
     } catch {
       toast({ title: 'Erro ao transferir rota', variant: 'destructive' });
     }

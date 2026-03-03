@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { fetchTableData, upsertTableData, countTableRows } from '@/lib/localAuth';
 
 // Todas as tabelas do sistema para backup completo
 const ALL_TABLES = [
@@ -65,8 +65,8 @@ const BackupSettings = () => {
   const fetchAllData = async () => {
     const data: Record<string, any[]> = {};
     for (const table of ALL_TABLES) {
-      const { data: rows, error } = await supabase.from(table as any).select('*');
-      if (!error && rows) {
+      const rows = await fetchTableData(table);
+      if (rows.length > 0) {
         data[table] = rows;
       }
     }
@@ -154,22 +154,9 @@ const BackupSettings = () => {
 
     setRestoring(true);
     try {
-      // 1. Verificar se já existem clientes cadastrados
-      const { data: existingClients, error: clientError } = await supabase
-        .from('clients')
-        .select('id', { count: 'exact', head: true });
+      const count = await countTableRows('clients');
 
-      if (clientError) {
-        toast({ title: 'Erro ao verificar servidor', description: 'Não foi possível verificar os dados existentes.', variant: 'destructive' });
-        setRestoring(false);
-        return;
-      }
-
-      const clientCount = (existingClients as any)?.length ?? 0;
-      // Usar count do header via workaround
-      const { count } = await supabase.from('clients').select('id', { count: 'exact', head: true });
-
-      if (count && count > 0) {
+      if (count > 0) {
         toast({
           title: '⛔ Restauração bloqueada',
           description: `Este servidor já possui ${count} cliente(s) cadastrado(s). A restauração só é permitida em servidores sem nenhum cliente para evitar conflitos de dados.`,
@@ -179,7 +166,7 @@ const BackupSettings = () => {
         return;
       }
 
-      // 2. Validar arquivo
+      // Validar arquivo
       const text = await restoreFile.text();
 
       if (restoreFile.size > 10 * 1024 * 1024) {
@@ -203,10 +190,7 @@ const BackupSettings = () => {
         return;
       }
 
-      // Remover metadados do backup
       const { _meta, ...tableData } = data as any;
-
-      // Only allow safe tables (exclude user_roles to prevent privilege escalation)
       const safeTables = ALL_TABLES as readonly string[];
       const tablesToRestore = Object.keys(tableData).filter(k => safeTables.includes(k));
 
@@ -216,27 +200,13 @@ const BackupSettings = () => {
         return;
       }
 
-      // 3. Restaurar dados - ordem importante (tabelas sem FK primeiro)
       const restoreOrder = [
-        'company_settings',
-        'storage_servers',
-        'media_servers',
-        'bank_configs',
-        'clients',
-        'guards',
-        'installers',
-        'cameras',
-        'alarms',
-        'analytics_events',
-        'invoices',
-        'bills',
-        'service_orders',
-        'recordings',
-        'patrol_routes',
+        'company_settings', 'storage_servers', 'media_servers', 'bank_configs',
+        'clients', 'guards', 'installers', 'cameras', 'alarms',
+        'analytics_events', 'invoices', 'bills', 'service_orders', 'recordings', 'patrol_routes',
       ];
 
       const orderedTables = restoreOrder.filter(t => tablesToRestore.includes(t));
-
       let restored = 0;
       let errors = 0;
 
@@ -254,7 +224,6 @@ const BackupSettings = () => {
             errors++;
             continue;
           }
-          // Sanitize: only allow string, number, boolean, null, arrays
           const sanitized: Record<string, unknown> = {};
           for (const [key, val] of Object.entries(record)) {
             if (val === null || typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
@@ -263,7 +232,7 @@ const BackupSettings = () => {
               sanitized[key] = val;
             }
           }
-          const { error } = await supabase.from(table as any).upsert(sanitized as any, { onConflict: 'id' });
+          const { error } = await upsertTableData(table, sanitized);
           if (error) errors++;
           else restored++;
         }
@@ -462,17 +431,18 @@ const BackupSettings = () => {
             </div>
           </div>
 
-          {exportTarget === 'local' ? (
-            <Button onClick={handleExport} disabled={loading} className="w-full gap-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              {loading ? 'Exportando...' : 'Baixar Backup Completo'}
-            </Button>
-          ) : (
-            <Button onClick={handleSaveAllSettings} className="w-full gap-2">
-              <Save className="w-4 h-4" />
-              Salvar Configurações
-            </Button>
-          )}
+          <div className="flex gap-2">
+            {exportTarget === 'local' ? (
+              <Button onClick={handleExport} disabled={loading} className="gap-2">
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                {loading ? 'Exportando...' : 'Baixar Backup Completo'}
+              </Button>
+            ) : (
+              <Button onClick={handleSaveAllSettings} className="gap-2">
+                <Cloud className="w-4 h-4" /> Salvar e Enviar para Nuvem
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

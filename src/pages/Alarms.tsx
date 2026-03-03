@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTableQuery, useInsertMutation, useUpdateMutation } from '@/hooks/useSupabaseQuery';
 import { supabase } from '@/integrations/supabase/client';
+import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
+import { useQueryClient } from '@tanstack/react-query';
 
 const Alarms = () => {
   const { data: alarms = [], isLoading } = useTableQuery('alarms');
@@ -15,6 +17,8 @@ const Alarms = () => {
   const { data: clients = [] } = useTableQuery('clients');
   const insertMutation = useInsertMutation('alarms');
   const updateMutation = useUpdateMutation('alarms');
+  const queryClient = useQueryClient();
+  const isLocal = isLocalInstallation();
 
   const [filterSeverity, setFilterSeverity] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -39,11 +43,21 @@ const Alarms = () => {
 
   const handleAcknowledgeAll = async () => {
     const activeAlarms = alarms.filter((a: any) => !a.acknowledged);
-    for (const alarm of activeAlarms) {
-      await supabase.from('alarms').update({ acknowledged: true }).eq('id', (alarm as any).id);
+    if (isLocal) {
+      for (const alarm of activeAlarms) {
+        await fetch(`${getLocalApiBase()}/rest/v1/alarms?id=eq.${(alarm as any).id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+          body: JSON.stringify({ acknowledged: true }),
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['local', 'alarms'] });
+    } else {
+      for (const alarm of activeAlarms) {
+        await supabase.from('alarms').update({ acknowledged: true }).eq('id', (alarm as any).id);
+      }
+      queryClient.invalidateQueries({ queryKey: ['alarms'] });
     }
-    // Refetch
-    window.location.reload();
   };
 
   const handleAddAlarm = () => {

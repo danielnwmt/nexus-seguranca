@@ -669,6 +669,28 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { return sendJSON(res, 500, { error: e.message }); }
     }
 
+    // ---- UPDATE PASSWORD (local) ----
+    if (path === '/api/local/update-password' && req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+
+      const body = await readBody(req);
+      if (!body.password || body.password.length < 8) return sendJSON(res, 400, { error: 'Senha deve ter pelo menos 8 caracteres' });
+
+      try {
+        await pool.query(
+          `UPDATE auth.users SET encrypted_password = crypt($1, gen_salt('bf')),
+           raw_user_meta_data = jsonb_set(COALESCE(raw_user_meta_data, '{}'), '{force_password_change}', 'false'),
+           updated_at = NOW() WHERE id = $2`,
+          [body.password, payload.sub]
+        );
+        return sendJSON(res, 200, { success: true });
+      } catch (e) { return sendJSON(res, 500, { error: e.message }); }
+    }
+
     // ---- INSTALAR MediaMTX via SSE ----
     if (path === '/api/media-servers/install' && req.method === 'POST') {
       const body = await readBody(req);
