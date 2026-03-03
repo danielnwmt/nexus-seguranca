@@ -738,7 +738,25 @@ const server = http.createServer(async (req, res) => {
               execSync(`sudo cp ${configSrc} ${configDst}`);
               sendEvent('config', 'success', 'Configuração copiada');
             } else {
+              // Se não há config customizada, usar a padrão gerada pelo tar
+              if (fs.existsSync('/tmp/mediamtx.yml')) {
+                execSync(`sudo mv /tmp/mediamtx.yml ${configDst}`);
+              }
               sendEvent('config', 'info', 'Usando configuração padrão');
+            }
+
+            // Limpeza: remover campos obsoletos que causam falha na v1.9.3
+            sendEvent('config', 'info', 'Removendo campos obsoletos do mediamtx.yml...');
+            try {
+              execSync(`sudo sed -i '/^rtspEncryption:/d' ${configDst}`, { timeout: 5000 });
+              // Remover autenticação (acesso sem senha - projeto Bravo)
+              execSync(`sudo sed -i 's/^readUser:.*/readUser: ""/' ${configDst}`, { timeout: 5000 });
+              execSync(`sudo sed -i 's/^readPass:.*/readPass: ""/' ${configDst}`, { timeout: 5000 });
+              execSync(`sudo sed -i 's/^publishUser:.*/publishUser: ""/' ${configDst}`, { timeout: 5000 });
+              execSync(`sudo sed -i 's/^publishPass:.*/publishPass: ""/' ${configDst}`, { timeout: 5000 });
+              sendEvent('config', 'success', 'Campos obsoletos removidos e autenticação desabilitada');
+            } catch (e) {
+              sendEvent('config', 'warn', 'Limpeza parcial do yml: ' + e.message);
             }
           } catch (e) {
             sendEvent('config', 'warn', 'Não foi possível copiar config: ' + e.message);
@@ -890,9 +908,9 @@ WantedBy=multi-user.target
       const { ip_address, hls_base_port, rtmp_base_port, os: serverOs } = await readBody(req);
       if (!ip_address) return sendJSON(res, 400, { error: 'ip_address required' });
 
-      const results = { ip_address, rtmp: false, hls: false, mediamtx_running: false, os: serverOs || 'unknown' };
+      const results = { ip_address, rtmp: false, rtsp: false, hls: false, mediamtx_running: false, os: serverOs || 'unknown' };
 
-      // Testar conectividade HLS
+      // Testar conectividade HLS (HTTP)
       try {
         const hlsPort = hls_base_port || 8888;
         const testUrl = `http://${ip_address}:${hlsPort}/v3/paths/list`;
@@ -913,7 +931,7 @@ WantedBy=multi-user.target
         });
       } catch {}
 
-      // Testar porta RTMP via TCP connect
+      // Testar porta RTMP via socket
       try {
         const net = require('net');
         const rtmpPort = rtmp_base_port || 1935;
@@ -927,7 +945,21 @@ WantedBy=multi-user.target
         });
       } catch {}
 
-      results.online = results.mediamtx_running || results.rtmp;
+      // Testar porta RTSP via socket (8554)
+      try {
+        const net = require('net');
+        const rtspPort = 8554;
+        await new Promise((resolve) => {
+          const sock = new net.Socket();
+          sock.setTimeout(3000);
+          sock.on('connect', () => { results.rtsp = true; sock.destroy(); resolve(); });
+          sock.on('error', () => { results.rtsp = false; resolve(); });
+          sock.on('timeout', () => { sock.destroy(); results.rtsp = false; resolve(); });
+          sock.connect(rtspPort, ip_address);
+        });
+      } catch {}
+
+      results.online = results.mediamtx_running || results.rtmp || results.rtsp;
       return sendJSON(res, 200, results);
     }
 
