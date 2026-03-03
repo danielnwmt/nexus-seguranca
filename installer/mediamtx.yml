@@ -16,7 +16,6 @@ metrics: no
 
 # ---- RTSP Server ----
 rtspAddress: :8554
-rtspEncryption: "no"
 rtspServerKey: ""
 rtspServerCert: ""
 
