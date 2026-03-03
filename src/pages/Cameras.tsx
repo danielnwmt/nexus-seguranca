@@ -35,6 +35,13 @@ interface CameraForm {
   brand: string;
 }
 
+const generateStreamKey = () => {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let key = '';
+  for (let i = 0; i < 12; i++) key += chars[Math.floor(Math.random() * chars.length)];
+  return key;
+};
+
 const emptyForm: CameraForm = { name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30', analytics: [], videoEncoding: 'H.264', maxBitrate: '4096', brand: '' };
 
 const Cameras = () => {
@@ -79,6 +86,12 @@ const Cameras = () => {
     setEditingId(null);
     setEditingStreamKey('');
     setDialogOpen(false);
+  };
+
+  const buildStreamUrl = (protocol: string, serverIp: string, key: string) => {
+    if (!serverIp || !key) return '';
+    if (protocol === 'RTMP') return `rtmp://${serverIp}:${rtmpPort}/${key}`;
+    return `rtsp://${serverIp}:8554/${key}`;
   };
 
   const toggleAnalytic = (analytic: AnalyticType) => {
@@ -172,7 +185,9 @@ const Cameras = () => {
                 toast({ title: 'Servidor de mídia obrigatório', description: 'Cadastre pelo menos um servidor de mídia em Configurações → Servidores antes de adicionar câmeras.', variant: 'destructive' });
                 return;
               }
-              setEditingId(null); setNewCamera({ ...emptyForm });
+              const key = generateStreamKey();
+              const url = buildStreamUrl('RTSP', mediaServerIp, key);
+              setEditingId(null); setNewCamera({ ...emptyForm, streamUrl: url });
             }}>
               <Plus className="w-4 h-4" /> Nova Câmera
             </Button>
@@ -237,13 +252,17 @@ const Cameras = () => {
                 </div>
               )}
               <div>
-                <Label className="text-xs text-muted-foreground">URL do Stream {newCamera.protocol === 'RTMP' ? '(opcional, override manual)' : ''}</Label>
-                <Input value={newCamera.streamUrl} onChange={e => setNewCamera(p => ({ ...p, streamUrl: e.target.value }))} placeholder={newCamera.protocol === 'RTMP' ? 'rtmp://192.168.1.100:1935/stream1' : 'rtsp://192.168.1.100:554/stream1'} className="bg-muted border-border font-mono text-xs" />
+                <Label className="text-xs text-muted-foreground">URL do Stream (gerada automaticamente)</Label>
+                <Input value={newCamera.streamUrl} readOnly className="bg-muted border-border font-mono text-xs opacity-70" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs text-muted-foreground">Protocolo</Label>
-                  <Select value={newCamera.protocol} onValueChange={v => setNewCamera(p => ({ ...p, protocol: v as 'RTSP' | 'RTMP' }))}>
+                  <Select value={newCamera.protocol} onValueChange={v => {
+                    const key = generateStreamKey();
+                    const url = buildStreamUrl(v, mediaServerIp, key);
+                    setNewCamera(p => ({ ...p, protocol: v as 'RTSP' | 'RTMP', streamUrl: url }));
+                  }}>
                     <SelectTrigger className="bg-muted border-border"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="RTSP">RTSP</SelectItem>
