@@ -16,7 +16,7 @@ const pathMod = require('path');
 const PORT = 8001;
 const JWT_SECRET = 'nexus-monitoramento-jwt-secret-key-2024-super-seguro';
 const POSTGREST_URL = 'http://127.0.0.1:3000';
-const CORS_HEADERS = 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version';
+const CORS_HEADERS = 'authorization, x-client-info, apikey, content-type, prefer, accept, accept-profile, content-profile, range, range-unit, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version';
 const CORS_METHODS = 'GET,POST,PUT,PATCH,DELETE,OPTIONS';
 
 const pool = new Pool({
