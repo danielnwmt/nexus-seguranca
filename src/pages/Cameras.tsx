@@ -48,12 +48,22 @@ const Cameras = () => {
   const { toast } = useToast();
   const { data: clients = [] } = useTableQuery('clients');
   const { data: mediaServers = [] } = useTableQuery('media_servers');
+  const { data: storageServers = [] } = useTableQuery('storage_servers');
   const serverList = mediaServers as any[];
   const firstServer = serverList.length > 0 ? serverList[0] : null;
-  const mediaServerIp = firstServer?.ip_address || '';
+  const defaultMediaServerIp = firstServer?.ip_address || '';
   const hlsPort = firstServer?.hls_base_port || 8888;
   const webrtcPort = firstServer?.webrtc_base_port || 8889;
   const rtmpPort = firstServer?.rtmp_base_port || 1935;
+
+  // Resolve media server IP from client's storage_server_id
+  const getServerIpForClient = (clientId: string): string => {
+    if (!clientId) return defaultMediaServerIp;
+    const client = (clients as any[]).find((c: any) => c.id === clientId);
+    if (!client?.storage_server_id) return defaultMediaServerIp;
+    const storageServer = (storageServers as any[]).find((s: any) => s.id === client.storage_server_id);
+    return storageServer?.ip_address || defaultMediaServerIp;
+  };
   const insertMutation = useInsertMutation('cameras');
   const updateMutation = useUpdateMutation('cameras');
   const deleteMutation = useDeleteMutation('cameras');
@@ -152,9 +162,10 @@ const Cameras = () => {
   // Map DB rows to CameraFeed expected format
   const mapCamera = (c: any) => {
     const client = clients.find((cl: any) => cl.id === c.client_id);
-    // Generate stream URL from media server IP + stream_key
-    const streamUrl = mediaServerIp && c.stream_key
-      ? `http://${mediaServerIp}:${webrtcPort}/${c.stream_key}/`
+    // Generate stream URL from client's server IP + stream_key
+    const resolvedIp = getServerIpForClient(c.client_id || '');
+    const streamUrl = resolvedIp && c.stream_key
+      ? `http://${resolvedIp}:${webrtcPort}/${c.stream_key}/`
       : c.stream_url || '';
     return {
       id: c.id,
@@ -187,7 +198,7 @@ const Cameras = () => {
                 return;
               }
               const key = generateStreamKey();
-              const url = buildStreamUrl('RTSP', mediaServerIp, key);
+              const url = buildStreamUrl('RTSP', defaultMediaServerIp, key);
               setEditingId(null); setNewCamera({ ...emptyForm, streamUrl: url });
             }}>
               <Plus className="w-4 h-4" /> Nova Câmera
@@ -200,7 +211,12 @@ const Cameras = () => {
             <div className="space-y-4">
               <div>
                 <Label className="text-xs text-muted-foreground">Cliente</Label>
-                <Select value={newCamera.clientId} onValueChange={v => setNewCamera(p => ({ ...p, clientId: v }))}>
+                <Select value={newCamera.clientId} onValueChange={v => {
+                  const serverIp = getServerIpForClient(v);
+                  const key = generateStreamKey();
+                  const url = buildStreamUrl(newCamera.protocol, serverIp, key);
+                  setNewCamera(p => ({ ...p, clientId: v, streamUrl: url }));
+                }}>
                   <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
                   <SelectContent>
                     {clients.map((client: any) => (
@@ -223,26 +239,26 @@ const Cameras = () => {
                       <Copy className="w-3.5 h-3.5" />
                     </Button>
                   </div>
-                  {mediaServerIp ? (
+                  {(() => { const resolvedIp = getServerIpForClient(newCamera.clientId); return resolvedIp ? (
                     <div className="space-y-1 pt-1">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px] shrink-0">RTMP</Badge>
-                        <code className="text-[11px] font-mono text-muted-foreground truncate">rtmp://{mediaServerIp}:{rtmpPort}/live/{editingStreamKey}</code>
-                        <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => { navigator.clipboard.writeText(`rtmp://${mediaServerIp}:${rtmpPort}/live/${editingStreamKey}`); toast({ title: 'URL RTMP copiada!' }); }}>
+                        <code className="text-[11px] font-mono text-muted-foreground truncate">rtmp://{resolvedIp}:{rtmpPort}/live/{editingStreamKey}</code>
+                        <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => { navigator.clipboard.writeText(`rtmp://${resolvedIp}:${rtmpPort}/live/${editingStreamKey}`); toast({ title: 'URL RTMP copiada!' }); }}>
                           <Copy className="w-3 h-3" />
                         </Button>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px] shrink-0">WebRTC</Badge>
-                        <code className="text-[11px] font-mono text-muted-foreground truncate">http://{mediaServerIp}:{webrtcPort}/{editingStreamKey}/</code>
-                        <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => { navigator.clipboard.writeText(`http://${mediaServerIp}:${webrtcPort}/${editingStreamKey}/`); toast({ title: 'URL WebRTC copiada!' }); }}>
+                        <code className="text-[11px] font-mono text-muted-foreground truncate">http://{resolvedIp}:{webrtcPort}/{editingStreamKey}/</code>
+                        <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => { navigator.clipboard.writeText(`http://${resolvedIp}:${webrtcPort}/${editingStreamKey}/`); toast({ title: 'URL WebRTC copiada!' }); }}>
                           <Copy className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>
                   ) : (
                     <p className="text-[11px] text-destructive">⚠️ Cadastre um servidor de mídia em Configurações → Servidores para gerar os links.</p>
-                  )}
+                  ); })()}
                 </div>
               )}
               {!editingId && newCamera.protocol === 'RTMP' && (
@@ -261,7 +277,8 @@ const Cameras = () => {
                   <Label className="text-xs text-muted-foreground">Protocolo</Label>
                   <Select value={newCamera.protocol} onValueChange={v => {
                     const key = generateStreamKey();
-                    const url = buildStreamUrl(v, mediaServerIp, key);
+                    const serverIp = getServerIpForClient(newCamera.clientId);
+                    const url = buildStreamUrl(v, serverIp, key);
                     setNewCamera(p => ({ ...p, protocol: v as 'RTSP' | 'RTMP', streamUrl: url }));
                   }}>
                     <SelectTrigger className="bg-muted border-border"><SelectValue /></SelectTrigger>
