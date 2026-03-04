@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 import { useToast } from '@/hooks/use-toast';
 
 interface RecordingsViewerProps {
@@ -60,15 +61,28 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const { data } = await supabase
-        .from('recordings')
-        .select('*')
-        .eq('camera_id', camera.id)
-        .gte('start_time', startOfDay.toISOString())
-        .lte('start_time', endOfDay.toISOString())
-        .order('start_time', { ascending: true });
+      if (isLocalInstallation()) {
+        try {
+          const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
 
-      setRecordings(data || []);
+          const url = `${getLocalApiBase()}/rest/v1/recordings?select=*&camera_id=eq.${camera.id}&and=(start_time.gte.${startOfDay.toISOString()},start_time.lte.${endOfDay.toISOString()})&order=start_time.asc`;
+          const res = await fetch(url, { headers });
+          setRecordings(res.ok ? await res.json() : []);
+        } catch {
+          setRecordings([]);
+        }
+      } else {
+        const { data } = await supabase
+          .from('recordings')
+          .select('*')
+          .eq('camera_id', camera.id)
+          .gte('start_time', startOfDay.toISOString())
+          .lte('start_time', endOfDay.toISOString())
+          .order('start_time', { ascending: true });
+        setRecordings(data || []);
+      }
       setLoading(false);
     };
     fetchRecordings();
@@ -220,7 +234,10 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
             {(() => {
               const rec = recordings.find(r => r.id === playingId);
               if (!rec?.file_path) return <p className="text-muted-foreground text-sm">Arquivo não disponível</p>;
-              return <video src={rec.file_path} controls autoPlay className="w-full h-full object-contain" />;
+              const videoSrc = isLocalInstallation()
+                ? `${getLocalApiBase()}/api/cameras/recording/file?path=${encodeURIComponent(rec.file_path)}`
+                : rec.file_path;
+              return <video src={videoSrc} controls autoPlay className="w-full h-full object-contain" />;
             })()}
           </div>
         )}
@@ -429,7 +446,13 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
                         <Play className="w-3.5 h-3.5" />
                       </Button>
                       {rec.file_path && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); window.open(rec.file_path, '_blank'); }}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => {
+                          e.stopPropagation();
+                          const url = isLocalInstallation()
+                            ? `${getLocalApiBase()}/api/cameras/recording/file?path=${encodeURIComponent(rec.file_path)}`
+                            : rec.file_path;
+                          window.open(url, '_blank');
+                        }}>
                           <Download className="w-3.5 h-3.5" />
                         </Button>
                       )}

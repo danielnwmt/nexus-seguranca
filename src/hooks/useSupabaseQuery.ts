@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 
-type TableName = 'clients' | 'cameras' | 'guards' | 'alarms' | 'invoices' | 'storage_servers' | 'installers' | 'service_orders' | 'bills' | 'media_servers';
+type TableName = 'clients' | 'cameras' | 'guards' | 'alarms' | 'invoices' | 'storage_servers' | 'installers' | 'service_orders' | 'bills' | 'media_servers' | 'recordings' | 'analytics_events';
 
 function getLocalHeaders(extra?: Record<string, string>): Record<string, string> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extra };
