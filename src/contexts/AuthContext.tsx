@@ -52,34 +52,73 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
-      // Local server: call auth server directly using browser hostname (works with public IP)
+      // Local server: tenta múltiplos endpoints para garantir compatibilidade HTTP/HTTPS e diferentes configs de proxy
       if (isLocal) {
         const apiBase = getLocalApiBase();
-        const res = await fetch(`${apiBase}/auth/v1/token?grant_type=password`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        });
+        const origin = window.location.origin.replace(/\/$/, '');
+        const host = window.location.hostname;
 
-        const data = await res.json();
+        const tokenUrls = [
+          `${apiBase}/auth/v1/token?grant_type=password`, // /auth/auth/v1/token (quando Nginx remove /auth)
+          `${origin}/auth/v1/token?grant_type=password`,  // /auth/v1/token (quando não remove /auth)
+        ];
 
-        if (!res.ok || data.error) {
-          return { error: new Error(data.error === 'Invalid login credentials' ? 'Email ou senha inválidos' : (data.error || 'Erro de autenticação')) };
+        if (window.location.protocol === 'http:') {
+          tokenUrls.push(`http://${host}:8001/auth/v1/token?grant_type=password`); // fallback direto em HTTP
         }
 
-        // Store session locally
-        const localSession = {
-          access_token: data.access_token,
-          refresh_token: data.refresh_token,
-          token_type: data.token_type,
-          expires_in: data.expires_in,
-          user: data.user,
-        };
-        localStorage.setItem('nexus-local-session', JSON.stringify(localSession));
-        setUser(data.user);
-        setSession(localSession as any);
+        let lastError: unknown = null;
 
-        return { error: null };
+        for (const tokenUrl of tokenUrls) {
+          try {
+            const res = await fetch(tokenUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, password }),
+            });
+
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok || data.error) {
+              // Erro de credencial: retorna imediatamente (não adianta tentar outro endpoint)
+              if (data.error === 'Invalid login credentials') {
+                return { error: new Error('Email ou senha inválidos') };
+              }
+
+              // Erros de autenticação sem fallback
+              if (res.status === 400 || res.status === 401 || res.status === 403) {
+                return { error: new Error(data.error || 'Erro de autenticação') };
+              }
+
+              // Para erros de gateway/rota, tenta próximo endpoint
+              lastError = new Error(data.error || `Erro HTTP ${res.status}`);
+              continue;
+            }
+
+            // Store session locally
+            const localSession = {
+              access_token: data.access_token,
+              refresh_token: data.refresh_token,
+              token_type: data.token_type,
+              expires_in: data.expires_in,
+              user: data.user,
+            };
+            localStorage.setItem('nexus-local-session', JSON.stringify(localSession));
+            setUser(data.user);
+            setSession(localSession as any);
+
+            return { error: null };
+          } catch (err) {
+            lastError = err;
+          }
+        }
+
+        const fallbackMessage = lastError instanceof Error ? lastError.message : 'Falha de conexão';
+        return {
+          error: new Error(
+            `Não foi possível conectar ao servidor local. Verifique se Nginx e nexus-auth estão ativos. (${fallbackMessage})`
+          ),
+        };
       }
 
       // Cloud: use server-side rate-limited auth endpoint
