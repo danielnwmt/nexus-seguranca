@@ -27,7 +27,7 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
   const status = statusConfig[camera.status];
   const [isRecording, setIsRecording] = useState(camera.status === 'recording');
   const [isRecordingLoading, setIsRecordingLoading] = useState(false);
-  const [isViewing, setIsViewing] = useState(false);
+  const [isViewing, setIsViewing] = useState(camera.status !== 'offline');
   const [showRecordings, setShowRecordings] = useState(false);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const { analyzing, analyzeFromCanvas } = useAnalyzeCamera();
