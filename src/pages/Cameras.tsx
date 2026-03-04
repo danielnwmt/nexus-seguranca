@@ -106,15 +106,8 @@ const Cameras = () => {
   };
 
   const generateStreamKey = () => {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      return crypto.randomUUID();
-    }
-
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
-      const random = Math.random() * 16 | 0;
-      const value = char === 'x' ? random : (random & 0x3 | 0x8);
-      return value.toString(16);
-    });
+    // Gera uma chave com 12 dígitos aleatórios
+    return Math.random().toString(36).substring(2, 14).padEnd(12, '0').substring(0, 12);
   };
 
   const handleAddCameraClick = () => {
