@@ -327,6 +327,20 @@ CREATE TABLE IF NOT EXISTS public.user_roles (
   role app_role DEFAULT 'n1'
 );
 
+CREATE TABLE IF NOT EXISTS public.notification_configs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  channel TEXT NOT NULL DEFAULT 'webhook',
+  enabled BOOLEAN DEFAULT false,
+  config JSONB NOT NULL DEFAULT '{}'::jsonb,
+  events TEXT[] DEFAULT ARRAY['camera_offline','alarm_critical','disk_warning','service_down'],
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.notification_configs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "auth_all_notification_configs" ON public.notification_configs;
+CREATE POLICY "auth_all_notification_configs" ON public.notification_configs FOR ALL USING (auth.uid() IS NOT NULL);
+
 -- 5. Funcoes auxiliares
 CREATE OR REPLACE FUNCTION public.is_authenticated()
 RETURNS BOOLEAN
@@ -525,6 +539,7 @@ GRANT USAGE ON SCHEMA auth TO anon, authenticated;
 
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT ALL ON TABLE public.notification_configs TO authenticated;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 
 GRANT SELECT ON auth.users TO authenticated;
