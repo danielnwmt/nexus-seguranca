@@ -186,7 +186,13 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
             <span className="text-xs font-mono">SEM SINAL</span>
           </div>
         ) : isViewing && webRtcUrl ? (
-          <WebRtcPlayer src={webRtcUrl} className="absolute inset-0" />
+          <iframe 
+            src={webRtcUrl} 
+            className="absolute inset-0 w-full h-full border-0"
+            allow="autoplay; encrypted-media"
+            sandbox="allow-scripts allow-same-origin"
+            title={`Stream ${camera.name}`}
+          />
         ) : (
           <div 
             className="absolute inset-0 cursor-pointer" 
