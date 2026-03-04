@@ -5,14 +5,21 @@ import AlarmItem from '@/components/dashboard/AlarmItem';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTableQuery, useUpdateMutation } from '@/hooks/useSupabaseQuery';
 import { useState } from 'react';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
 
 const Index = () => {
   const { data: cameras = [] } = useTableQuery('cameras');
   const { data: clients = [] } = useTableQuery('clients');
   const { data: alarms = [] } = useTableQuery('alarms');
+  const { data: mediaServers = [] } = useTableQuery('media_servers');
   const updateAlarm = useUpdateMutation('alarms');
 
   const [selectedClient, setSelectedClient] = useState<string>('all');
+
+  const serverList = mediaServers as any[];
+  const firstServer = serverList.length > 0 ? serverList[0] : null;
+  const mediaServerIp = firstServer?.ip_address || '';
+  const hlsPort = firstServer?.hls_base_port || 8888;
 
   const filteredCameras = selectedClient === 'all' ? cameras : cameras.filter((c: any) => c.client_id === selectedClient);
   const onlineCameras = filteredCameras.filter((c: any) => c.status !== 'offline').length;
@@ -25,9 +32,12 @@ const Index = () => {
 
   const mapCamera = (c: any) => {
     const client = clients.find((cl: any) => cl.id === c.client_id);
+    const streamUrl = mediaServerIp && c.stream_key
+      ? `http://${mediaServerIp}:${hlsPort}/${c.stream_key}/`
+      : c.stream_url || '';
     return {
       id: c.id, name: c.name, clientId: c.client_id || '', clientName: client?.name || '',
-      streamUrl: c.stream_url || '', protocol: c.protocol || 'RTSP', status: c.status || 'online',
+      streamUrl, protocol: c.protocol || 'RTSP', status: c.status || 'online',
       location: c.location || '', resolution: c.resolution || '', storagePath: c.storage_path || '',
       retentionDays: c.retention_days ?? 30, analytics: c.analytics || [],
     };
