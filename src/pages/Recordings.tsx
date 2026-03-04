@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 import { useTableQuery } from '@/hooks/useSupabaseQuery';
 import { useToast } from '@/hooks/use-toast';
 import RecordingsViewer from '@/components/cameras/RecordingsViewer';
@@ -51,19 +52,36 @@ const Recordings = () => {
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
 
-      let query = supabase
-        .from('recordings')
-        .select('*')
-        .gte('start_time', startOfDay.toISOString())
-        .lte('start_time', endOfDay.toISOString())
-        .order('start_time', { ascending: false });
+      if (isLocalInstallation()) {
+        try {
+          const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
 
-      if (selectedCameraId !== 'all') {
-        query = query.eq('camera_id', selectedCameraId);
+          let url = `${getLocalApiBase()}/rest/v1/recordings?select=*&and=(start_time.gte.${startOfDay.toISOString()},start_time.lte.${endOfDay.toISOString()})&order=start_time.desc`;
+          if (selectedCameraId !== 'all') {
+            url += `&camera_id=eq.${selectedCameraId}`;
+          }
+          const res = await fetch(url, { headers });
+          setRecordings(res.ok ? await res.json() : []);
+        } catch {
+          setRecordings([]);
+        }
+      } else {
+        let query = supabase
+          .from('recordings')
+          .select('*')
+          .gte('start_time', startOfDay.toISOString())
+          .lte('start_time', endOfDay.toISOString())
+          .order('start_time', { ascending: false });
+
+        if (selectedCameraId !== 'all') {
+          query = query.eq('camera_id', selectedCameraId);
+        }
+
+        const { data } = await query;
+        setRecordings(data || []);
       }
-
-      const { data } = await query;
-      setRecordings(data || []);
       setLoading(false);
     };
     fetchRecordings();

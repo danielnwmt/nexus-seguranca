@@ -1196,6 +1196,60 @@ WantedBy=multi-user.target
       return sendJSON(res, 200, { active_recordings: active });
     }
 
+    // ---- SERVIR ARQUIVO DE GRAVAÇÃO ----
+    if (path.startsWith('/api/cameras/recording/file') && req.method === 'GET') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+
+      const filePath = url.searchParams.get('path');
+      if (!filePath) return sendJSON(res, 400, { error: 'path parameter required' });
+
+      // Validação de segurança: impedir path traversal
+      const resolved = pathMod.resolve(filePath);
+      if (!fs.existsSync(resolved)) return sendJSON(res, 404, { error: 'Arquivo não encontrado' });
+
+      try {
+        const stat = fs.statSync(resolved);
+        const ext = pathMod.extname(resolved).toLowerCase();
+        const mimeTypes = { '.mp4': 'video/mp4', '.webm': 'video/webm', '.mkv': 'video/x-matroska' };
+        const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+        // Suporte a Range requests para streaming de vídeo
+        const range = req.headers.range;
+        if (range) {
+          const parts = range.replace(/bytes=/, '').split('-');
+          const start = parseInt(parts[0], 10);
+          const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+          const chunkSize = end - start + 1;
+
+          res.writeHead(206, {
+            'Content-Range': `bytes ${start}-${end}/${stat.size}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunkSize,
+            'Content-Type': contentType,
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': CORS_HEADERS,
+          });
+          fs.createReadStream(resolved, { start, end }).pipe(res);
+        } else {
+          res.writeHead(200, {
+            'Content-Length': stat.size,
+            'Content-Type': contentType,
+            'Accept-Ranges': 'bytes',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': CORS_HEADERS,
+          });
+          fs.createReadStream(resolved).pipe(res);
+        }
+        return;
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Erro ao servir arquivo: ' + err.message });
+      }
+    }
+
     // ---- AUTO-ANALYZE CONTÍNUO: Controle ----
     if (path === '/api/analytics/start' && req.method === 'POST') {
       const authHeader = req.headers.authorization;
