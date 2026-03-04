@@ -52,6 +52,7 @@ const Cameras = () => {
   const firstServer = serverList.length > 0 ? serverList[0] : null;
   const mediaServerIp = firstServer?.ip_address || '';
   const hlsPort = firstServer?.hls_base_port || 8888;
+  const webrtcPort = firstServer?.webrtc_base_port || 8889;
   const rtmpPort = firstServer?.rtmp_base_port || 1935;
   const insertMutation = useInsertMutation('cameras');
   const updateMutation = useUpdateMutation('cameras');
@@ -153,7 +154,7 @@ const Cameras = () => {
     const client = clients.find((cl: any) => cl.id === c.client_id);
     // Generate stream URL from media server IP + stream_key
     const streamUrl = mediaServerIp && c.stream_key
-      ? `http://${mediaServerIp}:${hlsPort}/${c.stream_key}/`
+      ? `http://${mediaServerIp}:${webrtcPort}/${c.stream_key}/`
       : c.stream_url || '';
     return {
       id: c.id,
@@ -232,9 +233,9 @@ const Cameras = () => {
                         </Button>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px] shrink-0">HLS</Badge>
-                        <code className="text-[11px] font-mono text-muted-foreground truncate">http://{mediaServerIp}:{hlsPort}/{editingStreamKey}/</code>
-                        <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => { navigator.clipboard.writeText(`http://${mediaServerIp}:${hlsPort}/${editingStreamKey}/`); toast({ title: 'URL HLS copiada!' }); }}>
+                        <Badge variant="outline" className="text-[10px] shrink-0">WebRTC</Badge>
+                        <code className="text-[11px] font-mono text-muted-foreground truncate">http://{mediaServerIp}:{webrtcPort}/{editingStreamKey}/</code>
+                        <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => { navigator.clipboard.writeText(`http://${mediaServerIp}:${webrtcPort}/${editingStreamKey}/`); toast({ title: 'URL WebRTC copiada!' }); }}>
                           <Copy className="w-3 h-3" />
                         </Button>
                       </div>
