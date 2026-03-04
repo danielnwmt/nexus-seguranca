@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store, Server, HardDrive, Bot, Globe, Palette, Loader2, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store, Server, HardDrive, Bot, Globe, Palette, Loader2, KeyRound, Eye, EyeOff, Bell } from 'lucide-react';
 import CompanySettings from '@/components/settings/CompanySettings';
 import StorageServers from '@/components/settings/StorageServers';
 import MediaServerSettings from '@/components/settings/MediaServerSettings';
@@ -8,6 +8,7 @@ import BackupSettings from '@/components/settings/BackupSettings';
 import ChatbotSettings from '@/components/settings/ChatbotSettings';
 import DomainSSL from '@/components/settings/DomainSSL';
 import ThemeSettings from '@/components/settings/ThemeSettings';
+import NotificationSettings from '@/components/settings/NotificationSettings';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -353,6 +354,7 @@ const Settings = () => {
           <TabsTrigger value="system" className="gap-2"><RefreshCw className="w-4 h-4" />Sistema</TabsTrigger>
           <TabsTrigger value="mobile" className="gap-2"><Smartphone className="w-4 h-4" />App Mobile</TabsTrigger>
           <TabsTrigger value="theme" className="gap-2"><Palette className="w-4 h-4" />Aparência</TabsTrigger>
+          <TabsTrigger value="notifications" className="gap-2"><Bell className="w-4 h-4" />Notificações</TabsTrigger>
         </TabsList>
 
         {/* ===== EMPRESA ===== */}
@@ -682,6 +684,11 @@ const Settings = () => {
         {/* ===== APARÊNCIA ===== */}
         <TabsContent value="theme" className="space-y-4">
           <ThemeSettings />
+        </TabsContent>
+
+        {/* ===== NOTIFICAÇÕES ===== */}
+        <TabsContent value="notifications" className="space-y-4">
+          <NotificationSettings />
         </TabsContent>
       </Tabs>
 

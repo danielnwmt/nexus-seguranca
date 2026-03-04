@@ -23,6 +23,7 @@ import Recordings from "./pages/Recordings";
 import SystemHealth from "./pages/SystemHealth";
 import CameraMap from "./pages/CameraMap";
 import Timeline from "./pages/Timeline";
+import LiveGrid from "./pages/LiveGrid";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,7 @@ const App = () => (
               <Route path="/system-health" element={<SystemHealth />} />
               <Route path="/camera-map" element={<CameraMap />} />
               <Route path="/timeline" element={<Timeline />} />
+              <Route path="/live" element={<LiveGrid />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />

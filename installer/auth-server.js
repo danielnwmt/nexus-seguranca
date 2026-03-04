@@ -1508,6 +1508,164 @@ WantedBy=multi-user.target
       return sendJSON(res, 200, result);
     }
 
+    // ---- NOTIFICATION CONFIG ENDPOINTS ----
+    if (path === '/api/notifications/config' && req.method === 'GET') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+
+      try {
+        const result = await pool.query(`SELECT * FROM notification_configs ORDER BY created_at`);
+        const configs = result.rows.map(r => ({
+          id: r.id,
+          channel: r.channel,
+          enabled: r.enabled,
+          events: r.events || [],
+          ...(r.config || {}),
+        }));
+        return sendJSON(res, 200, configs);
+      } catch (e) { return sendJSON(res, 200, []); }
+    }
+
+    if (path === '/api/notifications/config' && req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+
+      const body = await readBody(req);
+      const configs = body.configs || [];
+
+      try {
+        // Delete all existing and re-insert
+        await pool.query(`DELETE FROM notification_configs`);
+        for (const c of configs) {
+          const { channel, enabled, events, id, ...configFields } = c;
+          await pool.query(
+            `INSERT INTO notification_configs (channel, enabled, config, events) VALUES ($1, $2, $3, $4)`,
+            [channel || 'webhook', enabled || false, JSON.stringify(configFields), events || []]
+          );
+        }
+        return sendJSON(res, 200, { success: true });
+      } catch (e) { return sendJSON(res, 500, { error: e.message }); }
+    }
+
+    if (path === '/api/notifications/test' && req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+
+      const body = await readBody(req);
+      const channel = body.channel;
+
+      try {
+        const result = await pool.query(`SELECT * FROM notification_configs WHERE channel = $1 LIMIT 1`, [channel]);
+        if (result.rows.length === 0) return sendJSON(res, 400, { error: 'Canal não configurado' });
+
+        const nc = result.rows[0];
+        const cfg = nc.config || {};
+
+        if (channel === 'webhook' && cfg.webhook_url) {
+          const payload = JSON.stringify({ event: 'test', message: 'Teste de notificação Nexus', timestamp: new Date().toISOString() });
+          const url = new URL(cfg.webhook_url);
+          const httpModule = url.protocol === 'https:' ? require('https') : require('http');
+          const headers = { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) };
+          if (cfg.webhook_secret) headers['X-Webhook-Secret'] = cfg.webhook_secret;
+          await new Promise((resolve, reject) => {
+            const r = httpModule.request({ hostname: url.hostname, port: url.port, path: url.pathname, method: 'POST', headers, timeout: 10000 }, (resp) => { resp.resume(); resolve(); });
+            r.on('error', reject);
+            r.write(payload);
+            r.end();
+          });
+          return sendJSON(res, 200, { success: true });
+        }
+
+        if (channel === 'whatsapp' && cfg.whatsapp_api_url) {
+          const msgPayload = JSON.stringify({ phone: cfg.whatsapp_to, message: '✅ Teste Nexus Monitoramento - Notificações funcionando!' });
+          const url = new URL(cfg.whatsapp_api_url);
+          const httpModule = url.protocol === 'https:' ? require('https') : require('http');
+          const headers = { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(msgPayload) };
+          if (cfg.whatsapp_token) headers['Authorization'] = `Bearer ${cfg.whatsapp_token}`;
+          await new Promise((resolve, reject) => {
+            const r = httpModule.request({ hostname: url.hostname, port: url.port, path: url.pathname, method: 'POST', headers, timeout: 10000 }, (resp) => { resp.resume(); resolve(); });
+            r.on('error', reject);
+            r.write(msgPayload);
+            r.end();
+          });
+          return sendJSON(res, 200, { success: true });
+        }
+
+        if (channel === 'email' && cfg.smtp_host) {
+          // For test, just verify SMTP connection
+          const net = require('net');
+          await new Promise((resolve, reject) => {
+            const sock = net.createConnection({ host: cfg.smtp_host, port: parseInt(cfg.smtp_port) || 587, timeout: 5000 });
+            sock.on('connect', () => { sock.destroy(); resolve(); });
+            sock.on('error', reject);
+            sock.on('timeout', () => { sock.destroy(); reject(new Error('Timeout')); });
+          });
+          return sendJSON(res, 200, { success: true });
+        }
+
+        return sendJSON(res, 400, { error: 'Configuração incompleta para o canal' });
+      } catch (e) { return sendJSON(res, 500, { error: e.message, success: false }); }
+    }
+
+    // ---- PTZ CONTROL (ONVIF) ----
+    if (path === '/api/cameras/ptz' && req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const ptzPayload = verifyJWT(token);
+      if (!ptzPayload) return sendJSON(res, 401, { error: 'Invalid token' });
+
+      const body = await readBody(req);
+      const { camera_ip, action, speed } = body;
+      // action: up, down, left, right, zoom_in, zoom_out, stop
+      if (!camera_ip || !action) return sendJSON(res, 400, { error: 'camera_ip and action required' });
+
+      // PTZ via ONVIF SOAP (basic implementation using curl)
+      const ptzSpeed = speed || 0.5;
+      const panMap = { left: -ptzSpeed, right: ptzSpeed };
+      const tiltMap = { up: ptzSpeed, down: -ptzSpeed };
+      const zoomMap = { zoom_in: ptzSpeed, zoom_out: -ptzSpeed };
+
+      const pan = panMap[action] || 0;
+      const tilt = tiltMap[action] || 0;
+      const zoom = zoomMap[action] || 0;
+
+      if (action === 'stop') {
+        // ONVIF Stop command
+        const soapStop = `<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl">
+  <s:Body><tptz:Stop><tptz:ProfileToken>Profile_1</tptz:ProfileToken><tptz:PanTilt>true</tptz:PanTilt><tptz:Zoom>true</tptz:Zoom></tptz:Stop></s:Body>
+</s:Envelope>`;
+        try {
+          execSync(`curl -s --max-time 5 -X POST "http://${camera_ip}/onvif/ptz_service" -H "Content-Type: application/soap+xml" -d '${soapStop.replace(/'/g, "\\'")}'`, { encoding: 'utf8' });
+          return sendJSON(res, 200, { success: true, action: 'stop' });
+        } catch (e) { return sendJSON(res, 500, { error: 'PTZ command failed: ' + e.message }); }
+      }
+
+      const soapMove = `<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl" xmlns:tt="http://www.onvif.org/ver10/schema">
+  <s:Body><tptz:ContinuousMove><tptz:ProfileToken>Profile_1</tptz:ProfileToken><tptz:Velocity><tt:PanTilt x="${pan}" y="${tilt}"/><tt:Zoom x="${zoom}"/></tptz:Velocity></tptz:ContinuousMove></s:Body>
+</s:Envelope>`;
+
+      try {
+        execSync(`curl -s --max-time 5 -X POST "http://${camera_ip}/onvif/ptz_service" -H "Content-Type: application/soap+xml" -d '${soapMove.replace(/'/g, "\\'")}'`, { encoding: 'utf8' });
+        // Auto-stop after 500ms
+        setTimeout(() => {
+          try { execSync(`curl -s --max-time 3 -X POST "http://${camera_ip}/onvif/ptz_service" -H "Content-Type: application/soap+xml" -d '${`<?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:tptz="http://www.onvif.org/ver20/ptz/wsdl"><s:Body><tptz:Stop><tptz:ProfileToken>Profile_1</tptz:ProfileToken><tptz:PanTilt>true</tptz:PanTilt><tptz:Zoom>true</tptz:Zoom></tptz:Stop></s:Body></s:Envelope>`.replace(/'/g, "\\'")}'`, { encoding: 'utf8' }); } catch {}
+        }, 500);
+        return sendJSON(res, 200, { success: true, action, pan, tilt, zoom });
+      } catch (e) { return sendJSON(res, 500, { error: 'PTZ command failed: ' + e.message }); }
+    }
+
     // ---- REST API (proxy para PostgREST) ----
     if (path.startsWith('/rest/v1/')) {
       const postgrestPath = path.replace('/rest/v1/', '/');
@@ -2409,6 +2567,203 @@ function startCameraHealthCheck() {
   cameraCheckInterval = setInterval(checkCamerasOnlineStatus, 120000); // Every 2 min
 }
 
+// ============================================================
+//  SISTEMA DE NOTIFICAÇÕES (Email/Webhook/WhatsApp)
+// ============================================================
+
+async function loadNotificationConfigs() {
+  try {
+    const result = await pool.query(`SELECT * FROM notification_configs WHERE enabled = true`);
+    return result.rows;
+  } catch { return []; }
+}
+
+async function sendNotification(eventType, message, details) {
+  try {
+    const configs = await loadNotificationConfigs();
+    for (const nc of configs) {
+      if (!nc.events || !nc.events.includes(eventType)) continue;
+      const cfg = nc.config || {};
+
+      if (nc.channel === 'webhook' && cfg.webhook_url) {
+        try {
+          const payload = JSON.stringify({
+            event: eventType,
+            message,
+            details,
+            timestamp: new Date().toISOString(),
+            source: 'nexus-monitoramento',
+          });
+          const url = new URL(cfg.webhook_url);
+          const httpModule = url.protocol === 'https:' ? require('https') : require('http');
+          const headers = { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) };
+          if (cfg.webhook_secret) headers['X-Webhook-Secret'] = cfg.webhook_secret;
+          await new Promise((resolve, reject) => {
+            const r = httpModule.request({ hostname: url.hostname, port: url.port, path: url.pathname + url.search, method: 'POST', headers, timeout: 10000 }, (resp) => { resp.resume(); resolve(); });
+            r.on('error', (e) => { console.error('[notify] Webhook error:', e.message); resolve(); });
+            r.write(payload);
+            r.end();
+          });
+        } catch (e) { console.error('[notify] Webhook failed:', e.message); }
+      }
+
+      if (nc.channel === 'email' && cfg.smtp_host) {
+        // Use net/tls to send basic SMTP email (no external deps)
+        try {
+          await sendSmtpEmail(cfg, eventType, message, details);
+        } catch (e) { console.error('[notify] Email failed:', e.message); }
+      }
+
+      if (nc.channel === 'whatsapp' && cfg.whatsapp_api_url) {
+        try {
+          const payload = JSON.stringify({
+            phone: cfg.whatsapp_to,
+            message: `🚨 *NEXUS MONITORAMENTO*\n\n*${eventType.toUpperCase()}*\n${message}\n\n${details || ''}`,
+          });
+          const url = new URL(cfg.whatsapp_api_url);
+          const httpModule = url.protocol === 'https:' ? require('https') : require('http');
+          const headers = { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) };
+          if (cfg.whatsapp_token) headers['Authorization'] = `Bearer ${cfg.whatsapp_token}`;
+          await new Promise((resolve) => {
+            const r = httpModule.request({ hostname: url.hostname, port: url.port, path: url.pathname + url.search, method: 'POST', headers, timeout: 10000 }, (resp) => { resp.resume(); resolve(); });
+            r.on('error', (e) => { console.error('[notify] WhatsApp error:', e.message); resolve(); });
+            r.write(payload);
+            r.end();
+          });
+        } catch (e) { console.error('[notify] WhatsApp failed:', e.message); }
+      }
+    }
+  } catch (e) { console.error('[notify] Error:', e.message); }
+}
+
+async function sendSmtpEmail(cfg, eventType, message, details) {
+  const net = require('net');
+  const tls = require('tls');
+  const port = parseInt(cfg.smtp_port) || 587;
+  const isImplicitTLS = port === 465;
+
+  return new Promise((resolve, reject) => {
+    let socket;
+    const commands = [
+      `EHLO nexus`,
+      `AUTH LOGIN`,
+      Buffer.from(cfg.smtp_user || '').toString('base64'),
+      Buffer.from(cfg.smtp_pass || '').toString('base64'),
+      `MAIL FROM:<${cfg.smtp_from || cfg.smtp_user}>`,
+      `RCPT TO:<${cfg.smtp_to}>`,
+      `DATA`,
+      `From: Nexus Monitoramento <${cfg.smtp_from || cfg.smtp_user}>\r\nTo: ${cfg.smtp_to}\r\nSubject: [NEXUS] ${eventType} - ${message}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${message}\n\n${details || ''}\n\n-- Nexus Monitoramento\r\n.`,
+      `QUIT`,
+    ];
+    let cmdIndex = 0;
+    let upgraded = false;
+
+    const onData = (data) => {
+      const response = data.toString();
+      if (response.startsWith('220') && cmdIndex === 0) { socket.write(commands[cmdIndex++] + '\r\n'); }
+      else if (response.includes('STARTTLS') && !upgraded && !isImplicitTLS) {
+        socket.write('STARTTLS\r\n');
+        upgraded = true;
+      }
+      else if (response.startsWith('220') && upgraded) {
+        socket = tls.connect({ socket, host: cfg.smtp_host, rejectUnauthorized: false }, () => {
+          cmdIndex = 0;
+          socket.write(commands[cmdIndex++] + '\r\n');
+        });
+        socket.on('data', onData);
+      }
+      else if (cmdIndex < commands.length) { socket.write(commands[cmdIndex++] + '\r\n'); }
+      else { socket.end(); resolve(); }
+    };
+
+    if (isImplicitTLS) {
+      socket = tls.connect({ host: cfg.smtp_host, port, rejectUnauthorized: false }, () => {});
+    } else {
+      socket = net.createConnection({ host: cfg.smtp_host, port });
+    }
+    socket.setTimeout(15000);
+    socket.on('data', onData);
+    socket.on('error', reject);
+    socket.on('timeout', () => { socket.destroy(); reject(new Error('SMTP timeout')); });
+  });
+}
+
+// Integrate notifications into existing alarm creation
+const _originalCheckCamerasOnlineStatus = checkCamerasOnlineStatus;
+// Override to add notifications
+async function checkCamerasOnlineStatusWithNotify() {
+  try {
+    const { mediaIp, hlsPort } = await getMediaServer();
+    if (!mediaIp) return;
+
+    let activePaths = [];
+    try {
+      const httpLib = require('http');
+      const pathsData = await new Promise((resolve) => {
+        const r = httpLib.get(`http://${mediaIp}:${hlsPort}/v3/paths/list`, { timeout: 5000 }, (resp) => {
+          let body = '';
+          resp.on('data', c => body += c);
+          resp.on('end', () => {
+            try { resolve(JSON.parse(body).items || []); } catch { resolve([]); }
+          });
+        });
+        r.on('error', () => resolve([]));
+        r.on('timeout', () => { r.destroy(); resolve([]); });
+      });
+      activePaths = pathsData.map(p => p.name);
+    } catch {}
+
+    const camResult = await pool.query(`SELECT id, stream_key, status, name, client_id FROM cameras WHERE stream_key != ''`);
+    
+    for (const cam of camResult.rows) {
+      const isActive = activePaths.includes(cam.stream_key);
+      const newStatus = isActive ? 'online' : 'offline';
+      
+      if (cam.status !== newStatus) {
+        await pool.query(`UPDATE cameras SET status = $1, updated_at = now() WHERE id = $2`, [newStatus, cam.id]);
+        
+        if (newStatus === 'offline') {
+          let clientName = '';
+          if (cam.client_id) {
+            try {
+              const clResult = await pool.query(`SELECT name FROM clients WHERE id = $1`, [cam.client_id]);
+              clientName = clResult.rows[0]?.name || '';
+            } catch {}
+          }
+          await pool.query(
+            `INSERT INTO alarms (camera_id, camera_name, client_name, type, severity, message)
+             VALUES ($1, $2, $3, 'camera_offline', 'critical', $4)`,
+            [cam.id, cam.name, clientName, `Câmera ${cam.name} ficou offline`]
+          );
+          console.log(`⚠️ Câmera OFFLINE detectada: ${cam.name}`);
+          // Send notification
+          sendNotification('camera_offline', `Câmera ${cam.name} ficou OFFLINE`, `Cliente: ${clientName}`);
+        } else {
+          console.log(`✅ Câmera ONLINE: ${cam.stream_key}`);
+          sendNotification('camera_online', `Câmera ${cam.name} voltou ONLINE`, '');
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[cam-check] Error:', err.message);
+  }
+}
+
+// Disk usage notification check
+async function checkDiskUsageNotification() {
+  try {
+    if (process.platform === 'win32') return;
+    const dfOut = execSync(`df -B1 --output=size,avail / | tail -1`, { encoding: 'utf8' });
+    const parts = dfOut.trim().split(/\s+/);
+    const total = parseInt(parts[0]) || 1;
+    const avail = parseInt(parts[1]) || 0;
+    const usagePercent = Math.round(((total - avail) / total) * 100);
+    if (usagePercent > 90) {
+      sendNotification('disk_warning', `Disco em ${usagePercent}% de uso`, `${Math.round(avail / (1024*1024*1024))} GB livres`);
+    }
+  } catch {}
+}
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Nexus Auth + API Gateway rodando em http://localhost:${PORT}`);
   console.log(`PostgREST em ${POSTGREST_URL}`);
@@ -2416,5 +2771,11 @@ server.listen(PORT, '0.0.0.0', () => {
   autoStartAnalysis();
   startAutoRecordingWorker();
   startCleanupWorker();
-  startCameraHealthCheck();
+  // Use enhanced camera check with notifications
+  console.log('📡 Camera health check INICIADO (a cada 2min)');
+  setTimeout(checkCamerasOnlineStatusWithNotify, 15000);
+  setInterval(checkCamerasOnlineStatusWithNotify, 120000);
+  // Disk check every 30 min
+  setInterval(checkDiskUsageNotification, 30 * 60 * 1000);
+  setTimeout(checkDiskUsageNotification, 60000);
 });
