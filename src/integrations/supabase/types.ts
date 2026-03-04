@@ -256,6 +256,7 @@ export type Database = {
       cameras: {
         Row: {
           analytics: string[] | null
+          analytics_config: Json | null
           auto_record: boolean | null
           brand: string | null
           client_id: string | null
@@ -279,6 +280,7 @@ export type Database = {
         }
         Insert: {
           analytics?: string[] | null
+          analytics_config?: Json | null
           auto_record?: boolean | null
           brand?: string | null
           client_id?: string | null
@@ -302,6 +304,7 @@ export type Database = {
         }
         Update: {
           analytics?: string[] | null
+          analytics_config?: Json | null
           auto_record?: boolean | null
           brand?: string | null
           client_id?: string | null
