@@ -218,7 +218,13 @@ const Cameras = () => {
                 <Select value={newCamera.clientId} onValueChange={v => {
                   const serverIp = getServerIpForClient(v);
                   const url = buildStreamUrl(newCamera.protocol, serverIp, currentStreamKey);
-                  setNewCamera(p => ({ ...p, clientId: v, streamUrl: url }));
+                  // Auto-fill storage path from client's storage server
+                  const client = (clients as any[]).find((c: any) => c.id === v);
+                  const storageServer = client?.storage_server_id
+                    ? (storageServers as any[]).find((s: any) => s.id === client.storage_server_id)
+                    : null;
+                  const storagePath = storageServer?.storage_path || '';
+                  setNewCamera(p => ({ ...p, clientId: v, streamUrl: url, storagePath }));
                 }}>
                   <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
                   <SelectContent>
