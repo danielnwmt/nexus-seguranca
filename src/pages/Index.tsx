@@ -19,7 +19,7 @@ const Index = () => {
   const serverList = mediaServers as any[];
   const firstServer = serverList.length > 0 ? serverList[0] : null;
   const mediaServerIp = firstServer?.ip_address || '';
-  const hlsPort = firstServer?.hls_base_port || 8888;
+  const webrtcPort = firstServer?.webrtc_base_port || 8889;
 
   const filteredCameras = selectedClient === 'all' ? cameras : cameras.filter((c: any) => c.client_id === selectedClient);
   const onlineCameras = filteredCameras.filter((c: any) => c.status !== 'offline').length;
@@ -33,7 +33,7 @@ const Index = () => {
   const mapCamera = (c: any) => {
     const client = clients.find((cl: any) => cl.id === c.client_id);
     const streamUrl = mediaServerIp && c.stream_key
-      ? `http://${mediaServerIp}:${hlsPort}/${c.stream_key}/`
+      ? `http://${mediaServerIp}:${webrtcPort}/${c.stream_key}/whip`
       : c.stream_url || '';
     return {
       id: c.id, name: c.name, clientId: c.client_id || '', clientName: client?.name || '',
