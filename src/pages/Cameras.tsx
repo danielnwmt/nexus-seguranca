@@ -76,6 +76,7 @@ const Cameras = () => {
   const [editingStreamKey, setEditingStreamKey] = useState<string>('');
   const [newStreamKey, setNewStreamKey] = useState<string>(''); // key for new cameras, generated once
   const [page, setPage] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
   const PAGE_SIZE = 50;
 
   const filters: Record<string, string> = {};
@@ -110,11 +111,6 @@ const Cameras = () => {
   };
 
   const generateStreamKey = (): string => {
-    try {
-      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-        return crypto.randomUUID();
-      }
-    } catch (_) { /* fallback */ }
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
       const r = (Math.random() * 16) | 0;
       const v = c === 'x' ? r : (r & 0x3) | 0x8;
@@ -123,24 +119,19 @@ const Cameras = () => {
   };
 
   const handleAddCameraClick = () => {
-    try {
-      if (serverList.length === 0) {
-        toast({ title: 'Servidor de mídia obrigatório', description: 'Cadastre pelo menos um servidor de mídia em Configurações → Servidores antes de adicionar câmeras.', variant: 'destructive' });
-        return;
-      }
-
-      const generatedKey = generateStreamKey();
-      const initialUrl = buildStreamUrl(emptyForm.protocol, defaultMediaServerIp, generatedKey);
-
-      setEditingId(null);
-      setEditingStreamKey('');
-      setNewStreamKey(generatedKey);
-      setNewCamera({ ...emptyForm, streamUrl: initialUrl });
-      setDialogOpen(true);
-    } catch (error) {
-      console.error('Erro ao abrir modal de câmera:', error);
-      toast({ title: 'Erro ao abrir formulário', description: 'Tente novamente.', variant: 'destructive' });
+    if (serverList.length === 0) {
+      toast({ title: 'Servidor de mídia obrigatório', description: 'Cadastre pelo menos um servidor de mídia em Configurações → Servidores antes de adicionar câmeras.', variant: 'destructive' });
+      return;
     }
+
+    const generatedKey = generateStreamKey();
+    const initialUrl = buildStreamUrl(emptyForm.protocol, defaultMediaServerIp, generatedKey);
+
+    setEditingId(null);
+    setEditingStreamKey('');
+    setNewStreamKey(generatedKey);
+    setNewCamera({ ...emptyForm, streamUrl: initialUrl });
+    setDialogOpen(true);
   };
 
   const toggleAnalytic = (analytic: AnalyticType) => {
@@ -152,9 +143,14 @@ const Cameras = () => {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!newCamera.name.trim()) {
+      toast({ title: 'Nome obrigatório', description: 'Informe o nome da câmera para salvar.', variant: 'destructive' });
+      return;
+    }
+
     const payload = {
-      name: newCamera.name,
+      name: newCamera.name.trim(),
       client_id: newCamera.clientId || null,
       stream_url: newCamera.streamUrl,
       protocol: newCamera.protocol,
@@ -171,13 +167,23 @@ const Cameras = () => {
       analytics_config: newCamera.analyticsConfig || {},
     };
 
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, ...payload } as any);
-    } else {
-      insertMutation.mutate({ ...payload, stream_key: newStreamKey || undefined } as any);
-    }
+    setIsSaving(true);
+    try {
+      if (editingId) {
+        await updateMutation.mutateAsync({ id: editingId, ...payload } as any);
+      } else {
+        await insertMutation.mutateAsync({ ...payload, stream_key: newStreamKey || undefined } as any);
+      }
 
-    resetForm();
+      toast({ title: 'Câmera salva com sucesso' });
+      resetForm();
+    } catch (error) {
+      console.error('Erro ao salvar câmera:', error);
+      const message = error instanceof Error ? error.message : 'Falha inesperada ao salvar câmera.';
+      toast({ title: 'Erro ao salvar câmera', description: message, variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleEdit = (camera: any) => {
@@ -436,7 +442,7 @@ const Cameras = () => {
                   <Input type="number" step="any" value={newCamera.longitude} onChange={e => setNewCamera(p => ({ ...p, longitude: e.target.value }))} placeholder="-46.6333" className="bg-muted border-border font-mono text-xs" />
                 </div>
               </div>
-              <Button onClick={handleSave} className="w-full">{editingId ? 'Salvar Alterações' : 'Adicionar Câmera'}</Button>
+              <Button onClick={handleSave} disabled={isSaving || insertMutation.isPending || updateMutation.isPending} className="w-full">{isSaving ? 'Salvando...' : editingId ? 'Salvar Alterações' : 'Adicionar Câmera'}</Button>
             </div>
           </DialogContent>
         </Dialog>
