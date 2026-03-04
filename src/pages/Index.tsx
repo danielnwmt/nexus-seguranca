@@ -32,9 +32,8 @@ const Index = () => {
 
   const mapCamera = (c: any) => {
     const client = clients.find((cl: any) => cl.id === c.client_id);
-    const streamUrl = mediaServerIp && c.stream_key
-      ? `http://${mediaServerIp}:${webrtcPort}/${c.stream_key}/whip`
-      : c.stream_url || '';
+    // Pass raw stream_url — CameraFeed converts RTMP/RTSP to WebRTC internally
+    const streamUrl = c.stream_url || '';
     return {
       id: c.id, name: c.name, clientId: c.client_id || '', clientName: client?.name || '',
       streamUrl, protocol: c.protocol || 'RTSP', status: c.status || 'online',
