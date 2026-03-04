@@ -285,7 +285,7 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
                   {isViewing ? <Eye className="w-3 h-3" /> : <Play className="w-3 h-3" />}
                 </button>
               </TooltipTrigger>
-              <TooltipContent>{isViewing ? 'Fechar Visualização' : 'Visualizar Ao Vivo'}</TooltipContent>
+              <TooltipContent>{isViewing ? 'Fechar WebRTC' : 'Visualizar WebRTC'}</TooltipContent>
             </Tooltip>
           </div>
         )}
