@@ -1,3 +1,4 @@
+// AuthContext - Gerenciamento de autenticação (local + cloud)
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
