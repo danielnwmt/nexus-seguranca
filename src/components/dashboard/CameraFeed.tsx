@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera as CameraType, ANALYTIC_LABELS } from '@/types/monitoring';
-import { Video, VideoOff, Circle, Pencil, Trash2, Play, Square, Eye, Brain, Film, ScanEye, Loader2 } from 'lucide-react';
+import { Video, VideoOff, Circle, Pencil, Trash2, Play, Square, Eye, Brain, Film, ScanEye, Loader2, Link2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import WebRtcPlayer from './WebRtcPlayer';
@@ -200,6 +200,26 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
                 <TooltipContent>{isAnalyzing ? 'Analisando...' : 'Analisar com IA'}</TooltipContent>
               </Tooltip>
             )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => {
+                    const url = webRtcUrl || camera.streamUrl || 'Sem URL';
+                    navigator.clipboard.writeText(url).then(() => {
+                      toast({ title: 'Link copiado', description: url });
+                    }).catch(() => {
+                      toast({ title: 'Link WebRTC', description: url });
+                    });
+                  }}
+                  className="w-7 h-7 rounded flex items-center justify-center transition-colors bg-background/80 text-muted-foreground hover:text-foreground"
+                >
+                  <Link2 className="w-3 h-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs break-all font-mono text-[10px]">
+                {webRtcUrl || camera.streamUrl || 'Sem URL'}
+              </TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
