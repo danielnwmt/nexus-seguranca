@@ -9,7 +9,7 @@ export function isLocalInstallation(): boolean {
   if (projectId === 'local') return true;
 
   const hostname = window.location.hostname;
-  return !hostname.includes('lovable.app') && !hostname.includes('lovableproject.com') && !hostname.includes('localhost');
+  return !hostname.includes('lovable.app') && !hostname.includes('lovableproject.com');
 }
 
 export function getLocalApiBase() {
