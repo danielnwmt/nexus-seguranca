@@ -230,10 +230,83 @@ npm install pg > /dev/null 2>&1
 ok "Auth Server configurado"
 
 # ----------------------------------------------------------
-# 8. MediaMTX (Servidor de Midia) - Instalado via painel web
+# 8. MediaMTX (Servidor de Midia) - Instalacao automatica
 # ----------------------------------------------------------
-step "MediaMTX sera instalado via painel web apos o login..."
-ok "Acesse Configuracoes > Servidores de Midia > Cadastrar e Instalar"
+step "Instalando MediaMTX v1.9.3 (Servidor de Midia)..."
+
+MEDIAMTX_BIN="/usr/local/bin/mediamtx"
+MEDIAMTX_CONF="/usr/local/etc/mediamtx.yml"
+
+if [ -f "$MEDIAMTX_BIN" ]; then
+  ok "MediaMTX ja instalado, atualizando configuracao..."
+  systemctl stop mediamtx 2>/dev/null || true
+else
+  # Download
+  ARCH=$(uname -m)
+  if [ "$ARCH" = "x86_64" ]; then
+    MTX_URL="https://github.com/bluenviron/mediamtx/releases/download/v1.9.3/mediamtx_v1.9.3_linux_amd64.tar.gz"
+  elif [ "$ARCH" = "aarch64" ]; then
+    MTX_URL="https://github.com/bluenviron/mediamtx/releases/download/v1.9.3/mediamtx_v1.9.3_linux_arm64v8.tar.gz"
+  else
+    warn "Arquitetura $ARCH nao suportada para MediaMTX. Instale manualmente via painel web."
+    MTX_URL=""
+  fi
+
+  if [ -n "$MTX_URL" ]; then
+    wget -q "$MTX_URL" -O /tmp/mediamtx.tar.gz
+    tar xzf /tmp/mediamtx.tar.gz -C /tmp mediamtx mediamtx.yml
+    mv /tmp/mediamtx "$MEDIAMTX_BIN"
+    mv /tmp/mediamtx.yml "$MEDIAMTX_CONF"
+    rm -f /tmp/mediamtx.tar.gz
+    chmod +x "$MEDIAMTX_BIN"
+    ok "MediaMTX v1.9.3 baixado e instalado"
+  fi
+fi
+
+if [ -f "$MEDIAMTX_BIN" ]; then
+  # Ajuste de configuracao: remover campos problematicos e desativar autenticacao
+  sed -i '/rtspEncryption/d' "$MEDIAMTX_CONF"
+  sed -i '/rtspServerCert/d' "$MEDIAMTX_CONF"
+  sed -i '/rtspServerKey/d' "$MEDIAMTX_CONF"
+  sed -i 's/^readUser:.*/readUser: /g' "$MEDIAMTX_CONF"
+  sed -i 's/^readPass:.*/readPass: /g' "$MEDIAMTX_CONF"
+  sed -i 's/^publishUser:.*/publishUser: /g' "$MEDIAMTX_CONF"
+  sed -i 's/^publishPass:.*/publishPass: /g' "$MEDIAMTX_CONF"
+
+  # Configurar IP externo para WebRTC (usa IP detectado)
+  sed -i "s/^#webrtcICEUDPServerIPs:.*/webrtcICEUDPServerIPs: [$LOCAL_IP]/g" "$MEDIAMTX_CONF"
+  sed -i "s/^webrtcICEUDPServerIPs:.*/webrtcICEUDPServerIPs: [$LOCAL_IP]/g" "$MEDIAMTX_CONF"
+  ok "Configuracao MediaMTX ajustada (zero auth, IP: $LOCAL_IP)"
+
+  # Criar servico systemd
+  cat > /etc/systemd/system/mediamtx.service << EOF
+[Unit]
+Description=MediaMTX Service (Nexus Seguranca)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=$MEDIAMTX_BIN $MEDIAMTX_CONF
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  # Liberar portas MediaMTX no firewall
+  ufw allow 1935/tcp comment "MediaMTX RTMP" > /dev/null 2>&1
+  ufw allow 8554/tcp comment "MediaMTX RTSP" > /dev/null 2>&1
+  ufw allow 8888/tcp comment "MediaMTX HLS" > /dev/null 2>&1
+  ufw allow 8889/tcp comment "MediaMTX WebRTC" > /dev/null 2>&1
+  ufw allow 8189/udp comment "MediaMTX WebRTC UDP" > /dev/null 2>&1
+
+  systemctl daemon-reload
+  systemctl enable mediamtx > /dev/null 2>&1
+  systemctl start mediamtx
+  ok "MediaMTX rodando (RTMP:1935, RTSP:8554, HLS:8888, WebRTC:8889)"
+  ok "Tambem pode ser gerenciado via painel web: Configuracoes > Servidores de Midia"
+fi
 
 # ----------------------------------------------------------
 # 8.2 Instalar ffmpeg (para captura de frames IA)
@@ -424,7 +497,7 @@ User=root
 WantedBy=multi-user.target
 EOF
 
-# MediaMTX - servico criado via painel web (Cadastrar e Instalar)
+# MediaMTX - ja criado na etapa 8 (instalacao automatica)
 
 # Analytics IA
 cat > /etc/systemd/system/nexus-analytics.service << EOF
@@ -457,12 +530,12 @@ EOF
 
 # Recarregar e ativar
 systemctl daemon-reload
-systemctl enable nexus-postgrest nexus-auth nexus-analytics > /dev/null 2>&1
+systemctl enable nexus-postgrest nexus-auth nexus-analytics mediamtx > /dev/null 2>&1
 systemctl start nexus-postgrest
 systemctl start nexus-auth
-# MediaMTX iniciado via painel web
+systemctl start mediamtx 2>/dev/null || true
 systemctl start nexus-analytics
-ok "4 servicos criados e iniciados (inicio automatico)"
+ok "5 servicos criados e iniciados (inicio automatico)"
 
 # ----------------------------------------------------------
 # 15. Scripts de controle
@@ -584,8 +657,8 @@ echo -e "  - Auth Server.......: localhost:$API_PORT"
 echo -e "  - Nginx (Frontend)..: localhost:$PORT"
 echo ""
 echo -e "  ${CYAN}SERVIDOR DE MIDIA (MediaMTX):${NC}"
-echo -e "  Instale via painel web: Configuracoes > Servidores de Midia"
-echo -e "  Use o botao 'Cadastrar e Instalar' para instalacao automatica"
+echo -e "  - MediaMTX...........: RTMP:1935 | RTSP:8554 | HLS:8888 | WebRTC:8889"
+echo -e "  Tambem pode ser gerenciado via painel: Configuracoes > Servidores de Midia"
 echo ""
 echo -e "  ${CYAN}ACESSO:${NC}"
 echo -e "  URL:    http://$LOCAL_IP:$PORT"
