@@ -196,9 +196,7 @@ const Cameras = () => {
           <h1 className="text-2xl font-bold text-foreground">Câmeras</h1>
           <p className="text-sm text-muted-foreground font-mono">Gerenciamento de câmeras RTMP/RTSP</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) resetForm(); else setDialogOpen(true); }}>
-          <DialogTrigger asChild>
-            <Button className="gap-2" onClick={() => {
+        <Button className="gap-2" onClick={() => {
               if (serverList.length === 0) {
                 toast({ title: 'Servidor de mídia obrigatório', description: 'Cadastre pelo menos um servidor de mídia em Configurações → Servidores antes de adicionar câmeras.', variant: 'destructive' });
                 return;
@@ -208,10 +206,11 @@ const Cameras = () => {
               setNewStreamKey(generatedKey);
               setEditingId(null);
               setNewCamera({ ...emptyForm, streamUrl: initialUrl });
+              setDialogOpen(true);
             }}>
               <Plus className="w-4 h-4" /> Nova Câmera
-            </Button>
-          </DialogTrigger>
+        </Button>
+        <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) resetForm(); else setDialogOpen(true); }}>
           <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-foreground">{editingId ? 'Editar Câmera' : 'Adicionar Câmera'}</DialogTitle>
