@@ -16,12 +16,10 @@ interface UpdateStep {
 }
 
 const STEP_LABELS: Record<number, string> = {
-  1: 'Backup de configurações',
-  2: 'Download do GitHub',
-  3: 'Restaurar configurações',
-  4: 'Instalar dependências',
-  5: 'Compilar frontend',
-  6: 'Reiniciar serviços',
+  1: 'Download do GitHub',
+  2: 'Instalar dependências',
+  3: 'Compilar frontend',
+  4: 'Reiniciar serviços',
 };
 
 const SystemUpdate = () => {
@@ -328,7 +326,6 @@ const SystemUpdate = () => {
           <div className="border-t border-border pt-3">
             <p className="text-xs text-muted-foreground">
               O sistema faz <strong>git pull</strong> do repositório GitHub, reinstala dependências e reconstrói o frontend automaticamente.
-              Configurações locais (.env, auth-server) são preservadas durante a atualização.
               Você também pode atualizar via terminal: <code className="bg-muted px-1 py-0.5 rounded text-xs">bash /opt/nexus-monitoramento/atualizar-nexus.sh</code>
             </p>
           </div>
