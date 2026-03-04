@@ -75,6 +75,7 @@ const Cameras = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newCamera, setNewCamera] = useState<CameraForm>({ ...emptyForm });
   const [editingStreamKey, setEditingStreamKey] = useState<string>('');
+  const [newStreamKey, setNewStreamKey] = useState<string>(''); // key for new cameras, generated once
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
 
@@ -96,8 +97,12 @@ const Cameras = () => {
     setNewCamera({ ...emptyForm });
     setEditingId(null);
     setEditingStreamKey('');
+    setNewStreamKey('');
     setDialogOpen(false);
   };
+
+  // Get the current active stream key (editing or new)
+  const currentStreamKey = editingId ? editingStreamKey : newStreamKey;
 
   const buildStreamUrl = (protocol: string, serverIp: string, key: string) => {
     if (!serverIp || !key) return '';
@@ -198,6 +203,7 @@ const Cameras = () => {
                 return;
               }
               const key = generateStreamKey();
+              setNewStreamKey(key);
               const url = buildStreamUrl('RTSP', defaultMediaServerIp, key);
               setEditingId(null); setNewCamera({ ...emptyForm, streamUrl: url });
             }}>
@@ -213,8 +219,7 @@ const Cameras = () => {
                 <Label className="text-xs text-muted-foreground">Cliente</Label>
                 <Select value={newCamera.clientId} onValueChange={v => {
                   const serverIp = getServerIpForClient(v);
-                  const key = generateStreamKey();
-                  const url = buildStreamUrl(newCamera.protocol, serverIp, key);
+                  const url = buildStreamUrl(newCamera.protocol, serverIp, currentStreamKey);
                   setNewCamera(p => ({ ...p, clientId: v, streamUrl: url }));
                 }}>
                   <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
@@ -276,9 +281,8 @@ const Cameras = () => {
                 <div>
                   <Label className="text-xs text-muted-foreground">Protocolo</Label>
                   <Select value={newCamera.protocol} onValueChange={v => {
-                    const key = generateStreamKey();
                     const serverIp = getServerIpForClient(newCamera.clientId);
-                    const url = buildStreamUrl(v, serverIp, key);
+                    const url = buildStreamUrl(v, serverIp, currentStreamKey);
                     setNewCamera(p => ({ ...p, protocol: v as 'RTSP' | 'RTMP', streamUrl: url }));
                   }}>
                     <SelectTrigger className="bg-muted border-border"><SelectValue /></SelectTrigger>
