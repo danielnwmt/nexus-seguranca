@@ -1422,8 +1422,22 @@ WantedBy=multi-user.target
         return sendJSON(res, 400, { error: 'Caminho inválido' });
       }
       try {
-        fs.mkdirSync(storage_path, { recursive: true });
-        return sendJSON(res, 200, { created: true, path: storage_path });
+        fs.mkdirSync(storage_path, { recursive: true, mode: 0o755 });
+        // No Linux, ajustar permissões completas na pasta de gravação
+        if (process.platform !== 'win32') {
+          const { execSync } = require('child_process');
+          try {
+            // Dar permissão total ao usuário do serviço e leitura para grupo
+            execSync(`chmod -R 775 "${storage_path}"`);
+            // Ajustar dono para o usuário que roda o serviço (root no Ubuntu)
+            const currentUser = process.env.USER || process.env.LOGNAME || 'root';
+            execSync(`chown -R ${currentUser}:${currentUser} "${storage_path}"`);
+            console.log(`[storage] Permissões aplicadas: 775, dono: ${currentUser} em ${storage_path}`);
+          } catch (permErr) {
+            console.warn(`[storage] Aviso: não foi possível ajustar permissões: ${permErr.message}`);
+          }
+        }
+        return sendJSON(res, 200, { created: true, path: storage_path, permissions: process.platform !== 'win32' ? '775' : 'default' });
       } catch (e) {
         return sendJSON(res, 500, { error: 'Não foi possível criar o diretório: ' + e.message });
       }
