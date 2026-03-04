@@ -298,6 +298,17 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
             <p className="text-xs font-medium text-foreground truncate">{camera.name}</p>
             <p className="text-[10px] text-muted-foreground font-mono">{camera.protocol} • {camera.resolution} • {camera.retentionDays === 0 ? 'Ao Vivo' : `${camera.retentionDays}d`}</p>
             <p className="text-[10px] text-muted-foreground truncate">{camera.clientName}</p>
+            {webRtcUrl && (
+              <p className="text-[9px] text-primary/70 font-mono truncate mt-0.5 cursor-pointer hover:text-primary" onClick={() => {
+                navigator.clipboard.writeText(webRtcUrl).then(() => {
+                  toast({ title: 'Link copiado!', description: webRtcUrl });
+                }).catch(() => {
+                  toast({ title: 'Link do stream', description: webRtcUrl });
+                });
+              }} title={webRtcUrl}>
+                🔗 {webRtcUrl}
+              </p>
+            )}
           </div>
           {(onEdit || onDelete) && (
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
