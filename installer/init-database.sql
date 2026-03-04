@@ -531,17 +531,14 @@ INSERT INTO public.company_settings (name)
 VALUES ('Nexus Segurança')
 ON CONFLICT DO NOTHING;
 
--- 10. Usuario administrador padrao (admin@protenexus.com / senha: 1234)
+-- 10. Usuario administrador padrao (apenas primeiro setup)
 INSERT INTO auth.users (email, encrypted_password, raw_user_meta_data)
 VALUES (
   'admin@protenexus.com',
   crypt('1234', gen_salt('bf')),
   '{"force_password_change": true}'::jsonb
 )
-ON CONFLICT (email) DO UPDATE SET
-  encrypted_password = crypt('1234', gen_salt('bf')),
-  raw_user_meta_data = '{"force_password_change": true}'::jsonb,
-  updated_at = now();
+ON CONFLICT (email) DO NOTHING;
 
 -- Garantir que o admin tem role (trigger pode nao disparar em ON CONFLICT UPDATE)
 INSERT INTO public.user_roles (user_id, role)
