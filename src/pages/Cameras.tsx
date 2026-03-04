@@ -101,7 +101,7 @@ const Cameras = () => {
 
   const buildStreamUrl = (protocol: string, serverIp: string, key: string) => {
     if (!serverIp || !key) return '';
-    if (protocol === 'RTMP') return `rtmp://${serverIp}:${rtmpPort}/live/${key}`;
+    if (protocol === 'RTMP') return `rtmp://${serverIp}:${rtmpPort}/${key}`;
     return `rtsp://${serverIp}:8554/${key}`;
   };
 
@@ -268,12 +268,12 @@ const Cameras = () => {
                   </div>
                   {(() => { const resolvedIp = getServerIpForClient(newCamera.clientId); return resolvedIp ? (
                     <div className="space-y-1 pt-1">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px] shrink-0">RTMP</Badge>
-                        <code className="text-[11px] font-mono text-muted-foreground truncate">rtmp://{resolvedIp}:{rtmpPort}/live/{editingStreamKey}</code>
-                        <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => { navigator.clipboard.writeText(`rtmp://${resolvedIp}:${rtmpPort}/live/${editingStreamKey}`); toast({ title: 'URL RTMP copiada!' }); }}>
-                          <Copy className="w-3 h-3" />
-                        </Button>
+                       <div className="flex items-center gap-2">
+                         <Badge variant="outline" className="text-[10px] shrink-0">RTMP</Badge>
+                         <code className="text-[11px] font-mono text-muted-foreground truncate">rtmp://{resolvedIp}:{rtmpPort}/{editingStreamKey}</code>
+                         <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => { navigator.clipboard.writeText(`rtmp://${resolvedIp}:${rtmpPort}/${editingStreamKey}`); toast({ title: 'URL RTMP copiada!' }); }}>
+                           <Copy className="w-3 h-3" />
+                         </Button>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px] shrink-0">WebRTC</Badge>
