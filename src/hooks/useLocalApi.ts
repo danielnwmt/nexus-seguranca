@@ -6,10 +6,12 @@ import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
  */
 export function isLocalInstallation(): boolean {
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+
+  // Instalação local real sempre define PROJECT_ID como "local"
   if (projectId === 'local') return true;
 
-  const hostname = window.location.hostname;
-  return !hostname.includes('lovable.app') && !hostname.includes('lovableproject.com');
+  // Em domínios publicados/customizados, nunca forçar modo local por hostname
+  return false;
 }
 
 export function getLocalApiBase() {
