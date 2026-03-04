@@ -188,17 +188,21 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
         ) : isViewing && webRtcUrl ? (
           <WebRtcPlayer src={webRtcUrl} className="absolute inset-0" />
         ) : (
-          <>
+          <div 
+            className="absolute inset-0 cursor-pointer" 
+            onClick={() => { if (webRtcUrl) setIsViewing(true); }}
+          >
             <div className="absolute inset-0 opacity-10" style={{
               backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, hsl(175 80% 45% / 0.03) 2px, hsl(175 80% 45% / 0.03) 4px)',
             }} />
-            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center flex-col gap-2">
               <Video className="w-10 h-10 text-primary/20" />
+              {webRtcUrl && <span className="text-[10px] font-mono text-primary/40">Clique para visualizar</span>}
             </div>
             <div className="absolute bottom-2 left-2 font-mono text-[10px] text-primary/60">
               {new Date().toLocaleString('pt-BR')}
             </div>
-          </>
+          </div>
         )}
 
         {isRecording && (
