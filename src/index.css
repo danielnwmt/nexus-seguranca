@@ -99,7 +99,17 @@
 
   .camera-grid-3x3 {
     grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(3, 1fr);
+  }
+
+  .camera-grid-4x4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  @media (max-width: 768px) {
+    .camera-grid-3x3,
+    .camera-grid-4x4 {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
 
   .glow-border {

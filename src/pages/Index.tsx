@@ -1,8 +1,10 @@
-import { Camera, Users, Bell, AlertTriangle, Video, Shield, UserX } from 'lucide-react';
+import { Camera, Users, Bell, AlertTriangle, Video, Shield, UserX, Grid2X2, Grid3X3, LayoutGrid } from 'lucide-react';
 import StatsCard from '@/components/dashboard/StatsCard';
 import CameraFeed from '@/components/dashboard/CameraFeed';
 import AlarmItem from '@/components/dashboard/AlarmItem';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTableQuery, useUpdateMutation } from '@/hooks/useSupabaseQuery';
 import { useState } from 'react';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
@@ -15,6 +17,7 @@ const Index = () => {
   const updateAlarm = useUpdateMutation('alarms');
 
   const [selectedClient, setSelectedClient] = useState<string>('all');
+  const [gridLayout, setGridLayout] = useState<'2x2' | '3x3' | '4x4'>('3x3');
 
   const serverList = mediaServers as any[];
   const firstServer = serverList.length > 0 ? serverList[0] : null;
@@ -70,6 +73,41 @@ const Index = () => {
               Câmeras ao Vivo
             </h2>
             <div className="flex items-center gap-2">
+              <div className="flex items-center border border-border rounded-md overflow-hidden">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setGridLayout('2x2')}
+                      className={`p-1.5 transition-colors ${gridLayout === '2x2' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'}`}
+                    >
+                      <Grid2X2 className="w-3.5 h-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>2×2</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setGridLayout('3x3')}
+                      className={`p-1.5 transition-colors ${gridLayout === '3x3' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'}`}
+                    >
+                      <Grid3X3 className="w-3.5 h-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>3×3</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setGridLayout('4x4')}
+                      className={`p-1.5 transition-colors ${gridLayout === '4x4' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'}`}
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>4×4</TooltipContent>
+                </Tooltip>
+              </div>
               <Select value={selectedClient} onValueChange={setSelectedClient}>
                 <SelectTrigger className="w-44 h-8 text-xs bg-muted border-border">
                   <SelectValue placeholder="Filtrar por cliente" />
@@ -84,9 +122,9 @@ const Index = () => {
               <span className="text-[10px] font-mono text-muted-foreground">{filteredCameras.length} câmeras</span>
             </div>
           </div>
-          <div className="camera-grid camera-grid-3x3">
+          <div className={`camera-grid camera-grid-${gridLayout}`}>
             {filteredCameras.map((camera: any) => (
-              <CameraFeed key={camera.id} camera={mapCamera(camera) as any} compact />
+              <CameraFeed key={camera.id} camera={mapCamera(camera) as any} compact={gridLayout !== '2x2'} />
             ))}
           </div>
         </div>
