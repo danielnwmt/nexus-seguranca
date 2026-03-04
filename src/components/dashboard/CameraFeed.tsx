@@ -235,18 +235,23 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
               <TooltipTrigger asChild>
                 <button
                   onClick={() => {
-                    if (!webRtcUrl && !camera.streamUrl) {
+                    const linkToCopy = webRtcUrl || camera.streamUrl;
+                    if (!linkToCopy) {
                       toast({ title: 'Sem URL configurada', variant: 'destructive' });
                       return;
                     }
-                    setIsViewing(true);
+                    navigator.clipboard.writeText(linkToCopy).then(() => {
+                      toast({ title: 'Link copiado!', description: linkToCopy });
+                    }).catch(() => {
+                      toast({ title: 'Link do stream', description: linkToCopy });
+                    });
                   }}
-                  className={`w-7 h-7 rounded flex items-center justify-center transition-colors ${isViewing ? 'bg-primary/80 text-primary-foreground' : 'bg-background/80 text-muted-foreground hover:text-foreground'}`}
+                  className="w-7 h-7 rounded flex items-center justify-center transition-colors bg-background/80 text-muted-foreground hover:text-foreground"
                 >
                   <Link2 className="w-3 h-3" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Abrir stream ao vivo</TooltipContent>
+              <TooltipContent>Copiar link do stream</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
