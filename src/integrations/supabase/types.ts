@@ -256,11 +256,14 @@ export type Database = {
       cameras: {
         Row: {
           analytics: string[] | null
+          auto_record: boolean | null
           brand: string | null
           client_id: string | null
           created_at: string
           id: string
+          latitude: number | null
           location: string | null
+          longitude: number | null
           max_bitrate: number | null
           name: string
           protocol: string
@@ -276,11 +279,14 @@ export type Database = {
         }
         Insert: {
           analytics?: string[] | null
+          auto_record?: boolean | null
           brand?: string | null
           client_id?: string | null
           created_at?: string
           id?: string
+          latitude?: number | null
           location?: string | null
+          longitude?: number | null
           max_bitrate?: number | null
           name: string
           protocol?: string
@@ -296,11 +302,14 @@ export type Database = {
         }
         Update: {
           analytics?: string[] | null
+          auto_record?: boolean | null
           brand?: string | null
           client_id?: string | null
           created_at?: string
           id?: string
+          latitude?: number | null
           location?: string | null
+          longitude?: number | null
           max_bitrate?: number | null
           name?: string
           protocol?: string

@@ -1345,6 +1345,57 @@ WantedBy=multi-user.target
       return sendJSON(res, 200, results);
     }
 
+    // ---- SYSTEM HEALTH: Saúde completa do sistema ----
+    if (path === '/api/system/health' && req.method === 'GET') {
+      const health = await getSystemHealth();
+      return sendJSON(res, 200, health);
+    }
+
+    // ---- AUTO-RECORDING: Controle ----
+    if (path === '/api/recording/auto/start' && req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+      startAutoRecordingWorker();
+      return sendJSON(res, 200, { status: 'started', active: Object.keys(autoRecordingState.cameras).length });
+    }
+
+    if (path === '/api/recording/auto/stop' && req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+      stopAutoRecordingWorker();
+      return sendJSON(res, 200, { status: 'stopped' });
+    }
+
+    if (path === '/api/recording/auto/status' && req.method === 'GET') {
+      return sendJSON(res, 200, {
+        running: autoRecordingState.running,
+        active_cameras: Object.keys(autoRecordingState.cameras).length,
+        cameras: Object.entries(autoRecordingState.cameras).map(([id, rec]) => ({
+          camera_id: id,
+          camera_name: rec.cameraName,
+          start_time: rec.startTime.toISOString(),
+          duration_seconds: Math.round((Date.now() - rec.startTime.getTime()) / 1000),
+        })),
+      });
+    }
+
+    // ---- CLEANUP: Forçar limpeza manual ----
+    if (path === '/api/storage/cleanup' && req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+      const result = await cleanupOldRecordings();
+      return sendJSON(res, 200, result);
+    }
+
     // ---- SYSTEM INFO: Detectar SO e sugerir path de gravação ----
     if (path === '/api/system-info' && req.method === 'GET') {
       const platform = os.platform(); // 'win32', 'linux', 'darwin'
@@ -1856,10 +1907,514 @@ async function syncMediaServersToCloud() {
   }
 }
 
+// ============================================================
+//  WORKER DE GRAVAÇÃO AUTOMÁTICA (AGENDADA)
+//  Grava câmeras continuamente com base em retention_days > 0
+// ============================================================
+
+const autoRecordingState = {
+  running: false,
+  cameras: {},  // { cameraId: { process, filePath, startTime, ... } }
+  checkInterval: null,
+  segmentMinutes: 30, // Segmentar gravações a cada 30 min
+};
+
+async function autoRecordingCheck() {
+  try {
+    // Buscar câmeras online com retention > 0 (0 = sem gravação)
+    const camResult = await pool.query(`
+      SELECT c.id, c.name, c.stream_key, c.retention_days, c.storage_path, c.client_id, cl.name as client_name
+      FROM cameras c
+      LEFT JOIN clients cl ON c.client_id = cl.id
+      WHERE c.status = 'online' AND c.retention_days > 0 AND c.stream_key != ''
+    `);
+
+    const { mediaIp, hlsPort } = await getMediaServer();
+    const now = new Date();
+
+    for (const cam of camResult.rows) {
+      // Já tem gravação automática ativa?
+      if (autoRecordingState.cameras[cam.id]) {
+        const rec = autoRecordingState.cameras[cam.id];
+        const elapsed = (now.getTime() - rec.startTime.getTime()) / 1000 / 60;
+        // Segmentar: parar e reiniciar a cada N minutos
+        if (elapsed >= autoRecordingState.segmentMinutes) {
+          await stopAutoRecording(cam.id);
+          // Reiniciar imediatamente
+          await startAutoRecording(cam, mediaIp, hlsPort);
+        }
+        continue;
+      }
+      // Iniciar gravação automática
+      await startAutoRecording(cam, mediaIp, hlsPort);
+    }
+
+    // Parar gravações de câmeras que ficaram offline ou foram removidas
+    const activeIds = new Set(camResult.rows.map(c => c.id));
+    for (const camId of Object.keys(autoRecordingState.cameras)) {
+      if (!activeIds.has(camId)) {
+        await stopAutoRecording(camId);
+      }
+    }
+  } catch (err) {
+    console.error('[auto-rec] Check error:', err.message);
+  }
+}
+
+async function startAutoRecording(cam, mediaIp, hlsPort) {
+  const sourceUrl = `http://${mediaIp}:${hlsPort}/${cam.stream_key}/`;
+  const baseDir = cam.storage_path || '/opt/nexus-monitoramento/recordings';
+  const dateStr = new Date().toISOString().split('T')[0];
+  const recDir = pathMod.join(baseDir, cam.id, dateStr);
+
+  try {
+    if (!fs.existsSync(recDir)) {
+      fs.mkdirSync(recDir, { recursive: true, mode: 0o755 });
+      if (process.platform !== 'win32') {
+        try {
+          execSync(`chmod -R 775 "${recDir}"`);
+        } catch {}
+      }
+    }
+  } catch (err) {
+    console.error(`[auto-rec] Cannot create dir for ${cam.name}:`, err.message);
+    return;
+  }
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const fileName = `auto_${cam.stream_key}_${timestamp}.mp4`;
+  const filePath = pathMod.join(recDir, fileName);
+  const startTime = new Date();
+
+  try {
+    const { spawn } = require('child_process');
+    const ffmpegArgs = [
+      '-y', '-i', sourceUrl,
+      '-c', 'copy',
+      '-movflags', '+frag_keyframe+empty_moov+faststart',
+      '-t', String(autoRecordingState.segmentMinutes * 60), // Duração máxima do segmento
+      '-f', 'mp4', filePath
+    ];
+
+    const ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
+      detached: false,
+      stdio: ['ignore', 'ignore', 'ignore'],
+    });
+
+    ffmpegProcess.on('error', (err) => {
+      console.error(`[auto-rec] FFmpeg error for ${cam.name}:`, err.message);
+      delete autoRecordingState.cameras[cam.id];
+    });
+
+    ffmpegProcess.on('exit', async (code) => {
+      const rec = autoRecordingState.cameras[cam.id];
+      if (rec) {
+        // Salvar no banco
+        await saveRecordingToDb(cam.id, cam.name, cam.client_id, cam.client_name, rec.startTime, rec.filePath);
+        delete autoRecordingState.cameras[cam.id];
+      }
+    });
+
+    autoRecordingState.cameras[cam.id] = {
+      process: ffmpegProcess,
+      filePath,
+      startTime,
+      cameraName: cam.name,
+      clientId: cam.client_id,
+      clientName: cam.client_name,
+    };
+
+    console.log(`[auto-rec] ▶ ${cam.name} → ${filePath}`);
+  } catch (err) {
+    console.error(`[auto-rec] Start error for ${cam.name}:`, err.message);
+  }
+}
+
+async function stopAutoRecording(cameraId) {
+  const rec = autoRecordingState.cameras[cameraId];
+  if (!rec) return;
+
+  try {
+    rec.process.kill('SIGINT');
+    await new Promise(r => setTimeout(r, 1500));
+    await saveRecordingToDb(cameraId, rec.cameraName, rec.clientId, rec.clientName, rec.startTime, rec.filePath);
+  } catch (err) {
+    console.error(`[auto-rec] Stop error:`, err.message);
+  }
+  delete autoRecordingState.cameras[cameraId];
+}
+
+async function saveRecordingToDb(cameraId, cameraName, clientId, clientName, startTime, filePath) {
+  try {
+    const endTime = new Date();
+    const durationSeconds = Math.round((endTime.getTime() - startTime.getTime()) / 1000);
+    let fileSizeMb = 0;
+    try {
+      if (fs.existsSync(filePath)) {
+        const stats = fs.statSync(filePath);
+        fileSizeMb = Math.round(stats.size / (1024 * 1024) * 10) / 10;
+      }
+    } catch {}
+    if (fileSizeMb > 0) {
+      await pool.query(
+        `INSERT INTO recordings (camera_id, camera_name, client_id, client_name, start_time, end_time, duration_seconds, file_size_mb, file_path, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'completed')`,
+        [cameraId, cameraName, clientId, clientName, startTime.toISOString(), endTime.toISOString(), durationSeconds, fileSizeMb, filePath]
+      );
+    }
+  } catch (err) {
+    console.error('[auto-rec] DB save error:', err.message);
+  }
+}
+
+function startAutoRecordingWorker() {
+  if (autoRecordingState.running) return;
+  autoRecordingState.running = true;
+  console.log('🔴 Auto-recording worker INICIADO');
+  // Check every 30 seconds
+  autoRecordingCheck();
+  autoRecordingState.checkInterval = setInterval(autoRecordingCheck, 30000);
+}
+
+function stopAutoRecordingWorker() {
+  if (!autoRecordingState.running) return;
+  autoRecordingState.running = false;
+  if (autoRecordingState.checkInterval) clearInterval(autoRecordingState.checkInterval);
+  // Stop all active recordings
+  for (const camId of Object.keys(autoRecordingState.cameras)) {
+    stopAutoRecording(camId);
+  }
+  console.log('⏹ Auto-recording worker PARADO');
+}
+
+// ============================================================
+//  WORKER DE LIMPEZA AUTOMÁTICA DE GRAVAÇÕES
+//  Remove arquivos antigos com base em retention_days
+// ============================================================
+
+async function cleanupOldRecordings() {
+  try {
+    // Buscar gravações expiradas
+    const result = await pool.query(`
+      SELECT r.id, r.file_path, r.camera_id, c.retention_days
+      FROM recordings r
+      JOIN cameras c ON r.camera_id = c.id
+      WHERE c.retention_days > 0
+        AND r.created_at < now() - (c.retention_days || ' days')::interval
+        AND r.status = 'completed'
+      LIMIT 100
+    `);
+
+    if (result.rows.length === 0) return { deleted: 0 };
+
+    let deleted = 0;
+    let freedMb = 0;
+
+    for (const rec of result.rows) {
+      try {
+        if (rec.file_path && fs.existsSync(rec.file_path)) {
+          const stats = fs.statSync(rec.file_path);
+          freedMb += stats.size / (1024 * 1024);
+          fs.unlinkSync(rec.file_path);
+        }
+        await pool.query(`DELETE FROM recordings WHERE id = $1`, [rec.id]);
+        deleted++;
+      } catch (err) {
+        console.error(`[cleanup] Error deleting ${rec.file_path}:`, err.message);
+      }
+    }
+
+    // Limpar diretórios vazios
+    try {
+      const storageResult = await pool.query(`SELECT DISTINCT storage_path FROM cameras WHERE storage_path IS NOT NULL AND storage_path != ''`);
+      for (const row of storageResult.rows) {
+        cleanEmptyDirs(row.storage_path);
+      }
+    } catch {}
+
+    if (deleted > 0) {
+      console.log(`[cleanup] 🗑 ${deleted} gravações removidas, ${Math.round(freedMb)} MB liberados`);
+    }
+
+    return { deleted, freed_mb: Math.round(freedMb) };
+  } catch (err) {
+    console.error('[cleanup] Error:', err.message);
+    return { deleted: 0, error: err.message };
+  }
+}
+
+function cleanEmptyDirs(dirPath) {
+  try {
+    if (!fs.existsSync(dirPath)) return;
+    const entries = fs.readdirSync(dirPath);
+    for (const entry of entries) {
+      const fullPath = pathMod.join(dirPath, entry);
+      if (fs.statSync(fullPath).isDirectory()) {
+        cleanEmptyDirs(fullPath);
+        // After cleaning children, check if empty
+        if (fs.readdirSync(fullPath).length === 0) {
+          fs.rmdirSync(fullPath);
+        }
+      }
+    }
+  } catch {}
+}
+
+// Run cleanup every hour
+let cleanupInterval = null;
+function startCleanupWorker() {
+  console.log('🧹 Cleanup worker INICIADO (a cada 1h)');
+  cleanupOldRecordings();
+  cleanupInterval = setInterval(cleanupOldRecordings, 60 * 60 * 1000);
+}
+
+// ============================================================
+//  MONITORAMENTO DE SAÚDE DO SISTEMA
+// ============================================================
+
+async function getSystemHealth() {
+  const cpus = os.cpus();
+  const cpuCount = cpus.length;
+
+  // CPU usage (average over 1s)
+  const startUsage = process.cpuUsage();
+  const startTime = Date.now();
+
+  // Memory
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  const usedMem = totalMem - freeMem;
+
+  // Disk usage
+  let diskTotal = 0, diskFree = 0, diskUsed = 0;
+  try {
+    if (process.platform !== 'win32') {
+      const dfOut = execSync(`df -B1 --output=size,avail / | tail -1`, { encoding: 'utf8' });
+      const parts = dfOut.trim().split(/\s+/);
+      diskTotal = parseInt(parts[0]) || 0;
+      diskFree = parseInt(parts[1]) || 0;
+      diskUsed = diskTotal - diskFree;
+    } else {
+      const out = execSync(`wmic logicaldisk where "DeviceID='C:'" get Size,FreeSpace /format:value`, { encoding: 'utf8' });
+      const freeMatch = out.match(/FreeSpace=(\d+)/);
+      const sizeMatch = out.match(/Size=(\d+)/);
+      if (freeMatch) diskFree = parseInt(freeMatch[1]);
+      if (sizeMatch) diskTotal = parseInt(sizeMatch[1]);
+      diskUsed = diskTotal - diskFree;
+    }
+  } catch {}
+
+  // Uptime
+  const uptimeSeconds = os.uptime();
+
+  // Services status
+  const services = {};
+  // PostgreSQL
+  try {
+    await pool.query('SELECT 1');
+    services.postgresql = 'online';
+  } catch {
+    services.postgresql = 'offline';
+  }
+
+  // MediaMTX
+  try {
+    const msResult = await pool.query(`SELECT ip_address, hls_base_port FROM media_servers WHERE status = 'online' LIMIT 1`);
+    if (msResult.rows.length > 0) {
+      const ip = msResult.rows[0].ip_address || '127.0.0.1';
+      const port = msResult.rows[0].hls_base_port || 8888;
+      const httpLib = require('http');
+      await new Promise((resolve) => {
+        const r = httpLib.get(`http://${ip}:${port}/v3/paths/list`, { timeout: 3000 }, (resp) => {
+          services.mediamtx = resp.statusCode === 200 ? 'online' : 'offline';
+          resp.resume();
+          resolve();
+        });
+        r.on('error', () => { services.mediamtx = 'offline'; resolve(); });
+        r.on('timeout', () => { r.destroy(); services.mediamtx = 'offline'; resolve(); });
+      });
+    } else {
+      services.mediamtx = 'not_configured';
+    }
+  } catch {
+    services.mediamtx = 'offline';
+  }
+
+  // PostgREST
+  try {
+    const httpLib = require('http');
+    await new Promise((resolve) => {
+      const r = httpLib.get(`${POSTGREST_URL}/`, { timeout: 3000 }, (resp) => {
+        services.postgrest = resp.statusCode === 200 ? 'online' : 'offline';
+        resp.resume();
+        resolve();
+      });
+      r.on('error', () => { services.postgrest = 'offline'; resolve(); });
+      r.on('timeout', () => { r.destroy(); services.postgrest = 'offline'; resolve(); });
+    });
+  } catch {
+    services.postgrest = 'offline';
+  }
+
+  // Nginx
+  try {
+    if (process.platform !== 'win32') {
+      execSync('systemctl is-active nginx', { encoding: 'utf8' });
+      services.nginx = 'online';
+    } else {
+      services.nginx = 'not_applicable';
+    }
+  } catch {
+    services.nginx = 'offline';
+  }
+
+  // FFmpeg
+  try {
+    execSync('ffmpeg -version', { encoding: 'utf8', timeout: 5000 });
+    services.ffmpeg = 'installed';
+  } catch {
+    services.ffmpeg = 'not_installed';
+  }
+
+  // Recording counts
+  let totalRecordings = 0, storageSizeMb = 0;
+  try {
+    const recResult = await pool.query(`SELECT COUNT(*) as count, COALESCE(SUM(file_size_mb), 0) as total_mb FROM recordings`);
+    totalRecordings = parseInt(recResult.rows[0].count);
+    storageSizeMb = parseFloat(recResult.rows[0].total_mb);
+  } catch {}
+
+  // Camera counts
+  let camerasOnline = 0, camerasOffline = 0, camerasTotal = 0;
+  try {
+    const camResult = await pool.query(`SELECT status, COUNT(*) as count FROM cameras GROUP BY status`);
+    for (const row of camResult.rows) {
+      camerasTotal += parseInt(row.count);
+      if (row.status === 'online') camerasOnline = parseInt(row.count);
+      else if (row.status === 'offline') camerasOffline = parseInt(row.count);
+    }
+  } catch {}
+
+  return {
+    cpu: {
+      count: cpuCount,
+      model: cpus[0]?.model || 'unknown',
+    },
+    memory: {
+      total_gb: Math.round(totalMem / (1024 * 1024 * 1024) * 10) / 10,
+      used_gb: Math.round(usedMem / (1024 * 1024 * 1024) * 10) / 10,
+      free_gb: Math.round(freeMem / (1024 * 1024 * 1024) * 10) / 10,
+      usage_percent: Math.round((usedMem / totalMem) * 100),
+    },
+    disk: {
+      total_gb: Math.round(diskTotal / (1024 * 1024 * 1024) * 10) / 10,
+      used_gb: Math.round(diskUsed / (1024 * 1024 * 1024) * 10) / 10,
+      free_gb: Math.round(diskFree / (1024 * 1024 * 1024) * 10) / 10,
+      usage_percent: diskTotal > 0 ? Math.round((diskUsed / diskTotal) * 100) : 0,
+    },
+    uptime_seconds: uptimeSeconds,
+    uptime_human: `${Math.floor(uptimeSeconds / 86400)}d ${Math.floor((uptimeSeconds % 86400) / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m`,
+    services,
+    recordings: {
+      total: totalRecordings,
+      storage_mb: Math.round(storageSizeMb),
+      storage_gb: Math.round(storageSizeMb / 1024 * 10) / 10,
+    },
+    cameras: {
+      total: camerasTotal,
+      online: camerasOnline,
+      offline: camerasOffline,
+    },
+    auto_recording: {
+      running: autoRecordingState.running,
+      active_cameras: Object.keys(autoRecordingState.cameras).length,
+    },
+    analysis: getAnalysisStatus(),
+    timestamp: new Date().toISOString(),
+  };
+}
+
+// ============================================================
+//  DETECÇÃO AUTOMÁTICA DE CÂMERAS OFFLINE
+//  Verifica streams a cada 2 min e atualiza status
+// ============================================================
+
+async function checkCamerasOnlineStatus() {
+  try {
+    const { mediaIp, hlsPort } = await getMediaServer();
+    if (!mediaIp) return;
+
+    // Listar paths ativos no MediaMTX
+    let activePaths = [];
+    try {
+      const httpLib = require('http');
+      const pathsData = await new Promise((resolve) => {
+        const r = httpLib.get(`http://${mediaIp}:${hlsPort}/v3/paths/list`, { timeout: 5000 }, (resp) => {
+          let body = '';
+          resp.on('data', c => body += c);
+          resp.on('end', () => {
+            try {
+              const data = JSON.parse(body);
+              resolve(data.items || []);
+            } catch { resolve([]); }
+          });
+        });
+        r.on('error', () => resolve([]));
+        r.on('timeout', () => { r.destroy(); resolve([]); });
+      });
+      activePaths = pathsData.map(p => p.name);
+    } catch {}
+
+    // Buscar todas as câmeras com stream_key
+    const camResult = await pool.query(`SELECT id, stream_key, status FROM cameras WHERE stream_key != ''`);
+    
+    for (const cam of camResult.rows) {
+      const isActive = activePaths.includes(cam.stream_key);
+      const newStatus = isActive ? 'online' : 'offline';
+      
+      if (cam.status !== newStatus) {
+        await pool.query(`UPDATE cameras SET status = $1, updated_at = now() WHERE id = $2`, [newStatus, cam.id]);
+        
+        // Gerar alarme se câmera ficou offline
+        if (newStatus === 'offline') {
+          try {
+            const camInfo = await pool.query(`SELECT name, client_id FROM cameras WHERE id = $1`, [cam.id]);
+            const camName = camInfo.rows[0]?.name || '';
+            let clientName = '';
+            if (camInfo.rows[0]?.client_id) {
+              const clResult = await pool.query(`SELECT name FROM clients WHERE id = $1`, [camInfo.rows[0].client_id]);
+              clientName = clResult.rows[0]?.name || '';
+            }
+            await pool.query(
+              `INSERT INTO alarms (camera_id, camera_name, client_name, type, severity, message)
+               VALUES ($1, $2, $3, 'camera_offline', 'critical', $4)`,
+              [cam.id, camName, clientName, `Câmera ${camName} ficou offline`]
+            );
+            console.log(`⚠️ Câmera OFFLINE detectada: ${camName}`);
+          } catch {}
+        } else {
+          console.log(`✅ Câmera ONLINE: ${cam.stream_key}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[cam-check] Error:', err.message);
+  }
+}
+
+let cameraCheckInterval = null;
+function startCameraHealthCheck() {
+  console.log('📡 Camera health check INICIADO (a cada 2min)');
+  setTimeout(checkCamerasOnlineStatus, 15000); // First check after 15s
+  cameraCheckInterval = setInterval(checkCamerasOnlineStatus, 120000); // Every 2 min
+}
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Nexus Auth + API Gateway rodando em http://localhost:${PORT}`);
   console.log(`PostgREST em ${POSTGREST_URL}`);
-  // Cada servidor é independente — sem sync para nuvem
-  // Iniciar análise contínua automaticamente
+  // Iniciar todos os workers
   autoStartAnalysis();
+  startAutoRecordingWorker();
+  startCleanupWorker();
+  startCameraHealthCheck();
 });

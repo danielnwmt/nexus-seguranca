@@ -20,6 +20,9 @@ import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import Analytics from "./pages/Analytics";
 import Recordings from "./pages/Recordings";
+import SystemHealth from "./pages/SystemHealth";
+import CameraMap from "./pages/CameraMap";
+import Timeline from "./pages/Timeline";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +49,9 @@ const App = () => (
               <Route path="/service-orders" element={<ServiceOrders />} />
               <Route path="/support" element={<Support />} />
               <Route path="/analytics" element={<Analytics />} />
+              <Route path="/system-health" element={<SystemHealth />} />
+              <Route path="/camera-map" element={<CameraMap />} />
+              <Route path="/timeline" element={<Timeline />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />

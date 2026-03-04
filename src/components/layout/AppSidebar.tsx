@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Camera, Users, Bell, DollarSign, Shield, Settings, LogOut, Headphones, ClipboardList, Wrench, Brain, Film } from 'lucide-react';
+import { LayoutDashboard, Camera, Users, Bell, DollarSign, Shield, Settings, LogOut, Headphones, ClipboardList, Wrench, Brain, Film, Activity, MapPin, Clock } from 'lucide-react';
 import nexusLogo from '@/assets/nexus-logo.png';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
@@ -7,7 +7,9 @@ import { useCompanySettings } from '@/hooks/useCompanySettings';
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/cameras', icon: Camera, label: 'Câmeras' },
+  { to: '/camera-map', icon: MapPin, label: 'Mapa' },
   { to: '/recordings', icon: Film, label: 'Gravações' },
+  { to: '/timeline', icon: Clock, label: 'Timeline' },
   { to: '/clients', icon: Users, label: 'Clientes' },
   { to: '/guards', icon: Shield, label: 'Vigilantes' },
   { to: '/installers', icon: Wrench, label: 'Técnicos' },
@@ -15,6 +17,7 @@ const navItems = [
   { to: '/financial', icon: DollarSign, label: 'Financeiro' },
   { to: '/alarms', icon: Bell, label: 'Alarmes' },
   { to: '/analytics', icon: Brain, label: 'Analíticos IA' },
+  { to: '/system-health', icon: Activity, label: 'Saúde do Sistema' },
   { to: '/support', icon: Headphones, label: 'Atendimento' },
   { to: '/settings', icon: Settings, label: 'Configurações' },
 ];
@@ -36,14 +39,14 @@ const AppSidebar = () => {
         </div>
       </div>
 
-      <nav className="flex-1 p-3 space-y-1">
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-thin">
         {navItems.map((item) => {
           const isActive = location.pathname === item.to;
           return (
             <NavLink
               key={item.to}
               to={item.to}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                 isActive
                   ? 'bg-primary/10 text-primary glow-border'
                   : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
