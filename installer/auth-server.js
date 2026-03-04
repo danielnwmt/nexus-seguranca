@@ -1171,10 +1171,10 @@ WantedBy=multi-user.target
     if (path === '/api/cameras/recording/status' && req.method === 'GET') {
       const active = Object.entries(global._activeRecordings || {}).map(([id, rec]) => ({
         camera_id: id,
-        camera_name: (rec as any).cameraName,
-        start_time: (rec as any).startTime.toISOString(),
-        file_path: (rec as any).filePath,
-        duration_seconds: Math.round((Date.now() - (rec as any).startTime.getTime()) / 1000),
+        camera_name: rec.cameraName,
+        start_time: rec.startTime.toISOString(),
+        file_path: rec.filePath,
+        duration_seconds: Math.round((Date.now() - rec.startTime.getTime()) / 1000),
       }));
       return sendJSON(res, 200, { active_recordings: active });
     }
