@@ -204,21 +204,18 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
               <TooltipTrigger asChild>
                 <button
                   onClick={() => {
-                    const url = webRtcUrl || camera.streamUrl || '';
-                    if (url) {
-                      window.open(url, '_blank', 'noopener,noreferrer');
-                    } else {
+                    if (!webRtcUrl && !camera.streamUrl) {
                       toast({ title: 'Sem URL configurada', variant: 'destructive' });
+                      return;
                     }
+                    setIsViewing(true);
                   }}
-                  className="w-7 h-7 rounded flex items-center justify-center transition-colors bg-background/80 text-muted-foreground hover:text-foreground"
+                  className={`w-7 h-7 rounded flex items-center justify-center transition-colors ${isViewing ? 'bg-primary/80 text-primary-foreground' : 'bg-background/80 text-muted-foreground hover:text-foreground'}`}
                 >
                   <Link2 className="w-3 h-3" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent className="max-w-xs break-all font-mono text-[10px]">
-                {webRtcUrl || camera.streamUrl || 'Sem URL'}
-              </TooltipContent>
+              <TooltipContent>Abrir stream ao vivo</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
