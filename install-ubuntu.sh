@@ -272,11 +272,20 @@ if [ -f "$MEDIAMTX_BIN" ]; then
   sed -i 's/^readPass:.*/readPass: /g' "$MEDIAMTX_CONF"
   sed -i 's/^publishUser:.*/publishUser: /g' "$MEDIAMTX_CONF"
   sed -i 's/^publishPass:.*/publishPass: /g' "$MEDIAMTX_CONF"
+  # Detectar IP publico para WebRTC (necessario para acesso externo)
+  PUBLIC_IP=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || curl -s --max-time 5 https://ifconfig.me 2>/dev/null || echo "")
+  if [ -n "$PUBLIC_IP" ]; then
+    WEBRTC_IP="$PUBLIC_IP"
+    ok "IP publico detectado para WebRTC: $PUBLIC_IP"
+  else
+    WEBRTC_IP="$LOCAL_IP"
+    warn "Nao foi possivel detectar IP publico, usando IP local: $LOCAL_IP"
+  fi
 
-  # Configurar IP externo para WebRTC (usa IP detectado)
-  sed -i "s/^#webrtcICEUDPServerIPs:.*/webrtcICEUDPServerIPs: [$LOCAL_IP]/g" "$MEDIAMTX_CONF"
-  sed -i "s/^webrtcICEUDPServerIPs:.*/webrtcICEUDPServerIPs: [$LOCAL_IP]/g" "$MEDIAMTX_CONF"
-  ok "Configuracao MediaMTX ajustada (zero auth, IP: $LOCAL_IP)"
+  # Configurar IP externo para WebRTC
+  sed -i "s/^#webrtcICEUDPServerIPs:.*/webrtcICEUDPServerIPs: [$WEBRTC_IP]/g" "$MEDIAMTX_CONF"
+  sed -i "s/^webrtcICEUDPServerIPs:.*/webrtcICEUDPServerIPs: [$WEBRTC_IP]/g" "$MEDIAMTX_CONF"
+  ok "Configuracao MediaMTX ajustada (zero auth, WebRTC IP: $WEBRTC_IP)"
 
   # Criar servico systemd
   cat > /etc/systemd/system/mediamtx.service << EOF
