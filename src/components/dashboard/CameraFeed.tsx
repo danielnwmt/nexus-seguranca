@@ -120,35 +120,30 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
     }
   }, [isRecording, camera, toast]);
 
-  // Build WebRTC URL from stream info
-  // MediaMTX serves WebRTC (WHIP) at http://<server>:8889/<path>/whip
+  // Convert any stream URL (rtmp, rtsp, http) to WebRTC WHIP endpoint
   const getWebRtcUrl = (): string => {
-    if (!camera.streamUrl) return '';
-    // If it's already a WebRTC/WHIP URL
-    if (camera.streamUrl.includes('/whip')) return camera.streamUrl;
-    // If it's an http URL pointing to MediaMTX (HLS or WebRTC port)
-    if (camera.streamUrl.startsWith('http')) {
+    const url = camera.streamUrl;
+    if (!url) return '';
+    // Already a WHIP URL
+    if (url.includes('/whip')) return url;
+    // RTMP: rtmp://IP:PORT/KEY → http://IP:8889/KEY/whip
+    const rtmpMatch = url.match(/^rtmp:\/\/([^:/]+)(?::\d+)?\/(.+)/);
+    if (rtmpMatch) return `http://${rtmpMatch[1]}:8889/${rtmpMatch[2]}/whip`;
+    // RTSP: rtsp://IP:PORT/KEY → http://IP:8889/KEY/whip
+    const rtspMatch = url.match(/^rtsp:\/\/([^:/]+)(?::\d+)?\/(.+)/);
+    if (rtspMatch) return `http://${rtspMatch[1]}:8889/${rtspMatch[2]}/whip`;
+    // HTTP URL → extract host + path → build WHIP
+    if (url.startsWith('http')) {
       try {
-        const url = new URL(camera.streamUrl);
-        const streamPath = url.pathname.replace(/^\/+|\/+$/g, '') || camera.id;
-        const serverHost = url.hostname;
-        return `http://${serverHost}:8889/${streamPath}/whip`;
-      } catch {
-        return '';
-      }
+        const parsed = new URL(url);
+        const path = parsed.pathname.replace(/^\/+|\/+$/g, '');
+        if (path) return `http://${parsed.hostname}:8889/${path}/whip`;
+      } catch { /* ignore */ }
     }
-    // Extract server from RTSP/RTMP URL and build WebRTC path
-    try {
-      const url = new URL(camera.streamUrl);
-      const streamPath = url.pathname.replace(/^\//, '') || camera.id;
-      const serverHost = url.hostname;
-      return `http://${serverHost}:8889/${streamPath}/whip`;
-    } catch {
-      return '';
-    }
+    return '';
   };
 
-  const hlsUrl = getWebRtcUrl();
+  const webRtcUrl = getWebRtcUrl();
 
   return (
     <div className="rounded-lg border border-camera-border bg-camera-bg overflow-hidden group">
@@ -159,8 +154,8 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
             <VideoOff className="w-8 h-8" />
             <span className="text-xs font-mono">SEM SINAL</span>
           </div>
-        ) : isViewing && hlsUrl ? (
-          <WebRtcPlayer src={hlsUrl} className="absolute inset-0" />
+        ) : isViewing && webRtcUrl ? (
+          <WebRtcPlayer src={webRtcUrl} className="absolute inset-0" />
         ) : (
           <>
             <div className="absolute inset-0 opacity-10" style={{
