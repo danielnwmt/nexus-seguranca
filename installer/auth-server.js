@@ -27,6 +27,20 @@ const pool = new Pool({
   password: '' // Definido pelo instalador
 });
 
+
+// Evita queda total do serviço em erros transitórios de conexão
+pool.on('error', (err) => {
+  console.error('[PG_POOL_ERROR]', err?.message || err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[UNHANDLED_REJECTION]', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[UNCAUGHT_EXCEPTION]', err?.message || err);
+});
+
 // JWT simples (sem dependência externa)
 function base64url(str) {
   return Buffer.from(str).toString('base64')

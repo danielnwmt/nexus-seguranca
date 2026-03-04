@@ -59,10 +59,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const origin = window.location.origin.replace(/\/$/, '');
         const host = window.location.hostname;
 
-        const tokenUrls = [
+        const tokenUrls = Array.from(new Set([
           `${apiBase}/auth/v1/token?grant_type=password`, // /auth/auth/v1/token (quando Nginx remove /auth)
-          `${origin}/auth/v1/token?grant_type=password`,  // /auth/v1/token (quando não remove /auth)
-        ];
+          `${origin}/auth/v1/token?grant_type=password`,  // /auth/v1/token (quando preserva /auth)
+          `${origin}/v1/token?grant_type=password`,       // /v1/token (quando um proxy externo já remove /auth)
+        ]));
 
         if (window.location.protocol === 'http:') {
           tokenUrls.push(`http://${host}:8001/auth/v1/token?grant_type=password`); // fallback direto em HTTP
@@ -72,11 +73,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         for (const tokenUrl of tokenUrls) {
           try {
+            const controller = new AbortController();
+            const timeoutId = window.setTimeout(() => controller.abort(), 12000);
+
             const res = await fetch(tokenUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ email, password }),
+              signal: controller.signal,
             });
+
+            clearTimeout(timeoutId);
 
             const data = await res.json().catch(() => ({}));
 
@@ -92,7 +99,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               }
 
               // Para erros de gateway/rota, tenta próximo endpoint
-              lastError = new Error(data.error || `Erro HTTP ${res.status}`);
+              lastError = new Error(`${tokenUrl} -> ${data.error || `Erro HTTP ${res.status}`}`);
               continue;
             }
 
@@ -110,7 +117,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             return { error: null };
           } catch (err) {
-            lastError = err;
+            console.error('[local-login] endpoint_failed', tokenUrl, err);
+            lastError = new Error(`${tokenUrl} -> ${err instanceof Error ? err.message : 'Falha de conexão'}`);
           }
         }
 
