@@ -1,0 +1,3 @@
+ALTER TABLE public.cameras ADD COLUMN IF NOT EXISTS latitude NUMERIC;
+ALTER TABLE public.cameras ADD COLUMN IF NOT EXISTS longitude NUMERIC;
+ALTER TABLE public.cameras ADD COLUMN IF NOT EXISTS auto_record BOOLEAN DEFAULT true;

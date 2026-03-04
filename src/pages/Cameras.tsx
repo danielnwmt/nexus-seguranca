@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Camera, Plus, Search, HardDrive, Calendar, Brain, Video, Key, Copy } from 'lucide-react';
+import { Camera, Plus, Search, HardDrive, Calendar, Brain, Video, Key, Copy, MapPin } from 'lucide-react';
 import CameraFeed from '@/components/dashboard/CameraFeed';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -33,11 +33,13 @@ interface CameraForm {
   videoEncoding: string;
   maxBitrate: string;
   brand: string;
+  latitude: string;
+  longitude: string;
 }
 
 // stream_key is auto-generated as UUID by the database (gen_random_uuid())
 
-const emptyForm: CameraForm = { name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30', analytics: [], videoEncoding: 'H.264', maxBitrate: '4096', brand: '' };
+const emptyForm: CameraForm = { name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30', analytics: [], videoEncoding: 'H.264', maxBitrate: '4096', brand: '', latitude: '', longitude: '' };
 
 const Cameras = () => {
   const { toast } = useToast();
@@ -154,6 +156,8 @@ const Cameras = () => {
       video_encoding: newCamera.videoEncoding,
       max_bitrate: Number(newCamera.maxBitrate),
       brand: newCamera.brand || null,
+      latitude: newCamera.latitude ? Number(newCamera.latitude) : null,
+      longitude: newCamera.longitude ? Number(newCamera.longitude) : null,
     };
 
     if (editingId) {
@@ -185,6 +189,8 @@ const Cameras = () => {
       videoEncoding: camera.video_encoding || 'H.264',
       maxBitrate: String(camera.max_bitrate || 4096),
       brand: camera.brand || '',
+      latitude: camera.latitude ? String(camera.latitude) : '',
+      longitude: camera.longitude ? String(camera.longitude) : '',
     });
     setDialogOpen(true);
   };
@@ -392,6 +398,16 @@ const Cameras = () => {
                       <span className="text-xs text-foreground">{ANALYTIC_LABELS[analytic]}</span>
                     </label>
                   ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" /> Latitude</Label>
+                  <Input type="number" step="any" value={newCamera.latitude} onChange={e => setNewCamera(p => ({ ...p, latitude: e.target.value }))} placeholder="-23.5505" className="bg-muted border-border font-mono text-xs" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" /> Longitude</Label>
+                  <Input type="number" step="any" value={newCamera.longitude} onChange={e => setNewCamera(p => ({ ...p, longitude: e.target.value }))} placeholder="-46.6333" className="bg-muted border-border font-mono text-xs" />
                 </div>
               </div>
               <Button onClick={handleSave} className="w-full">{editingId ? 'Salvar Alterações' : 'Adicionar Câmera'}</Button>
