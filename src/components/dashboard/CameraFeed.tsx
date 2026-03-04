@@ -204,12 +204,12 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
               <TooltipTrigger asChild>
                 <button
                   onClick={() => {
-                    const url = webRtcUrl || camera.streamUrl || 'Sem URL';
-                    navigator.clipboard.writeText(url).then(() => {
-                      toast({ title: 'Link copiado', description: url });
-                    }).catch(() => {
-                      toast({ title: 'Link WebRTC', description: url });
-                    });
+                    const url = webRtcUrl || camera.streamUrl || '';
+                    if (url) {
+                      window.open(url, '_blank', 'noopener,noreferrer');
+                    } else {
+                      toast({ title: 'Sem URL configurada', variant: 'destructive' });
+                    }
                   }}
                   className="w-7 h-7 rounded flex items-center justify-center transition-colors bg-background/80 text-muted-foreground hover:text-foreground"
                 >
