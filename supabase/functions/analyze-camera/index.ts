@@ -59,7 +59,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { image_base64, image_url, camera_id, camera_name, client_id, client_name, enabled_analytics } = body;
+    const { image_base64, image_url, camera_id, camera_name, client_id, client_name, enabled_analytics, analytics_config } = body;
 
     // Validate enabled_analytics
     if (!Array.isArray(enabled_analytics) || enabled_analytics.length === 0 || enabled_analytics.length > 20) {
@@ -106,7 +106,15 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "No image provided (send image_base64 or image_url)" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const userMessage = `Enabled analytics: ${sanitizedAnalytics.join(", ")}\n\nAnalyze this surveillance camera image.`;
+    let userMessage = `Enabled analytics: ${sanitizedAnalytics.join(", ")}\n\nAnalyze this surveillance camera image.`;
+    
+    // Add line crossing configuration if present
+    if (analytics_config?.line_crossing_lines && Array.isArray(analytics_config.line_crossing_lines) && analytics_config.line_crossing_lines.length > 0) {
+      const lineDescs = analytics_config.line_crossing_lines.map((l: any, i: number) => 
+        `Line "${l.name || `Line ${i+1}`}": from (${Math.round(l.x1*100)}%,${Math.round(l.y1*100)}%) to (${Math.round(l.x2*100)}%,${Math.round(l.y2*100)}%), direction: ${l.direction || 'both'}`
+      ).join('\n');
+      userMessage += `\n\nLine crossing zones configured:\n${lineDescs}\nDetect people or vehicles crossing these virtual lines.`;
+    }
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

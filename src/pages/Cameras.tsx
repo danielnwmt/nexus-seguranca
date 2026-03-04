@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { AnalyticType } from '@/types/monitoring';
 import { ANALYTIC_LABELS } from '@/types/monitoring';
 import { useTableQuery, usePaginatedQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
+import LineCrossingEditor, { type LineCrossingLine } from '@/components/cameras/LineCrossingEditor';
 
 const RETENTION_OPTIONS = [0, 5, 10, 15, 20, 25, 30] as const;
 const ALL_ANALYTICS: AnalyticType[] = ['lpr', 'weapon_detection', 'line_crossing', 'area_intrusion', 'loitering', 'human_car_classification', 'fallen_person', 'people_counting', 'tampering'];
@@ -35,11 +36,12 @@ interface CameraForm {
   brand: string;
   latitude: string;
   longitude: string;
+  analyticsConfig: { line_crossing_lines?: LineCrossingLine[]; [key: string]: any };
 }
 
 // stream_key is auto-generated as UUID by the database (gen_random_uuid())
 
-const emptyForm: CameraForm = { name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30', analytics: [], videoEncoding: 'H.264', maxBitrate: '4096', brand: '', latitude: '', longitude: '' };
+const emptyForm: CameraForm = { name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080', clientId: '', storagePath: '', retentionDays: '30', analytics: [], videoEncoding: 'H.264', maxBitrate: '4096', brand: '', latitude: '', longitude: '', analyticsConfig: {} };
 
 const Cameras = () => {
   const { toast } = useToast();
@@ -158,6 +160,7 @@ const Cameras = () => {
       brand: newCamera.brand || null,
       latitude: newCamera.latitude ? Number(newCamera.latitude) : null,
       longitude: newCamera.longitude ? Number(newCamera.longitude) : null,
+      analytics_config: newCamera.analyticsConfig || {},
     };
 
     if (editingId) {
@@ -191,6 +194,7 @@ const Cameras = () => {
       brand: camera.brand || '',
       latitude: camera.latitude ? String(camera.latitude) : '',
       longitude: camera.longitude ? String(camera.longitude) : '',
+      analyticsConfig: camera.analytics_config || {},
     });
     setDialogOpen(true);
   };
@@ -400,6 +404,20 @@ const Cameras = () => {
                   ))}
                 </div>
               </div>
+              {/* Line Crossing Editor - shown when line_crossing is enabled */}
+              {newCamera.analytics.includes('line_crossing') && (
+                <div className="border border-primary/20 rounded-lg p-3 bg-primary/5">
+                  <Label className="text-xs text-primary font-semibold mb-2 block">🔲 Configurar Linhas de Cruzamento</Label>
+                  <LineCrossingEditor
+                    lines={newCamera.analyticsConfig?.line_crossing_lines || []}
+                    onChange={(lines) => setNewCamera(p => ({
+                      ...p,
+                      analyticsConfig: { ...p.analyticsConfig, line_crossing_lines: lines },
+                    }))}
+                    snapshotUrl={editingId ? undefined : undefined}
+                  />
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" /> Latitude</Label>
