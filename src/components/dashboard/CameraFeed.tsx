@@ -121,26 +121,57 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
   }, [isRecording, camera, toast]);
 
   // Convert any stream URL (rtmp, rtsp, http) to WebRTC WHIP endpoint
+  // Works in both HTTP and HTTPS by using Nginx proxy in HTTPS mode
   const getWebRtcUrl = (): string => {
     const url = camera.streamUrl;
     if (!url) return '';
+    
+    let streamHost = '';
+    let streamKey = '';
+    
     // Already a WebRTC URL on port 8889
-    if (url.includes(':8889')) return url.replace(/\/whip\/?$/, '');
-    // RTMP: rtmp://IP:PORT/KEY → http://IP:8889/KEY
-    const rtmpMatch = url.match(/^rtmp:\/\/([^:/]+)(?::\d+)?\/(.+)/);
-    if (rtmpMatch) return `http://${rtmpMatch[1]}:8889/${rtmpMatch[2]}`;
-    // RTSP: rtsp://IP:PORT/KEY → http://IP:8889/KEY
-    const rtspMatch = url.match(/^rtsp:\/\/([^:/]+)(?::\d+)?\/(.+)/);
-    if (rtspMatch) return `http://${rtspMatch[1]}:8889/${rtspMatch[2]}`;
-    // HTTP URL → extract host + path → build WebRTC URL
-    if (url.startsWith('http')) {
+    if (url.includes(':8889')) {
+      try {
+        const parsed = new URL(url.replace(/\/whip\/?$/, ''));
+        streamHost = parsed.hostname;
+        streamKey = parsed.pathname.replace(/^\/+|\/+$/g, '');
+      } catch {
+        return url.replace(/\/whip\/?$/, '');
+      }
+    }
+    // RTMP: rtmp://IP:PORT/KEY
+    if (!streamKey) {
+      const rtmpMatch = url.match(/^rtmp:\/\/([^:/]+)(?::\d+)?\/(.+)/);
+      if (rtmpMatch) { streamHost = rtmpMatch[1]; streamKey = rtmpMatch[2]; }
+    }
+    // RTSP: rtsp://IP:PORT/KEY
+    if (!streamKey) {
+      const rtspMatch = url.match(/^rtsp:\/\/([^:/]+)(?::\d+)?\/(.+)/);
+      if (rtspMatch) { streamHost = rtspMatch[1]; streamKey = rtspMatch[2]; }
+    }
+    // HTTP/HTTPS URL
+    if (!streamKey && url.startsWith('http')) {
       try {
         const parsed = new URL(url);
-        const path = parsed.pathname.replace(/^\/+|\/+$/g, '');
-        if (path) return `http://${parsed.hostname}:8889/${path}`;
+        streamHost = parsed.hostname;
+        streamKey = parsed.pathname.replace(/^\/+|\/+$/g, '');
       } catch { /* ignore */ }
     }
-    return '';
+    
+    if (!streamKey) return '';
+    
+    const currentHost = window.location.hostname;
+    const isHttps = window.location.protocol === 'https:';
+    const isLocal = streamHost === currentHost || streamHost === '127.0.0.1' || streamHost === 'localhost';
+    
+    // HTTPS: use Nginx proxy to avoid mixed content
+    if (isHttps) {
+      // Proxy route: /webrtc/ → MediaMTX :8889
+      return `${window.location.origin}/webrtc/${streamKey}`;
+    }
+    
+    // HTTP: direct access
+    return `http://${isLocal ? currentHost : streamHost}:8889/${streamKey}`;
   };
 
   const webRtcUrl = getWebRtcUrl();

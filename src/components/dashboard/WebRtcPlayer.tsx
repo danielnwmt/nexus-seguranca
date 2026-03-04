@@ -75,7 +75,8 @@ const WebRtcPlayer = ({ src, className = '', muted = true, autoPlay = true }: We
         });
 
         // Send offer to WHIP endpoint
-        const whipUrl = src.endsWith('/whip') ? src : `${src.replace(/\/$/, '')}/whip`;
+        // If src already contains /whip, use as-is; otherwise append /whip
+        const whipUrl = src.includes('/whip') ? src : `${src.replace(/\/$/, '')}/whip`;
         const resp = await fetch(whipUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/sdp' },
