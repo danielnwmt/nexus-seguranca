@@ -18,6 +18,31 @@ export function getLocalApiBase() {
 }
 
 /**
+ * Retorna a URL base para acessar a API de gerenciamento de um servidor (local ou remoto).
+ * - Se o IP do servidor for o mesmo do hostname atual → usa proxy Nginx (/auth/api/...)
+ * - Se estiver em HTTP → acessa diretamente http://IP:8001/api/...
+ * - Se estiver em HTTPS e IP diferente → usa proxy local que repassa ao servidor remoto
+ *   Fallback: tenta via proxy local primeiro, depois direto se HTTP
+ */
+export function getServerApiUrl(serverIp: string, path: string): string {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const currentHost = window.location.hostname;
+  
+  // Se o servidor é o próprio host, usa proxy Nginx (funciona em HTTP e HTTPS)
+  if (serverIp === currentHost || serverIp === '127.0.0.1' || serverIp === 'localhost') {
+    return `${window.location.origin}/auth/api${normalizedPath}`;
+  }
+  
+  // Para servidores remotos em HTTPS: proxy via servidor local
+  if (window.location.protocol === 'https:') {
+    return `${window.location.origin}/auth/api${normalizedPath}`;
+  }
+  
+  // HTTP: acesso direto ao servidor remoto
+  return `http://${serverIp}:8001/api${normalizedPath}`;
+}
+
+/**
  * Converte nome de tabela para endpoint legado (media-servers, storage-servers)
  * Para outras tabelas, usa o proxy PostgREST via /rest/v1/
  */

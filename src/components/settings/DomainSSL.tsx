@@ -74,9 +74,6 @@ const DomainSSL = () => {
       }
 
       const urls = [`${systemApiBase}/ssl`];
-      if (typeof window !== 'undefined' && window.location.protocol === 'http:') {
-        urls.push(`http://${host}:8001/api/system/ssl`);
-      }
 
       let connected = false;
 

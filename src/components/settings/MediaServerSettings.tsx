@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
-import { isLocalInstallation, getLocalApiBase, useLocalTableQuery, useLocalInsertMutation, useLocalUpdateMutation, useLocalPatchMutation, useLocalDeleteMutation } from '@/hooks/useLocalApi';
+import { isLocalInstallation, getLocalApiBase, getServerApiUrl, useLocalTableQuery, useLocalInsertMutation, useLocalUpdateMutation, useLocalPatchMutation, useLocalDeleteMutation } from '@/hooks/useLocalApi';
 import { toast } from 'sonner';
 
 interface MediaServer {
@@ -137,7 +137,7 @@ const MediaServerSettings = () => {
     }
     setDialogTestStatus('testing');
     try {
-      const testUrl = `http://${form.ip_address}:8001/api/media-servers/test`;
+      const testUrl = getServerApiUrl(form.ip_address, '/media-servers/test');
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8000);
       const response = await fetch(testUrl, {
@@ -167,7 +167,7 @@ const MediaServerSettings = () => {
       }
     } catch {
       setDialogTestStatus('offline');
-      toast.error(`❌ Servidor não acessível em ${form.ip_address}:8001`);
+      toast.error(`❌ Servidor não acessível em ${form.ip_address}`);
     }
   };
 
@@ -201,11 +201,11 @@ const MediaServerSettings = () => {
     setInstalling(true);
     setInstallLog([]);
     try {
-      const apiBase = `http://${ip}:8001`;
+      const installUrl = getServerApiUrl(ip, '/media-servers/install');
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 120000); // 2 min timeout
 
-      const res = await fetch(`${apiBase}/api/media-servers/install`, {
+      const res = await fetch(installUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ os: osType }),
@@ -260,8 +260,8 @@ const MediaServerSettings = () => {
       }
     } catch (e: any) {
       const errorDetail = e.name === 'AbortError'
-        ? `Tempo limite excedido (120s) ao conectar em ${ip}:8001`
-        : `Não foi possível conectar ao servidor ${ip}:8001 — ${e.message || 'verifique se o serviço está rodando'}`;
+        ? `Tempo limite excedido (120s) ao conectar em ${ip}`
+        : `Não foi possível conectar ao servidor ${ip} — ${e.message || 'verifique se o serviço está rodando'}`;
       setInstallLog(prev => [...prev, `[error] ❌ ${errorDetail}`]);
       toast.error(errorDetail);
     } finally {
@@ -281,7 +281,7 @@ const MediaServerSettings = () => {
     setTestingId(server.id);
     try {
       // Tenta testar via API local do auth-server (porta 8001)
-      const testUrl = `http://${server.ip_address}:8001/api/media-servers/test`;
+      const testUrl = getServerApiUrl(server.ip_address, '/media-servers/test');
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8000);
       
@@ -315,7 +315,7 @@ const MediaServerSettings = () => {
         if (isLocal) { localPatch.mutate({ id: server.id, status: 'offline' }); } else { updateMutation.mutate({ id: server.id, status: 'offline' } as any); }
       }
     } catch {
-      toast.error(`❌ ${server.name}: Servidor não acessível em ${server.ip_address}:8001`);
+      toast.error(`❌ ${server.name}: Servidor não acessível em ${server.ip_address}`);
       if (isLocal) { localPatch.mutate({ id: server.id, status: 'offline' }); } else { updateMutation.mutate({ id: server.id, status: 'offline' } as any); }
     } finally {
       setTestingId(null);

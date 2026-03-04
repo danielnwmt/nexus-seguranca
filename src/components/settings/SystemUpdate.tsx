@@ -47,9 +47,6 @@ const SystemUpdate = () => {
 
   const fetchVersion = async () => {
     const urls = [`${systemApiBase}/version`];
-    if (typeof window !== 'undefined' && window.location.protocol === 'http:') {
-      urls.push(`http://${host}:8001/api/system/version`);
-    }
     for (const url of urls) {
       try {
         const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
@@ -100,9 +97,6 @@ const SystemUpdate = () => {
       }
 
       const urls = [`${systemApiBase}/update`];
-      if (typeof window !== 'undefined' && window.location.protocol === 'http:') {
-        urls.push(`http://${window.location.hostname}:8001/api/system/update`);
-      }
 
       let connected = false;
 

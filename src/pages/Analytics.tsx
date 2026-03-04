@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTableQuery } from '@/hooks/useSupabaseQuery';
 import { supabase } from '@/integrations/supabase/client';
-import { isLocalInstallation } from '@/hooks/useLocalApi';
+import { isLocalInstallation, getServerApiUrl } from '@/hooks/useLocalApi';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -54,7 +54,7 @@ const Analytics = () => {
   const fetchStatus = useCallback(async () => {
     if (!mediaServerIp) return;
     try {
-      const resp = await fetch(`http://${mediaServerIp}:8001/api/analytics/status`);
+      const resp = await fetch(getServerApiUrl(mediaServerIp, '/analytics/status'));
       if (resp.ok) {
         const data = await resp.json();
         setAnalysisStatus(data);
@@ -86,7 +86,7 @@ const Analytics = () => {
       if (!token) { toast({ title: 'Faça login novamente', variant: 'destructive' }); return; }
 
       const endpoint = analysisStatus?.running ? 'stop' : 'start';
-      const resp = await fetch(`http://${mediaServerIp}:8001/api/analytics/${endpoint}`, {
+      const resp = await fetch(getServerApiUrl(mediaServerIp, `/analytics/${endpoint}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ interval: 3 }),
