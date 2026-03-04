@@ -19,6 +19,7 @@ import Support from "./pages/Support";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import Analytics from "./pages/Analytics";
+import Recordings from "./pages/Recordings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/" element={<Index />} />
               <Route path="/cameras" element={<Cameras />} />
+              <Route path="/recordings" element={<Recordings />} />
               <Route path="/clients" element={<Clients />} />
               <Route path="/guards" element={<Guards />} />
               <Route path="/financial" element={<Financial />} />
