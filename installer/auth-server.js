@@ -380,6 +380,140 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    // ---- SSL INSTALL (SSE streaming) ----
+    if (path === '/api/system/ssl' && req.method === 'POST') {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
+      const token = authHeader.replace('Bearer ', '');
+      const payload = verifyJWT(token);
+      if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
+
+      const body = await readBody(req);
+      const sslDomain = (body.domain || '').trim().replace(/[^a-zA-Z0-9.\-]/g, '');
+      const sslEmail = (body.email || `admin@${sslDomain}`).trim();
+
+      if (!sslDomain || sslDomain.length < 4) {
+        return sendJSON(res, 400, { error: 'Domínio inválido' });
+      }
+
+      // SSE headers
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': CORS_HEADERS,
+        'Access-Control-Allow-Methods': CORS_METHODS
+      });
+
+      const sendEvent = (step, status, message, detail) => {
+        const data = JSON.stringify({ step, status, message, detail: detail || '' });
+        res.write(`data: ${data}\n\n`);
+      };
+
+      try {
+        // Step 1: Install certbot
+        sendEvent(1, 'running', 'Instalando Certbot...');
+        try {
+          execSync('apt-get update -qq && apt-get install -y -qq certbot python3-certbot-nginx 2>&1', { timeout: 120000 });
+          sendEvent(1, 'done', 'Certbot instalado');
+        } catch (e) {
+          const output = (e.stdout ? e.stdout.toString() : '') + (e.stderr ? e.stderr.toString() : '');
+          if (output.includes('already the newest version') || output.includes('is already installed')) {
+            sendEvent(1, 'done', 'Certbot já instalado');
+          } else {
+            sendEvent(1, 'error', 'Erro ao instalar Certbot', output.substring(0, 500));
+            res.write(`data: ${JSON.stringify({ step: 'complete', status: 'error', message: 'Falha ao instalar Certbot', output })}\n\n`);
+            return res.end();
+          }
+        }
+
+        // Step 2: Configure Nginx for domain
+        sendEvent(2, 'running', `Configurando Nginx para ${sslDomain}...`);
+        try {
+          const nginxConf = `server {
+    listen 80;
+    server_name ${sslDomain} www.${sslDomain};
+
+    location / {
+        root /opt/nexus-monitoramento/dist;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /auth/ {
+        proxy_pass http://127.0.0.1:8001/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /rest/ {
+        proxy_pass http://127.0.0.1:3000/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+`;
+          fs.writeFileSync(`/etc/nginx/sites-available/${sslDomain}`, nginxConf);
+          execSync(`ln -sf /etc/nginx/sites-available/${sslDomain} /etc/nginx/sites-enabled/`, { timeout: 5000 });
+          execSync('nginx -t 2>&1', { timeout: 10000 });
+          execSync('systemctl reload nginx 2>&1', { timeout: 10000 });
+          sendEvent(2, 'done', 'Nginx configurado para o domínio');
+        } catch (e) {
+          const output = (e.stdout ? e.stdout.toString() : '') + (e.stderr ? e.stderr.toString() : '');
+          sendEvent(2, 'error', 'Erro ao configurar Nginx', output.substring(0, 500));
+          res.write(`data: ${JSON.stringify({ step: 'complete', status: 'error', message: 'Falha ao configurar Nginx', output })}\n\n`);
+          return res.end();
+        }
+
+        // Step 3: Generate SSL certificate
+        sendEvent(3, 'running', 'Gerando certificado SSL (Let\'s Encrypt)...');
+        try {
+          const certOutput = execSync(
+            `certbot --nginx -d ${sslDomain} -d www.${sslDomain} --non-interactive --agree-tos --email ${sslEmail} 2>&1`,
+            { timeout: 120000 }
+          ).toString().trim();
+          sendEvent(3, 'done', 'Certificado SSL gerado com sucesso');
+        } catch (e) {
+          const output = (e.stdout ? e.stdout.toString() : '') + (e.stderr ? e.stderr.toString() : '');
+          // Check if certificate already exists
+          if (output.includes('Certificate not yet due for renewal') || output.includes('already have a certificate')) {
+            sendEvent(3, 'done', 'Certificado SSL já existe e está válido');
+          } else {
+            sendEvent(3, 'error', 'Erro ao gerar certificado SSL', output.substring(0, 500));
+            res.write(`data: ${JSON.stringify({ step: 'complete', status: 'error', message: 'Falha ao gerar certificado. Verifique se o DNS aponta para este servidor.', output })}\n\n`);
+            return res.end();
+          }
+        }
+
+        // Step 4: Enable auto-renewal and restart
+        sendEvent(4, 'running', 'Configurando renovação automática...');
+        try {
+          execSync('systemctl enable certbot.timer 2>&1 || true', { timeout: 10000 });
+          execSync('systemctl reload nginx 2>&1', { timeout: 10000 });
+          sendEvent(4, 'done', 'Renovação automática ativada');
+        } catch (e) {
+          sendEvent(4, 'warn', 'Renovação automática pode precisar de configuração manual', e.message);
+        }
+
+        res.write(`data: ${JSON.stringify({ step: 'complete', status: 'success', message: `SSL configurado com sucesso para ${sslDomain}! Acesse https://${sslDomain}` })}\n\n`);
+        res.end();
+
+      } catch (error) {
+        sendEvent(0, 'error', 'Erro inesperado', error.message);
+        res.write(`data: ${JSON.stringify({ step: 'complete', status: 'error', message: error.message })}\n\n`);
+        res.end();
+      }
+    }
+
     // ---- AUTO-REGISTER: detecta IP local e cadastra servidor de mídia se não existir ----
     if (path === '/api/local/media-servers/auto-register' && req.method === 'POST') {
       try {
