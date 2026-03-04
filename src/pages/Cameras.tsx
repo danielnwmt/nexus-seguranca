@@ -105,6 +105,39 @@ const Cameras = () => {
     return `rtsp://${serverIp}:8554/${key}`;
   };
 
+  const generateStreamKey = () => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+      const random = Math.random() * 16 | 0;
+      const value = char === 'x' ? random : (random & 0x3 | 0x8);
+      return value.toString(16);
+    });
+  };
+
+  const handleAddCameraClick = () => {
+    try {
+      if (serverList.length === 0) {
+        toast({ title: 'Servidor de mídia obrigatório', description: 'Cadastre pelo menos um servidor de mídia em Configurações → Servidores antes de adicionar câmeras.', variant: 'destructive' });
+        return;
+      }
+
+      const generatedKey = generateStreamKey();
+      const initialUrl = buildStreamUrl(emptyForm.protocol, defaultMediaServerIp, generatedKey);
+
+      setEditingId(null);
+      setEditingStreamKey('');
+      setNewStreamKey(generatedKey);
+      setNewCamera({ ...emptyForm, streamUrl: initialUrl });
+      setDialogOpen(true);
+    } catch (error) {
+      console.error('Erro ao abrir modal de câmera:', error);
+      toast({ title: 'Erro ao abrir formulário', description: 'Tente novamente.', variant: 'destructive' });
+    }
+  };
+
   const toggleAnalytic = (analytic: AnalyticType) => {
     setNewCamera(p => ({
       ...p,
@@ -196,18 +229,7 @@ const Cameras = () => {
           <h1 className="text-2xl font-bold text-foreground">Câmeras</h1>
           <p className="text-sm text-muted-foreground font-mono">Gerenciamento de câmeras RTMP/RTSP</p>
         </div>
-        <Button className="gap-2" onClick={() => {
-              if (serverList.length === 0) {
-                toast({ title: 'Servidor de mídia obrigatório', description: 'Cadastre pelo menos um servidor de mídia em Configurações → Servidores antes de adicionar câmeras.', variant: 'destructive' });
-                return;
-              }
-              const generatedKey = crypto.randomUUID();
-              const initialUrl = buildStreamUrl(emptyForm.protocol, defaultMediaServerIp, generatedKey);
-              setNewStreamKey(generatedKey);
-              setEditingId(null);
-              setNewCamera({ ...emptyForm, streamUrl: initialUrl });
-              setDialogOpen(true);
-            }}>
+        <Button className="gap-2" onClick={handleAddCameraClick}>
               <Plus className="w-4 h-4" /> Nova Câmera
         </Button>
         <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) resetForm(); else setDialogOpen(true); }}>
