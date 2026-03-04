@@ -3,7 +3,7 @@ import { Camera as CameraType, ANALYTIC_LABELS } from '@/types/monitoring';
 import { Video, VideoOff, Circle, Pencil, Trash2, Play, Square, Eye, Brain, Film, ScanEye, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import HlsPlayer from './HlsPlayer';
+import WebRtcPlayer from './WebRtcPlayer';
 import RecordingsViewer from '@/components/cameras/RecordingsViewer';
 import { useAnalyzeCamera } from '@/hooks/useAnalyzeCamera';
 import { getLocalApiBase, isLocalInstallation } from '@/hooks/useLocalApi';
@@ -120,27 +120,35 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
     }
   }, [isRecording, camera, toast]);
 
-  // Build HLS URL from stream info
-  // MediaMTX serves HLS at http://<server>:8888/<path>/
-  // The camera name (slugified) is used as the path
-  const getHlsUrl = (): string => {
+  // Build WebRTC URL from stream info
+  // MediaMTX serves WebRTC (WHIP) at http://<server>:8889/<path>/whip
+  const getWebRtcUrl = (): string => {
     if (!camera.streamUrl) return '';
-    // If already an HLS URL, use directly
-    if (camera.streamUrl.includes('.m3u8')) return camera.streamUrl;
-    // If it's an http URL pointing to MediaMTX HLS
-    if (camera.streamUrl.startsWith('http')) return camera.streamUrl;
-    // Extract server from RTSP/RTMP URL and build HLS path
+    // If it's already a WebRTC/WHIP URL
+    if (camera.streamUrl.includes('/whip')) return camera.streamUrl;
+    // If it's an http URL pointing to MediaMTX (HLS or WebRTC port)
+    if (camera.streamUrl.startsWith('http')) {
+      try {
+        const url = new URL(camera.streamUrl);
+        const streamPath = url.pathname.replace(/^\/+|\/+$/g, '') || camera.id;
+        const serverHost = url.hostname;
+        return `http://${serverHost}:8889/${streamPath}/whip`;
+      } catch {
+        return '';
+      }
+    }
+    // Extract server from RTSP/RTMP URL and build WebRTC path
     try {
       const url = new URL(camera.streamUrl);
       const streamPath = url.pathname.replace(/^\//, '') || camera.id;
       const serverHost = url.hostname;
-      return `http://${serverHost}:8888/${streamPath}/`;
+      return `http://${serverHost}:8889/${streamPath}/whip`;
     } catch {
       return '';
     }
   };
 
-  const hlsUrl = getHlsUrl();
+  const hlsUrl = getWebRtcUrl();
 
   return (
     <div className="rounded-lg border border-camera-border bg-camera-bg overflow-hidden group">
@@ -152,7 +160,7 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
             <span className="text-xs font-mono">SEM SINAL</span>
           </div>
         ) : isViewing && hlsUrl ? (
-          <HlsPlayer src={hlsUrl} className="absolute inset-0" />
+          <WebRtcPlayer src={hlsUrl} className="absolute inset-0" />
         ) : (
           <>
             <div className="absolute inset-0 opacity-10" style={{
