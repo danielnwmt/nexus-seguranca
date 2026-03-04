@@ -474,6 +474,23 @@ const server = http.createServer(async (req, res) => {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
+
+    location /hls/ {
+        proxy_pass http://127.0.0.1:8888/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+    }
+
+    location /webrtc/ {
+        proxy_pass http://127.0.0.1:8889/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+    }
 }
 `;
           fs.writeFileSync(`/etc/nginx/sites-available/${sslDomain}`, nginxConf);
