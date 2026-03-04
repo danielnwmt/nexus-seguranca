@@ -119,7 +119,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       return { error: null };
     } catch (err) {
-      return { error: err as Error };
+      const message = isLocal && err instanceof TypeError
+        ? 'Não foi possível conectar ao servidor local. Verifique se o Nginx e o serviço nexus-auth estão ativos.'
+        : (err as Error).message;
+      return { error: new Error(message) };
     }
   };
 

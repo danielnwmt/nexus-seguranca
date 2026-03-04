@@ -73,10 +73,10 @@ const DomainSSL = () => {
         accessToken = session?.access_token || '';
       }
 
-      const urls = [
-        `${systemApiBase}/ssl`,
-        `http://${host}:8001/api/system/ssl`,
-      ];
+      const urls = [`${systemApiBase}/ssl`];
+      if (typeof window !== 'undefined' && window.location.protocol === 'http:') {
+        urls.push(`http://${host}:8001/api/system/ssl`);
+      }
 
       let connected = false;
 
@@ -158,7 +158,7 @@ const DomainSSL = () => {
       if (!connected) {
         setStatus('error');
         setStatusMessage('Não foi possível conectar ao servidor.');
-        setErrorOutput('Verifique se o auth-server está rodando na porta 8001.');
+        setErrorOutput('Verifique se o serviço nexus-auth está ativo e se o proxy /auth está configurado no Nginx.');
         toast({ title: 'Servidor não acessível', description: 'Use o script manual abaixo.', variant: 'destructive' });
         setShowManual(true);
       }

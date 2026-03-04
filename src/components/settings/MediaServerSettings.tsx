@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
-import { isLocalInstallation, useLocalTableQuery, useLocalInsertMutation, useLocalUpdateMutation, useLocalPatchMutation, useLocalDeleteMutation } from '@/hooks/useLocalApi';
+import { isLocalInstallation, getLocalApiBase, useLocalTableQuery, useLocalInsertMutation, useLocalUpdateMutation, useLocalPatchMutation, useLocalDeleteMutation } from '@/hooks/useLocalApi';
 import { toast } from 'sonner';
 
 interface MediaServer {
@@ -79,7 +79,7 @@ const MediaServerSettings = () => {
     }
     autoRegisterDone.current = true;
     setAutoRegistering(true);
-    const apiBase = `http://${window.location.hostname}:8001`;
+    const apiBase = getLocalApiBase();
     fetch(`${apiBase}/api/local/media-servers/auto-register`, { method: 'POST' })
       .then(r => r.json())
       .then(data => {
