@@ -46,10 +46,10 @@ const SystemUpdate = () => {
   }, []);
 
   const fetchVersion = async () => {
-    const urls = [
-      `${systemApiBase}/version`,
-      `http://${host}:8001/api/system/version`,
-    ];
+    const urls = [`${systemApiBase}/version`];
+    if (typeof window !== 'undefined' && window.location.protocol === 'http:') {
+      urls.push(`http://${host}:8001/api/system/version`);
+    }
     for (const url of urls) {
       try {
         const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
@@ -99,10 +99,10 @@ const SystemUpdate = () => {
         accessToken = session?.access_token || '';
       }
 
-      const urls = [
-        `${systemApiBase}/update`,
-        `http://${window.location.hostname}:8001/api/system/update`,
-      ];
+      const urls = [`${systemApiBase}/update`];
+      if (typeof window !== 'undefined' && window.location.protocol === 'http:') {
+        urls.push(`http://${window.location.hostname}:8001/api/system/update`);
+      }
 
       let connected = false;
 
@@ -193,7 +193,7 @@ const SystemUpdate = () => {
       if (!connected) {
         setStatus('error');
         setUpdateMessage('Não foi possível conectar ao servidor.');
-        setErrorOutput('Verifique se o auth-server está rodando na porta 8001.');
+        setErrorOutput('Verifique se o serviço nexus-auth está ativo e se o proxy /auth está configurado no Nginx.');
         toast({ title: 'Servidor não acessível', description: 'Use: bash /opt/nexus-monitoramento/atualizar-nexus.sh', variant: 'destructive' });
       }
     } catch (err: any) {

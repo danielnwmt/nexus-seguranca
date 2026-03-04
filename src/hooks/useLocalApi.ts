@@ -5,12 +5,16 @@ import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
  * Detecta se estamos rodando em uma instalação local (não no preview da Lovable)
  */
 export function isLocalInstallation(): boolean {
+  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+  if (projectId === 'local') return true;
+
   const hostname = window.location.hostname;
   return !hostname.includes('lovable.app') && !hostname.includes('lovableproject.com') && !hostname.includes('localhost');
 }
 
 export function getLocalApiBase() {
-  return `http://${window.location.hostname}:8001`;
+  const origin = window.location.origin.replace(/\/$/, '');
+  return `${origin}/auth`;
 }
 
 /**

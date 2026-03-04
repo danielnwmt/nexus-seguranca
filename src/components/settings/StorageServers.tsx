@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
-import { isLocalInstallation, useLocalTableQuery, useLocalInsertMutation, useLocalUpdateMutation, useLocalDeleteMutation } from '@/hooks/useLocalApi';
+import { isLocalInstallation, getLocalApiBase, useLocalTableQuery, useLocalInsertMutation, useLocalUpdateMutation, useLocalDeleteMutation } from '@/hooks/useLocalApi';
 import { toast as sonnerToast } from 'sonner';
 
 interface ServerForm {
@@ -43,9 +43,6 @@ const emptyForm: ServerForm = {
   is_local: true,
 };
 
-function getLocalApiBase() {
-  return `http://${window.location.hostname}:8001`;
-}
 
 const StorageServers = () => {
   const { toast } = useToast();
@@ -100,7 +97,7 @@ const StorageServers = () => {
       }));
       sonnerToast.success(`${info.os_name} detectado • IP: ${info.local_ip} • ${info.disk_free_gb} GB livres`);
     } catch {
-      sonnerToast.error('Não foi possível conectar ao servidor local (porta 8001)');
+      sonnerToast.error('Não foi possível conectar ao servidor local (serviço nexus-auth/proxy /auth)');
     } finally {
       setDetecting(false);
     }
