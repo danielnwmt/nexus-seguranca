@@ -124,20 +124,20 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
   const getWebRtcUrl = (): string => {
     const url = camera.streamUrl;
     if (!url) return '';
-    // Already a WHIP URL
-    if (url.includes('/whip')) return url;
-    // RTMP: rtmp://IP:PORT/KEY → http://IP:8889/KEY/whip
+    // Already a WebRTC URL on port 8889
+    if (url.includes(':8889')) return url.replace(/\/whip\/?$/, '');
+    // RTMP: rtmp://IP:PORT/KEY → http://IP:8889/KEY
     const rtmpMatch = url.match(/^rtmp:\/\/([^:/]+)(?::\d+)?\/(.+)/);
-    if (rtmpMatch) return `http://${rtmpMatch[1]}:8889/${rtmpMatch[2]}/whip`;
-    // RTSP: rtsp://IP:PORT/KEY → http://IP:8889/KEY/whip
+    if (rtmpMatch) return `http://${rtmpMatch[1]}:8889/${rtmpMatch[2]}`;
+    // RTSP: rtsp://IP:PORT/KEY → http://IP:8889/KEY
     const rtspMatch = url.match(/^rtsp:\/\/([^:/]+)(?::\d+)?\/(.+)/);
-    if (rtspMatch) return `http://${rtspMatch[1]}:8889/${rtspMatch[2]}/whip`;
-    // HTTP URL → extract host + path → build WHIP
+    if (rtspMatch) return `http://${rtspMatch[1]}:8889/${rtspMatch[2]}`;
+    // HTTP URL → extract host + path → build WebRTC URL
     if (url.startsWith('http')) {
       try {
         const parsed = new URL(url);
         const path = parsed.pathname.replace(/^\/+|\/+$/g, '');
-        if (path) return `http://${parsed.hostname}:8889/${path}/whip`;
+        if (path) return `http://${parsed.hostname}:8889/${path}`;
       } catch { /* ignore */ }
     }
     return '';
