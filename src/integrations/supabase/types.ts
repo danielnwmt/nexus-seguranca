@@ -261,6 +261,7 @@ export type Database = {
           brand: string | null
           client_id: string | null
           created_at: string
+          deleted_at: string | null
           id: string
           latitude: number | null
           location: string | null
@@ -285,6 +286,7 @@ export type Database = {
           brand?: string | null
           client_id?: string | null
           created_at?: string
+          deleted_at?: string | null
           id?: string
           latitude?: number | null
           location?: string | null
@@ -309,6 +311,7 @@ export type Database = {
           brand?: string | null
           client_id?: string | null
           created_at?: string
+          deleted_at?: string | null
           id?: string
           latitude?: number | null
           location?: string | null
@@ -342,6 +345,7 @@ export type Database = {
           cameras_count: number
           cpf: string | null
           created_at: string
+          deleted_at: string | null
           email: string | null
           id: string
           monthly_fee: number | null
@@ -357,6 +361,7 @@ export type Database = {
           cameras_count?: number
           cpf?: string | null
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           id?: string
           monthly_fee?: number | null
@@ -372,6 +377,7 @@ export type Database = {
           cameras_count?: number
           cpf?: string | null
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           id?: string
           monthly_fee?: number | null
@@ -437,6 +443,42 @@ export type Database = {
         }
         Relationships: []
       }
+      guard_clients: {
+        Row: {
+          client_id: string
+          created_at: string
+          guard_id: string
+          id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          guard_id: string
+          id?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          guard_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guard_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guard_clients_guard_id_fkey"
+            columns: ["guard_id"]
+            isOneToOne: false
+            referencedRelation: "guards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       guards: {
         Row: {
           city: string | null
@@ -444,6 +486,7 @@ export type Database = {
           cnv: string | null
           cpf: string | null
           created_at: string
+          deleted_at: string | null
           email: string | null
           hire_date: string | null
           id: string
@@ -460,6 +503,7 @@ export type Database = {
           cnv?: string | null
           cpf?: string | null
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           hire_date?: string | null
           id?: string
@@ -476,6 +520,7 @@ export type Database = {
           cnv?: string | null
           cpf?: string | null
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           hire_date?: string | null
           id?: string

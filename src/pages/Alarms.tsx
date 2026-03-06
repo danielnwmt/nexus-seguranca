@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bell, CheckCheck, Plus } from 'lucide-react';
 import AlarmItem from '@/components/dashboard/AlarmItem';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { useTableQuery, useInsertMutation, useUpdateMutation } from '@/hooks/use
 import { supabase } from '@/integrations/supabase/client';
 import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 import { useQueryClient } from '@tanstack/react-query';
+import { subscribeToAlarms, acknowledgeAllAlarms } from '@/services/alarmService';
 
 const Alarms = () => {
   const { data: alarms = [], isLoading } = useTableQuery('alarms');
@@ -19,6 +20,15 @@ const Alarms = () => {
   const updateMutation = useUpdateMutation('alarms');
   const queryClient = useQueryClient();
   const isLocal = isLocalInstallation();
+
+  // Realtime subscription for alarms (cloud only)
+  useEffect(() => {
+    if (isLocal) return;
+    const unsubscribe = subscribeToAlarms(() => {
+      queryClient.invalidateQueries({ queryKey: ['alarms'] });
+    });
+    return unsubscribe;
+  }, [isLocal, queryClient]);
 
   const [filterSeverity, setFilterSeverity] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -42,22 +52,9 @@ const Alarms = () => {
   };
 
   const handleAcknowledgeAll = async () => {
-    const activeAlarms = alarms.filter((a: any) => !a.acknowledged);
-    if (isLocal) {
-      for (const alarm of activeAlarms) {
-        await fetch(`${getLocalApiBase()}/rest/v1/alarms?id=eq.${(alarm as any).id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
-          body: JSON.stringify({ acknowledged: true }),
-        });
-      }
-      queryClient.invalidateQueries({ queryKey: ['local', 'alarms'] });
-    } else {
-      for (const alarm of activeAlarms) {
-        await supabase.from('alarms').update({ acknowledged: true }).eq('id', (alarm as any).id);
-      }
-      queryClient.invalidateQueries({ queryKey: ['alarms'] });
-    }
+    const activeAlarmIds = alarms.filter((a: any) => !a.acknowledged).map((a: any) => a.id);
+    await acknowledgeAllAlarms(activeAlarmIds);
+    queryClient.invalidateQueries({ queryKey: isLocal ? ['local', 'alarms'] : ['alarms'] });
   };
 
   const handleAddAlarm = () => {

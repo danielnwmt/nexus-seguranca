@@ -2,7 +2,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 
-type TableName = 'clients' | 'cameras' | 'guards' | 'alarms' | 'invoices' | 'storage_servers' | 'installers' | 'service_orders' | 'bills' | 'media_servers' | 'recordings' | 'analytics_events';
+type TableName = 'clients' | 'cameras' | 'guards' | 'alarms' | 'invoices' | 'storage_servers' | 'installers' | 'service_orders' | 'bills' | 'media_servers' | 'recordings' | 'analytics_events' | 'guard_clients';
+
+// Tables that support soft delete (deleted_at column)
+const SOFT_DELETE_TABLES: Set<string> = new Set(['clients', 'cameras', 'guards']);
 
 function getLocalHeaders(extra?: Record<string, string>): Record<string, string> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extra };
@@ -56,16 +59,21 @@ export function useTableQuery<T = any>(table: TableName, orderBy = 'created_at',
     queryKey: isLocal ? ['local', table] : [table],
     queryFn: async () => {
       if (isLocal) {
+        const softFilter = SOFT_DELETE_TABLES.has(table) ? '&deleted_at=is.null' : '';
         const res = await fetchLocalRest(
-          `/${table}?select=*&order=${orderBy}.${ascending ? 'asc' : 'desc'}`,
+          `/${table}?select=*&order=${orderBy}.${ascending ? 'asc' : 'desc'}${softFilter}`,
           { headers: getLocalHeaders() }
         );
         if (!res.ok) throw new Error(`Erro ao buscar ${table}`);
         return res.json() as Promise<T[]>;
       }
-      const { data, error } = await (supabase.from(table) as any)
+      let query = (supabase.from(table) as any)
         .select('*')
         .order(orderBy, { ascending });
+      if (SOFT_DELETE_TABLES.has(table)) {
+        query = query.is('deleted_at', null);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data as T[];
     },
@@ -100,6 +108,10 @@ export function usePaginatedQuery<T = any>(
         params.set('order', `${orderBy}.${ascending ? 'asc' : 'desc'}`);
         params.set('offset', String(from));
         params.set('limit', String(pageSize));
+
+        if (SOFT_DELETE_TABLES.has(table)) {
+          params.set('deleted_at', 'is.null');
+        }
 
         if (search && searchColumns && searchColumns.length > 0) {
           const orFilter = searchColumns.map(col => `${col}.ilike.*${search}*`).join(',');
@@ -136,6 +148,10 @@ export function usePaginatedQuery<T = any>(
         .select('*', { count: 'exact' })
         .order(orderBy, { ascending })
         .range(from, to);
+
+      if (SOFT_DELETE_TABLES.has(table)) {
+        query = query.is('deleted_at', null);
+      }
 
       if (search && searchColumns && searchColumns.length > 0) {
         const orFilter = searchColumns.map(col => `${col}.ilike.%${search}%`).join(',');
@@ -221,19 +237,41 @@ export function useDeleteMutation(table: TableName) {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      const useSoftDelete = SOFT_DELETE_TABLES.has(table);
+
       if (isLocal) {
-        const res = await fetchLocalRest(`/${table}?id=eq.${id}`, {
-          method: 'DELETE',
-          headers: getLocalHeaders(),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ message: 'Erro ao remover' }));
-          throw new Error(err.message || err.error || 'Erro ao remover');
+        if (useSoftDelete) {
+          const res = await fetchLocalRest(`/${table}?id=eq.${id}`, {
+            method: 'PATCH',
+            headers: getLocalHeaders({ 'Prefer': 'return=representation' }),
+            body: JSON.stringify({ deleted_at: new Date().toISOString() }),
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({ message: 'Erro ao remover' }));
+            throw new Error(err.message || err.error || 'Erro ao remover');
+          }
+        } else {
+          const res = await fetchLocalRest(`/${table}?id=eq.${id}`, {
+            method: 'DELETE',
+            headers: getLocalHeaders(),
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({ message: 'Erro ao remover' }));
+            throw new Error(err.message || err.error || 'Erro ao remover');
+          }
         }
         return { success: true };
       }
-      const { error } = await (supabase.from(table) as any).delete().eq('id', id);
-      if (error) throw error;
+
+      if (useSoftDelete) {
+        const { error } = await (supabase.from(table) as any)
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', id);
+        if (error) throw error;
+      } else {
+        const { error } = await (supabase.from(table) as any).delete().eq('id', id);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: isLocal ? ['local', table] : [table] });
