@@ -1,0 +1,1 @@
+ALTER TABLE public.cameras ADD COLUMN IF NOT EXISTS analytics_config JSONB DEFAULT '{}'::jsonb;
