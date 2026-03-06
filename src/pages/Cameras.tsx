@@ -149,7 +149,7 @@ const Cameras = () => {
       return;
     }
 
-    const payload = {
+    const buildPayload = (includeAnalyticsConfig: boolean) => ({
       name: newCamera.name.trim(),
       client_id: newCamera.clientId || null,
       stream_url: newCamera.streamUrl,
@@ -164,23 +164,46 @@ const Cameras = () => {
       brand: newCamera.brand || null,
       latitude: newCamera.latitude ? Number(newCamera.latitude) : null,
       longitude: newCamera.longitude ? Number(newCamera.longitude) : null,
-      analytics_config: newCamera.analyticsConfig || {},
-    };
+      ...(includeAnalyticsConfig ? { analytics_config: newCamera.analyticsConfig || {} } : {}),
+    });
 
-    setIsSaving(true);
-    try {
+    const persistCamera = async (includeAnalyticsConfig: boolean) => {
+      const payload = buildPayload(includeAnalyticsConfig);
       if (editingId) {
         await updateMutation.mutateAsync({ id: editingId, ...payload } as any);
       } else {
         await insertMutation.mutateAsync({ ...payload, stream_key: newStreamKey || undefined } as any);
       }
+    };
 
+    setIsSaving(true);
+    try {
+      await persistCamera(true);
       toast({ title: 'Câmera salva com sucesso' });
       resetForm();
     } catch (error) {
+      const firstMessage = error instanceof Error ? error.message : 'Falha inesperada ao salvar câmera.';
+      const shouldRetryWithoutAnalyticsConfig = /analytics_config|schema cache|Could not find the 'analytics_config'/i.test(firstMessage);
+
+      if (shouldRetryWithoutAnalyticsConfig) {
+        try {
+          await persistCamera(false);
+          toast({
+            title: 'Câmera salva com sucesso',
+            description: 'Salva em modo de compatibilidade. Recarregue a página e tente novamente se precisar editar analíticos.',
+          });
+          resetForm();
+          return;
+        } catch (retryError) {
+          console.error('Erro ao salvar câmera (retry sem analytics_config):', retryError);
+          const retryMessage = retryError instanceof Error ? retryError.message : 'Falha inesperada ao salvar câmera.';
+          toast({ title: 'Erro ao salvar câmera', description: retryMessage, variant: 'destructive' });
+          return;
+        }
+      }
+
       console.error('Erro ao salvar câmera:', error);
-      const message = error instanceof Error ? error.message : 'Falha inesperada ao salvar câmera.';
-      toast({ title: 'Erro ao salvar câmera', description: message, variant: 'destructive' });
+      toast({ title: 'Erro ao salvar câmera', description: firstMessage, variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
