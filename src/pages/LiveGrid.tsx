@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { useTableQuery } from '@/hooks/useSupabaseQuery';
+import { isLocalInstallation } from '@/hooks/useLocalApi';
 import LazyVideoCell from '@/components/dashboard/LazyVideoCell';
 
 type GridLayout = '2x2' | '3x3' | '4x4';
@@ -66,24 +67,45 @@ const LiveGrid = () => {
     const streamUrl = cam.stream_url || '';
     if (!streamUrl) return '';
 
+    let streamHost = '';
     let streamKey = '';
-    const rtmpMatch = streamUrl.match(/^rtmp:\/\/[^:/]+(?::\d+)?\/(.+)/);
-    if (rtmpMatch) streamKey = rtmpMatch[1];
+    let streamPort = 8889;
+    let scheme: 'http' | 'https' = 'http';
+
+    const rtmpMatch = streamUrl.match(/^rtmp:\/\/([^:/]+)(?::\d+)?\/(.+)/);
+    if (rtmpMatch) {
+      streamHost = rtmpMatch[1];
+      streamKey = rtmpMatch[2];
+    }
+
     if (!streamKey) {
-      const rtspMatch = streamUrl.match(/^rtsp:\/\/[^:/]+(?::\d+)?\/(.+)/);
-      if (rtspMatch) streamKey = rtspMatch[1];
+      const rtspMatch = streamUrl.match(/^rtsp:\/\/([^:/]+)(?::\d+)?\/(.+)/);
+      if (rtspMatch) {
+        streamHost = rtspMatch[1];
+        streamKey = rtspMatch[2];
+      }
     }
+
     if (!streamKey && streamUrl.startsWith('http')) {
-      try { streamKey = new URL(streamUrl).pathname.replace(/^\/+|\/+$/g, ''); } catch {}
+      try {
+        const parsed = new URL(streamUrl.replace(/\/whip\/?$/, ''));
+        streamHost = parsed.hostname;
+        streamPort = Number(parsed.port) || 8889;
+        streamKey = parsed.pathname.replace(/^\/+|\/+$/g, '');
+        scheme = parsed.protocol === 'https:' ? 'https' : 'http';
+      } catch {
+        return streamUrl.replace(/\/whip\/?$/, '');
+      }
     }
+
     if (!streamKey) return '';
 
-    if (window.location.protocol === 'https:') {
+    if (window.location.protocol === 'https:' && isLocalInstallation()) {
       return `${window.location.origin}/webrtc/${streamKey}`;
     }
-    const server = (mediaServers as any[])[0];
-    const host = server?.ip_address || window.location.hostname;
-    return `http://${host}:8889/${streamKey}`;
+
+    const host = streamHost || (mediaServers as any[])[0]?.ip_address || window.location.hostname;
+    return `${scheme}://${host}:${streamPort}/${streamKey}/`;
   };
 
   return (
