@@ -111,11 +111,13 @@ const Cameras = () => {
   };
 
   const generateStreamKey = (): string => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
+    // Gera chave numérica de 5 a 12 dígitos
+    const length = Math.floor(Math.random() * 8) + 5; // 5..12
+    let key = '';
+    for (let i = 0; i < length; i++) {
+      key += (i === 0 ? Math.floor(Math.random() * 9) + 1 : Math.floor(Math.random() * 10)).toString();
+    }
+    return key;
   };
 
   const handleAddCameraClick = () => {
