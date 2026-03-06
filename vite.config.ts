@@ -26,15 +26,22 @@ export default defineConfig(({ mode }) => ({
       manifest: {
         name: 'Nexus Segurança',
         short_name: 'Nexus',
-        description: 'Sistema de monitoramento e segurança',
+        description: 'Sistema profissional de monitoramento e segurança eletrônica',
         theme_color: '#0a0f14',
         background_color: '#0a0f14',
         display: 'standalone',
         orientation: 'any',
+        start_url: '/',
+        scope: '/',
+        categories: ['security', 'business', 'utilities'],
         icons: [
           { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
           { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
           { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+        shortcuts: [
+          { name: 'Alarmes', short_name: 'Alarmes', url: '/alarms', icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }] },
+          { name: 'Ao Vivo', short_name: 'Live', url: '/live', icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }] },
         ],
       },
     }),
