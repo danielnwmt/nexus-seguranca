@@ -42,8 +42,10 @@ const Analytics = () => {
   const { toast } = useToast();
   const { data: cameras = [] } = useTableQuery('cameras');
   const { data: clients = [] } = useTableQuery('clients');
+  const { data: mediaServers = [] } = useTableQuery('media_servers');
   const { data: companySettings } = useCompanySettings();
-  const mediaServerIp = (companySettings as any)?.media_server_ip || '';
+  const fallbackMediaServerIp = (mediaServers as any[])[0]?.ip_address || '';
+  const mediaServerIp = (companySettings as any)?.media_server_ip || fallbackMediaServerIp;
   const [events, setEvents] = useState<any[]>([]);
   const [filterType, setFilterType] = useState<string>('all');
   const [filterClient, setFilterClient] = useState<string>('all');
