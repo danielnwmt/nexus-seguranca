@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS public.clients (
   monthly_fee NUMERIC,
   payment_due_day INTEGER,
   storage_server_id UUID,
+  deleted_at TIMESTAMPTZ DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -98,6 +99,7 @@ CREATE TABLE IF NOT EXISTS public.cameras (
   storage_path TEXT,
   retention_days INTEGER DEFAULT 30,
   analytics TEXT[],
+  deleted_at TIMESTAMPTZ DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -115,8 +117,18 @@ CREATE TABLE IF NOT EXISTS public.guards (
   status TEXT DEFAULT 'active',
   client_ids TEXT[],
   hire_date DATE,
+  deleted_at TIMESTAMPTZ DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Tabela intermediária guard_clients (relação N:N)
+CREATE TABLE IF NOT EXISTS public.guard_clients (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  guard_id UUID NOT NULL REFERENCES public.guards(id) ON DELETE CASCADE,
+  client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(guard_id, client_id)
 );
 
 CREATE TABLE IF NOT EXISTS public.alarms (
@@ -620,6 +632,26 @@ $$;
 -- Permitir login/signup para anon
 GRANT EXECUTE ON FUNCTION public.login(TEXT, TEXT) TO anon;
 GRANT EXECUTE ON FUNCTION public.signup(TEXT, TEXT) TO anon;
+
+-- Soft delete indexes
+CREATE INDEX IF NOT EXISTS idx_clients_deleted_at ON public.clients(deleted_at) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_cameras_deleted_at ON public.cameras(deleted_at) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_guards_deleted_at ON public.guards(deleted_at) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_guard_clients_guard ON public.guard_clients(guard_id);
+CREATE INDEX IF NOT EXISTS idx_guard_clients_client ON public.guard_clients(client_id);
+
+-- Idempotent: add deleted_at if missing
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='clients' AND column_name='deleted_at') THEN
+    ALTER TABLE public.clients ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='cameras' AND column_name='deleted_at') THEN
+    ALTER TABLE public.cameras ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='guards' AND column_name='deleted_at') THEN
+    ALTER TABLE public.guards ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL;
+  END IF;
+END $$;
 
 -- Fim
 DO $$ BEGIN RAISE NOTICE 'Banco de dados inicializado com sucesso!'; END $$;

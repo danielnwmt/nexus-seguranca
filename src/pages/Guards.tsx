@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import PatrolRouteMap from '@/components/guards/PatrolRouteMap';
+import { fetchGuardClientIds, syncGuardClients } from '@/services/guardClientService';
 
 const maskCpf = (value: string) => {
   const digits = value.replace(/\D/g, '').slice(0, 11);
@@ -145,26 +146,39 @@ const Guards = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!validate()) return;
     const payload = {
       name: form.name, cpf: form.cpf, phone: form.phone, email: form.email,
-      shift: form.shift, status: form.status, cnv: form.cnv || null, state: form.state || null, city: form.city || null, client_ids: form.clientIds,
+      shift: form.shift, status: form.status, cnv: form.cnv || null, state: form.state || null, city: form.city || null,
+      client_ids: form.clientIds, // keep for backward compat
     };
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, ...payload } as any);
-    } else {
-      insertMutation.mutate(payload as any);
+    try {
+      if (editingId) {
+        await updateMutation.mutateAsync({ id: editingId, ...payload } as any);
+        await syncGuardClients(editingId, form.clientIds);
+      } else {
+        const result = await insertMutation.mutateAsync(payload as any);
+        if (result?.id) {
+          await syncGuardClients(result.id, form.clientIds);
+        }
+      }
+      toast({ title: editingId ? 'Vigilante atualizado' : 'Vigilante adicionado' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro inesperado';
+      toast({ title: 'Erro ao salvar', description: message, variant: 'destructive' });
     }
     resetForm();
   };
 
   const handleEdit = async (guard: any) => {
     setEditingId(guard.id);
+    // Fetch client IDs from junction table
+    const clientIds = await fetchGuardClientIds(guard.id);
     setForm({
       name: guard.name, cpf: guard.cpf || '', phone: guard.phone || '', email: guard.email || '',
       shift: guard.shift, status: guard.status, cnv: guard.cnv || '', state: guard.state || '', city: guard.city || '',
-      clientIds: guard.client_ids || [],
+      clientIds: clientIds.length > 0 ? clientIds : (guard.client_ids || []),
     });
     if (guard.state) {
       try {

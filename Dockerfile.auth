@@ -1,0 +1,6 @@
+FROM node:20-alpine
+WORKDIR /app
+COPY installer/auth-server.js .
+COPY installer/analytics-service.js .
+EXPOSE 8001
+CMD ["node", "auth-server.js"]
