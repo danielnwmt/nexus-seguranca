@@ -268,11 +268,11 @@ export type Database = {
           longitude: number | null
           max_bitrate: number | null
           name: string
-          protocol: string
+          protocol: Database["public"]["Enums"]["camera_protocol"]
           resolution: string | null
           retention_days: number
           snapshot_url: string | null
-          status: string
+          status: Database["public"]["Enums"]["entity_status"]
           storage_path: string | null
           stream_key: string
           stream_url: string | null
@@ -293,11 +293,11 @@ export type Database = {
           longitude?: number | null
           max_bitrate?: number | null
           name: string
-          protocol?: string
+          protocol?: Database["public"]["Enums"]["camera_protocol"]
           resolution?: string | null
           retention_days?: number
           snapshot_url?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["entity_status"]
           storage_path?: string | null
           stream_key?: string
           stream_url?: string | null
@@ -318,11 +318,11 @@ export type Database = {
           longitude?: number | null
           max_bitrate?: number | null
           name?: string
-          protocol?: string
+          protocol?: Database["public"]["Enums"]["camera_protocol"]
           resolution?: string | null
           retention_days?: number
           snapshot_url?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["entity_status"]
           storage_path?: string | null
           stream_key?: string
           stream_url?: string | null
@@ -925,6 +925,16 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "n1" | "n2" | "n3"
+      camera_protocol: "RTSP" | "RTMP" | "HLS" | "WebRTC" | "ONVIF"
+      entity_status:
+        | "active"
+        | "inactive"
+        | "online"
+        | "offline"
+        | "recording"
+        | "pending"
+        | "completed"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1053,6 +1063,17 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "n1", "n2", "n3"],
+      camera_protocol: ["RTSP", "RTMP", "HLS", "WebRTC", "ONVIF"],
+      entity_status: [
+        "active",
+        "inactive",
+        "online",
+        "offline",
+        "recording",
+        "pending",
+        "completed",
+        "cancelled",
+      ],
     },
   },
 } as const

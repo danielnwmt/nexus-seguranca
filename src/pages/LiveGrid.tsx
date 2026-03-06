@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Camera, Grid2X2, Grid3X3, LayoutGrid, Maximize2, Minimize2, Volume2, VolumeX, Video } from 'lucide-react';
+import { Camera, Grid2X2, Grid3X3, LayoutGrid, Maximize2, Minimize2, Video } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { useTableQuery } from '@/hooks/useSupabaseQuery';
+import LazyVideoCell from '@/components/dashboard/LazyVideoCell';
 
 type GridLayout = '2x2' | '3x3' | '4x4';
 
@@ -205,39 +206,13 @@ const LiveGrid = () => {
             const url = getWebRtcUrl(cam);
             const client = (clients as any[]).find((c: any) => c.id === cam.client_id);
             return (
-              <div
+              <LazyVideoCell
                 key={cam.id}
-                className="relative bg-black rounded overflow-hidden cursor-pointer group border border-border/50 hover:border-primary/50 transition-colors"
-                style={{ aspectRatio: '16/9' }}
+                cam={cam}
+                clientName={client?.name}
+                url={url}
                 onClick={() => setSelectedCam(cam.id)}
-              >
-                {url ? (
-                  <iframe
-                    src={url}
-                    className="absolute inset-0 w-full h-full border-0 pointer-events-none"
-                    allow="autoplay; encrypted-media"
-                    sandbox="allow-scripts allow-same-origin"
-                    title={cam.name}
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30">
-                    <Camera className="w-8 h-8" />
-                  </div>
-                )}
-                {/* Overlay info */}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <p className="text-[10px] font-medium text-white truncate">{cam.name}</p>
-                  <p className="text-[9px] text-white/60 truncate">{client?.name || ''}</p>
-                </div>
-                {/* Status dot */}
-                <div className="absolute top-1 left-1">
-                  <div className={`w-2 h-2 rounded-full ${cam.status === 'online' ? 'bg-emerald-400' : 'bg-destructive'}`} />
-                </div>
-                {/* Camera name always visible */}
-                <div className="absolute top-1 right-1 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded">
-                  <span className="text-[9px] font-mono text-white/80">{cam.name}</span>
-                </div>
-              </div>
+              />
             );
           })}
           {/* Fill empty slots */}
