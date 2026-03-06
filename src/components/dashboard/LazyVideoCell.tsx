@@ -1,6 +1,5 @@
 import { Camera } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { useLazyVideo } from '@/hooks/useLazyVideo';
 
 interface LazyVideoCellProps {
   cam: any;
@@ -14,16 +13,13 @@ interface LazyVideoCellProps {
  * the video iframe when the element is visible in the viewport.
  */
 const LazyVideoCell = ({ cam, clientName, url, onClick }: LazyVideoCellProps) => {
-  const { ref, isVisible } = useLazyVideo();
-
   return (
     <div
-      ref={ref}
       className="relative bg-black rounded overflow-hidden cursor-pointer group border border-border/50 hover:border-primary/50 transition-colors"
       style={{ aspectRatio: '16/9' }}
       onClick={onClick}
     >
-      {isVisible && url ? (
+      {url ? (
         <iframe
           src={url}
           className="absolute inset-0 w-full h-full border-0 pointer-events-none"
