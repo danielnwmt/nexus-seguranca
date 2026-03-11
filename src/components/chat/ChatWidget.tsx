@@ -1,24 +1,25 @@
-import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, Send, X, Bot, User, Loader2 } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { MessageCircle, Send, X, Bot, User, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 interface ChatMessage {
   id: string;
-  role: 'user' | 'bot';
+  role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
 }
 
-interface BotAction {
-  keyword: string;
-  response: string;
-}
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-ai`;
 
 const ChatWidget = () => {
+  const { session } = useAuth();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', role: 'bot', content: 'Olá! Sou o assistente Nexus. Como posso ajudar?', timestamp: new Date() },
+    { id: '1', role: 'assistant', content: 'Olá! Sou o assistente Nexus com IA. Pergunte sobre câmeras, alarmes, clientes ou qualquer aspecto do sistema.', timestamp: new Date() },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,18 +31,75 @@ const ChatWidget = () => {
     }
   }, [messages]);
 
-  const getFallbackReply = (message: string): string | null => {
-    try {
-      const actionsJson = localStorage.getItem('nexus_bot_actions');
-      if (!actionsJson) return null;
-      const actions: BotAction[] = JSON.parse(actionsJson);
-      const lower = message.toLowerCase();
-      const match = actions.find(a => lower.includes(a.keyword.toLowerCase()));
-      return match?.response || null;
-    } catch {
-      return null;
+  const streamChat = useCallback(async (allMessages: ChatMessage[]) => {
+    const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+    const resp = await fetch(CHAT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        messages: allMessages.map(m => ({ role: m.role, content: m.content })),
+      }),
+    });
+
+    if (!resp.ok) {
+      const errorData = await resp.json().catch(() => ({ error: 'Erro desconhecido' }));
+      throw new Error(errorData.error || `Erro ${resp.status}`);
     }
-  };
+
+    if (!resp.body) throw new Error('Sem resposta do servidor');
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let textBuffer = '';
+    let assistantSoFar = '';
+    let streamDone = false;
+
+    while (!streamDone) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      textBuffer += decoder.decode(value, { stream: true });
+
+      let newlineIndex: number;
+      while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
+        let line = textBuffer.slice(0, newlineIndex);
+        textBuffer = textBuffer.slice(newlineIndex + 1);
+
+        if (line.endsWith('\r')) line = line.slice(0, -1);
+        if (line.startsWith(':') || line.trim() === '') continue;
+        if (!line.startsWith('data: ')) continue;
+
+        const jsonStr = line.slice(6).trim();
+        if (jsonStr === '[DONE]') { streamDone = true; break; }
+
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+          if (content) {
+            assistantSoFar += content;
+            setMessages(prev => {
+              const last = prev[prev.length - 1];
+              if (last?.role === 'assistant' && last.id === 'streaming') {
+                return prev.map((m, i) => i === prev.length - 1 ? { ...m, content: assistantSoFar } : m);
+              }
+              return [...prev, { id: 'streaming', role: 'assistant', content: assistantSoFar, timestamp: new Date() }];
+            });
+          }
+        } catch {
+          textBuffer = line + '\n' + textBuffer;
+          break;
+        }
+      }
+    }
+
+    // Finalize the streaming message with a permanent ID
+    setMessages(prev =>
+      prev.map(m => m.id === 'streaming' ? { ...m, id: Date.now().toString() } : m)
+    );
+  }, [session]);
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
@@ -52,61 +110,20 @@ const ChatWidget = () => {
       content: input.trim(),
       timestamp: new Date(),
     };
-    setMessages(prev => [...prev, userMsg]);
+    const updated = [...messages, userMsg];
+    setMessages(updated);
     setInput('');
     setLoading(true);
 
     try {
-      const webhookUrl = localStorage.getItem('nexus_n8n_webhook');
-      const botEnabled = localStorage.getItem('nexus_bot_enabled') !== 'false';
-
-      let replyText = '';
-
-      const isValidWebhookUrl = (url: string) => {
-        try {
-          const parsed = new URL(url);
-          return parsed.protocol === 'https:' && parsed.hostname.toLowerCase().includes('n8n');
-        } catch { return false; }
-      };
-
-      if (webhookUrl && botEnabled && isValidWebhookUrl(webhookUrl)) {
-        // Try n8n webhook first
-        try {
-          const res = await fetch(webhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              message: userMsg.content,
-              source: 'nexus-chat',
-              timestamp: new Date().toISOString(),
-            }),
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            replyText = data?.reply || data?.output || data?.message || data?.text || '';
-          }
-        } catch {
-          // n8n failed, will fallback
-        }
-      }
-
-      // Fallback to local actions
-      if (!replyText) {
-        replyText = getFallbackReply(userMsg.content) || 'Desculpe, não entendi. Digite "ajuda" para ver o que posso fazer.';
-      }
-
+      await streamChat(updated);
+    } catch (e: any) {
+      console.error('Chat error:', e);
+      toast({ title: 'Erro no chat', description: e.message, variant: 'destructive' });
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
-        role: 'bot',
-        content: replyText,
-        timestamp: new Date(),
-      }]);
-    } catch {
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: 'bot',
-        content: 'Erro ao processar sua mensagem. Tente novamente.',
+        role: 'assistant',
+        content: 'Desculpe, ocorreu um erro. Tente novamente.',
         timestamp: new Date(),
       }]);
     } finally {
@@ -130,10 +147,10 @@ const ChatWidget = () => {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-primary text-primary-foreground">
         <div className="flex items-center gap-2">
-          <Bot className="w-5 h-5" />
+          <Sparkles className="w-5 h-5" />
           <div>
-            <p className="text-sm font-semibold">Assistente Nexus</p>
-            <p className="text-[10px] opacity-80">Online • n8n</p>
+            <p className="text-sm font-semibold">Assistente Nexus IA</p>
+            <p className="text-[10px] opacity-80">Powered by AI</p>
           </div>
         </div>
         <button onClick={() => setOpen(false)} className="hover:opacity-70 transition-opacity">
@@ -145,12 +162,12 @@ const ChatWidget = () => {
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.map(msg => (
           <div key={msg.id} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            {msg.role === 'bot' && (
+            {msg.role === 'assistant' && (
               <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                 <Bot className="w-3.5 h-3.5 text-primary" />
               </div>
             )}
-            <div className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
+            <div className={`max-w-[75%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
               msg.role === 'user'
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-muted text-foreground'
@@ -164,7 +181,7 @@ const ChatWidget = () => {
             )}
           </div>
         ))}
-        {loading && (
+        {loading && messages[messages.length - 1]?.role !== 'assistant' && (
           <div className="flex gap-2 justify-start">
             <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
               <Bot className="w-3.5 h-3.5 text-primary" />
@@ -178,14 +195,11 @@ const ChatWidget = () => {
 
       {/* Input */}
       <div className="border-t border-border p-3">
-        <form
-          onSubmit={e => { e.preventDefault(); handleSend(); }}
-          className="flex gap-2"
-        >
+        <form onSubmit={e => { e.preventDefault(); handleSend(); }} className="flex gap-2">
           <Input
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder="Digite sua mensagem..."
+            placeholder="Pergunte algo..."
             className="bg-muted border-border text-sm"
             disabled={loading}
           />
