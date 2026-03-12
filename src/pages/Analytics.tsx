@@ -266,7 +266,7 @@ const Analytics = () => {
         })}
       </div>
 
-      {/* Analytics by type */}
+      {/* Analytics by type + Manual Analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
@@ -290,7 +290,9 @@ const Analytics = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border lg:col-span-2">
+        <ManualAnalysis />
+
+        <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Câmeras com IA Habilitada</CardTitle>
           </CardHeader>
