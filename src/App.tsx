@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "./components/layout/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
+import ErrorBoundary from "./components/layout/ErrorBoundary";
 import Index from "./pages/Index";
 import Cameras from "./pages/Cameras";
 import Clients from "./pages/Clients";
