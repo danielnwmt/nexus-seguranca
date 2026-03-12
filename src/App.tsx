@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "./components/layout/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
+import ErrorBoundary from "./components/layout/ErrorBoundary";
 import Index from "./pages/Index";
 import Cameras from "./pages/Cameras";
 import Clients from "./pages/Clients";
@@ -29,39 +30,41 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-              <Route path="/" element={<Index />} />
-              <Route path="/cameras" element={<Cameras />} />
-              <Route path="/recordings" element={<Recordings />} />
-              <Route path="/clients" element={<Clients />} />
-              <Route path="/guards" element={<Guards />} />
-              <Route path="/financial" element={<Financial />} />
-              <Route path="/alarms" element={<Alarms />} />
-              <Route path="/installers" element={<Installers />} />
-              <Route path="/service-orders" element={<ServiceOrders />} />
-              <Route path="/support" element={<Support />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/system-health" element={<SystemHealth />} />
-              <Route path="/camera-map" element={<CameraMap />} />
-              <Route path="/timeline" element={<Timeline />} />
-              <Route path="/live" element={<LiveGrid />} />
-              <Route path="/settings" element={<Settings />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+                <Route path="/" element={<Index />} />
+                <Route path="/cameras" element={<Cameras />} />
+                <Route path="/recordings" element={<Recordings />} />
+                <Route path="/clients" element={<Clients />} />
+                <Route path="/guards" element={<Guards />} />
+                <Route path="/financial" element={<Financial />} />
+                <Route path="/alarms" element={<Alarms />} />
+                <Route path="/installers" element={<Installers />} />
+                <Route path="/service-orders" element={<ServiceOrders />} />
+                <Route path="/support" element={<Support />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/system-health" element={<SystemHealth />} />
+                <Route path="/camera-map" element={<CameraMap />} />
+                <Route path="/timeline" element={<Timeline />} />
+                <Route path="/live" element={<LiveGrid />} />
+                <Route path="/settings" element={<Settings />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
