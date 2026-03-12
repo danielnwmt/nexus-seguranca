@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Brain, ShieldAlert, Users, Car, Crosshair, Footprints, PersonStanding, ScanEye, AlertTriangle, Camera, Play, Square, Loader2, Zap } from 'lucide-react';
+import ManualAnalysis from '@/components/analytics/ManualAnalysis';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -265,7 +266,7 @@ const Analytics = () => {
         })}
       </div>
 
-      {/* Analytics by type */}
+      {/* Analytics by type + Manual Analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
@@ -289,7 +290,9 @@ const Analytics = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border lg:col-span-2">
+        <ManualAnalysis />
+
+        <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Câmeras com IA Habilitada</CardTitle>
           </CardHeader>
