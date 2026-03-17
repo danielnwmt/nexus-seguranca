@@ -10,8 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
-import { Plus, FileText, Search, Trash2, Eye, ShoppingCart } from 'lucide-react';
+import { Plus, FileText, Search, Trash2, Eye, ShoppingCart, Download } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { generateQuotePdf } from '@/lib/generateQuotePdf';
 
 const STATUS_MAP: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Rascunho', variant: 'secondary' },
