@@ -94,8 +94,11 @@ const Guards = () => {
     queryKey: isLocal ? ['local', 'patrol_routes'] : ['patrol_routes'],
     queryFn: async () => {
       if (isLocal) {
+        const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
         const res = await fetch(`${getLocalApiBase()}/rest/v1/patrol_routes?select=*&order=created_at.desc`, {
-          headers: { 'Content-Type': 'application/json' },
+          headers,
         });
         if (!res.ok) throw new Error('Erro ao buscar rotas');
         return res.json();
@@ -237,12 +240,18 @@ const Guards = () => {
         city: selectedGuardForRoute?.city || null,
       };
       if (isLocal) {
+        const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
+        const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+        if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
         const res = await fetch(`${getLocalApiBase()}/rest/v1/patrol_routes`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+          headers,
           body: JSON.stringify(routeData),
         });
-        if (!res.ok) throw new Error('Erro ao salvar rota');
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          throw new Error(errBody.message || errBody.details || `HTTP ${res.status}`);
+        }
       } else {
         const { error } = await (supabase.from('patrol_routes') as any).insert(routeData);
         if (error) throw error;
@@ -260,7 +269,10 @@ const Guards = () => {
   const handleDeleteRoute = async (routeId: string) => {
     try {
       if (isLocal) {
-        const res = await fetch(`${getLocalApiBase()}/rest/v1/patrol_routes?id=eq.${routeId}`, { method: 'DELETE' });
+        const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
+        const headers: Record<string, string> = {};
+        if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+        const res = await fetch(`${getLocalApiBase()}/rest/v1/patrol_routes?id=eq.${routeId}`, { method: 'DELETE', headers });
         if (!res.ok) throw new Error('Erro ao remover');
       } else {
         const { error } = await (supabase.from('patrol_routes') as any).delete().eq('id', routeId);
@@ -281,9 +293,12 @@ const Guards = () => {
       const targetGuard = guards.find((g: any) => g.id === transferTargetGuard);
       const updateData = { guard_id: transferTargetGuard, city: targetGuard?.city || transferRoute.city };
       if (isLocal) {
+        const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
+        const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+        if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
         const res = await fetch(`${getLocalApiBase()}/rest/v1/patrol_routes?id=eq.${transferRoute.id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+          headers,
           body: JSON.stringify(updateData),
         });
         if (!res.ok) throw new Error('Erro ao transferir');
