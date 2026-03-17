@@ -17,9 +17,10 @@ interface Installer {
   cpf: string | null;
   phone: string | null;
   email: string | null;
-  specialty: string;
+  specialty: string | null;
   status: string;
   created_at: string;
+  updated_at: string;
 }
 
 const specialtyLabels: Record<string, string> = {
@@ -51,7 +52,7 @@ const Installers = () => {
 
   const openEdit = (inst: Installer) => {
     setEditing(inst);
-    setForm({ name: inst.name, cpf: inst.cpf || '', phone: inst.phone || '', email: inst.email || '', specialty: inst.specialty, status: inst.status });
+    setForm({ name: inst.name, cpf: inst.cpf || '', phone: inst.phone || '', email: inst.email || '', specialty: inst.specialty || 'general', status: inst.status });
     setDialogOpen(true);
   };
 
@@ -119,7 +120,7 @@ const Installers = () => {
                     <TableCell className="text-muted-foreground text-sm font-mono">{inst.cpf || '—'}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{inst.phone || '—'}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{inst.email || '—'}</TableCell>
-                    <TableCell><Badge variant="secondary">{specialtyLabels[inst.specialty] || inst.specialty}</Badge></TableCell>
+                    <TableCell><Badge variant="secondary">{specialtyLabels[inst.specialty || ''] || inst.specialty || 'Geral'}</Badge></TableCell>
                     <TableCell>
                       <span className={`text-xs font-mono ${inst.status === 'active' ? 'text-success' : 'text-destructive'}`}>
                         {inst.status === 'active' ? 'Ativo' : 'Inativo'}
