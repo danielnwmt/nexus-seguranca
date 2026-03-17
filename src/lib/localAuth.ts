@@ -46,7 +46,7 @@ export async function updateUserPassword(password: string): Promise<{ error: str
     // Update local session metadata
     if (session.user?.user_metadata) {
       session.user.user_metadata.force_password_change = false;
-      localStorage.setItem('nexus-local-session', JSON.stringify(session));
+      sessionStorage.setItem('nexus-local-session', JSON.stringify(session));
     }
     return { error: null };
   }
