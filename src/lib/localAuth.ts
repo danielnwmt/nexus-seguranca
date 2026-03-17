@@ -9,7 +9,7 @@ import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
  */
 export async function getAccessToken(): Promise<string> {
   if (isLocalInstallation()) {
-    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
     return session.access_token || '';
   }
   const { data } = await supabase.auth.getSession();
