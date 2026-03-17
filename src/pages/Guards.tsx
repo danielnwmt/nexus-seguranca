@@ -237,12 +237,18 @@ const Guards = () => {
         city: selectedGuardForRoute?.city || null,
       };
       if (isLocal) {
+        const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
+        const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+        if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
         const res = await fetch(`${getLocalApiBase()}/rest/v1/patrol_routes`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+          headers,
           body: JSON.stringify(routeData),
         });
-        if (!res.ok) throw new Error('Erro ao salvar rota');
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          throw new Error(errBody.message || errBody.details || `HTTP ${res.status}`);
+        }
       } else {
         const { error } = await (supabase.from('patrol_routes') as any).insert(routeData);
         if (error) throw error;
