@@ -269,7 +269,10 @@ const Guards = () => {
   const handleDeleteRoute = async (routeId: string) => {
     try {
       if (isLocal) {
-        const res = await fetch(`${getLocalApiBase()}/rest/v1/patrol_routes?id=eq.${routeId}`, { method: 'DELETE' });
+        const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
+        const headers: Record<string, string> = {};
+        if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+        const res = await fetch(`${getLocalApiBase()}/rest/v1/patrol_routes?id=eq.${routeId}`, { method: 'DELETE', headers });
         if (!res.ok) throw new Error('Erro ao remover');
       } else {
         const { error } = await (supabase.from('patrol_routes') as any).delete().eq('id', routeId);
