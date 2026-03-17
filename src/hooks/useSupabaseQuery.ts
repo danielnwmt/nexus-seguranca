@@ -98,7 +98,18 @@ export function useTableQuery<T = any>(table: TableName, orderBy = 'created_at',
         query = query.is('deleted_at', null);
       }
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        const refreshed = await handleJwtExpired(error);
+        if (refreshed) {
+          // Retry after refresh
+          let retryQuery = (supabase.from(table) as any).select('*').order(orderBy, { ascending });
+          if (SOFT_DELETE_TABLES.has(table)) retryQuery = retryQuery.is('deleted_at', null);
+          const { data: d2, error: e2 } = await retryQuery;
+          if (e2) throw e2;
+          return d2 as T[];
+        }
+        throw error;
+      }
       return data as T[];
     },
     enabled,
