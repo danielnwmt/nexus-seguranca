@@ -293,9 +293,12 @@ const Guards = () => {
       const targetGuard = guards.find((g: any) => g.id === transferTargetGuard);
       const updateData = { guard_id: transferTargetGuard, city: targetGuard?.city || transferRoute.city };
       if (isLocal) {
+        const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
+        const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+        if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
         const res = await fetch(`${getLocalApiBase()}/rest/v1/patrol_routes?id=eq.${transferRoute.id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+          headers,
           body: JSON.stringify(updateData),
         });
         if (!res.ok) throw new Error('Erro ao transferir');
