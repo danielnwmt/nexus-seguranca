@@ -228,7 +228,15 @@ export function useInsertMutation(table: TableName) {
         return Array.isArray(result) ? result[0] : result;
       }
       const { data, error } = await (supabase.from(table) as any).insert(row).select().single();
-      if (error) throw error;
+      if (error) {
+        const refreshed = await handleJwtExpired(error);
+        if (refreshed) {
+          const { data: d2, error: e2 } = await (supabase.from(table) as any).insert(row).select().single();
+          if (e2) throw e2;
+          return d2;
+        }
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {
