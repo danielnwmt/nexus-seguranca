@@ -104,7 +104,7 @@ export async function upsertTableData(table: string, row: Record<string, unknown
  */
 export async function countTableRows(table: string): Promise<number> {
   if (isLocalInstallation()) {
-    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
     const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Prefer': 'count=exact' };
     if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
     const res = await fetch(
