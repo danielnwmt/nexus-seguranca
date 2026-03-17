@@ -58,6 +58,8 @@ const App = () => (
                 <Route path="/camera-map" element={<CameraMap />} />
                 <Route path="/timeline" element={<Timeline />} />
                 <Route path="/live" element={<LiveGrid />} />
+                <Route path="/stock" element={<Stock />} />
+                <Route path="/quotes" element={<Quotes />} />
                 <Route path="/settings" element={<Settings />} />
               </Route>
               <Route path="*" element={<NotFound />} />
