@@ -150,7 +150,7 @@ const Quotes = () => {
         phone: company?.phone,
         email: company?.email,
         logo_url: company?.logo_url,
-        razao_social: (company as any)?.razao_social,
+        razao_social: company?.razao_social,
       },
       viewQuote,
       quoteItems,
