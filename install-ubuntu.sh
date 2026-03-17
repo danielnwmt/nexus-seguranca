@@ -374,12 +374,27 @@ npm install --legacy-peer-deps > /dev/null 2>&1
 ok "Dependencias instaladas"
 
 step "Gerando build de producao..."
-npm run build > /dev/null 2>&1
+
+# Garantir swap para servidores com pouca RAM (build consome muita memoria)
+TOTAL_RAM_MB=$(free -m | awk '/^Mem:/{print $2}')
+if [ "$TOTAL_RAM_MB" -lt 2048 ] && [ ! -f /swapfile ]; then
+  warn "RAM baixa (${TOTAL_RAM_MB}MB). Criando swap temporario de 2GB..."
+  fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+  chmod 600 /swapfile
+  mkswap /swapfile > /dev/null 2>&1
+  swapon /swapfile
+  ok "Swap de 2GB ativado"
+fi
+
+# Limitar memoria do Node para evitar OOM
+export NODE_OPTIONS="--max-old-space-size=1536"
+
+npm run build 2>&1 | tail -50
 
 if [ -f "dist/index.html" ]; then
   ok "Build concluido"
 else
-  err "Build falhou. Execute 'npm run build' manualmente."
+  err "Build falhou. Verifique os erros acima ou execute 'npm run build' manualmente."
 fi
 
 # ----------------------------------------------------------
