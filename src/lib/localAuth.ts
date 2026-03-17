@@ -82,7 +82,7 @@ export async function fetchTableData(table: string): Promise<any[]> {
  */
 export async function upsertTableData(table: string, row: Record<string, unknown>): Promise<{ error: boolean }> {
   if (isLocalInstallation()) {
-    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Prefer': 'resolution=merge-duplicates,return=representation',
