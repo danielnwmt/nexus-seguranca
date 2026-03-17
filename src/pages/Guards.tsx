@@ -250,8 +250,10 @@ const Guards = () => {
       toast({ title: 'Rota de ronda salva com sucesso' });
       queryClient.invalidateQueries({ queryKey: isLocal ? ['local', 'patrol_routes'] : ['patrol_routes'] });
       setRouteDialogOpen(false);
-    } catch {
-      toast({ title: 'Erro ao salvar rota', variant: 'destructive' });
+    } catch (err: any) {
+      const msg = err?.message || err?.details || 'Erro desconhecido';
+      console.error('[save-route]', err);
+      toast({ title: 'Erro ao salvar rota', description: msg, variant: 'destructive' });
     }
   };
 
