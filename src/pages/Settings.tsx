@@ -225,7 +225,7 @@ const Settings = () => {
   // Helper para chamadas de gerenciamento de usuários (local ou cloud)
   const invokeManageUsers = async (body: Record<string, unknown>) => {
     if (isLocalInstallation()) {
-      const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+      const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
       const res = await fetch(`${getLocalApiBase()}/api/local/manage-users`, {
         method: 'POST',
         headers: {
