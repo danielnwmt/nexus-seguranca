@@ -178,7 +178,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     if (isLocal) {
-      localStorage.removeItem('nexus-local-session');
+      sessionStorage.removeItem('nexus-local-session');
       setUser(null);
       setSession(null);
       return;
