@@ -32,6 +32,7 @@ interface QuoteItem {
 
 const Quotes = () => {
   const queryClient = useQueryClient();
+  const { data: company } = useCompanySettings();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewQuote, setViewQuote] = useState<any>(null);
   const [form, setForm] = useState({ client_id: '', client_name: '', notes: '', valid_until: '', discount: 0 });
