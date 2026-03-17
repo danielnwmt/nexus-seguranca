@@ -113,7 +113,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               expires_in: data.expires_in,
               user: data.user,
             };
-            localStorage.setItem('nexus-local-session', JSON.stringify(localSession));
+            sessionStorage.setItem('nexus-local-session', JSON.stringify(localSession));
             setUser(data.user);
             setSession(localSession as any);
 
