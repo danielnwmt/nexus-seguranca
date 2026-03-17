@@ -1,15 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Video, VideoOff, Volume2, VolumeX, Camera as CameraIcon,
-  Pause, Play, RefreshCw, Loader2, Download,
+  Pause, Play, RefreshCw, Loader2, Download, Maximize2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { isLocalInstallation } from '@/hooks/useLocalApi';
 import { useToast } from '@/hooks/use-toast';
+import AnalyticsOverlay from '@/components/dashboard/AnalyticsOverlay';
 
-type StreamType = 'webrtc' | 'hls' | 'iframe';
+type StreamMode = 'webrtc-iframe' | 'hls' | 'webrtc-native';
 type LatencyLevel = 'good' | 'fair' | 'poor';
 
 interface CameraPlayerProps {
@@ -20,10 +21,12 @@ interface CameraPlayerProps {
   resolution?: string;
   className?: string;
   compact?: boolean;
-  /** If true, uses iframe embed (default for MediaMTX WebRTC pages) */
   useIframe?: boolean;
   mediaServerIp?: string;
   webrtcPort?: number;
+  hlsPort?: number;
+  cameraId?: string;
+  showAnalytics?: boolean;
 }
 
 const RECONNECT_DELAY = 5000;
@@ -46,6 +49,9 @@ const CameraPlayer = ({
   useIframe = true,
   mediaServerIp,
   webrtcPort = 8889,
+  hlsPort = 8888,
+  cameraId,
+  showAnalytics = true,
 }: CameraPlayerProps) => {
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -58,90 +64,139 @@ const CameraPlayer = ({
   const [muted, setMuted] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'loading' | 'connected' | 'error'>('loading');
   const [latency, setLatency] = useState<LatencyLevel>('good');
-  const [streamType, setStreamType] = useState<StreamType>('iframe');
+  const [streamMode, setStreamMode] = useState<StreamMode>('webrtc-iframe');
 
-  // Resolve the playback URL
-  const resolvedUrl = useCallback(() => {
+  // Extract stream key from URL
+  const extractStreamKey = useCallback((): string => {
     if (!streamUrl) return '';
-
-    let host = '';
-    let key = '';
-    let port = webrtcPort;
-    let scheme: 'http' | 'https' = 'http';
-
-    const rtmpMatch = streamUrl.match(/^rtmp:\/\/([^:/]+)(?::\d+)?\/(.+)/);
-    if (rtmpMatch) { host = rtmpMatch[1]; key = rtmpMatch[2]; }
-
-    if (!key) {
-      const rtspMatch = streamUrl.match(/^rtsp:\/\/([^:/]+)(?::\d+)?\/(.+)/);
-      if (rtspMatch) { host = rtspMatch[1]; key = rtspMatch[2]; }
-    }
-
-    if (!key && streamUrl.startsWith('http')) {
+    const rtmpMatch = streamUrl.match(/^rtmp:\/\/[^:/]+(?::\d+)?\/(.+)/);
+    if (rtmpMatch) return rtmpMatch[1];
+    const rtspMatch = streamUrl.match(/^rtsp:\/\/[^:/]+(?::\d+)?\/(.+)/);
+    if (rtspMatch) return rtspMatch[1];
+    if (streamUrl.startsWith('http')) {
       try {
         const parsed = new URL(streamUrl.replace(/\/whip\/?$/, ''));
-        host = parsed.hostname;
-        port = Number(parsed.port) || 8889;
-        key = parsed.pathname.replace(/^\/+|\/+$/g, '');
-        scheme = parsed.protocol === 'https:' ? 'https' : 'http';
-      } catch {
-        return streamUrl.replace(/\/whip\/?$/, '');
-      }
+        return parsed.pathname.replace(/^\/+|\/+$/g, '');
+      } catch { return ''; }
     }
+    return '';
+  }, [streamUrl]);
 
+  // Build WebRTC iframe URL
+  const buildWebRtcUrl = useCallback((): string => {
+    const key = extractStreamKey();
     if (!key) return '';
 
     if (window.location.protocol === 'https:' && isLocalInstallation()) {
       return `${window.location.origin}/webrtc/${key}`;
     }
 
-    const finalHost = host || mediaServerIp || window.location.hostname;
-    return `${scheme}://${finalHost}:${port}/${key}/`;
-  }, [streamUrl, mediaServerIp, webrtcPort]);
+    const host = mediaServerIp || window.location.hostname;
+    return `http://${host}:${webrtcPort}/${key}/`;
+  }, [extractStreamKey, mediaServerIp, webrtcPort]);
 
-  const url = resolvedUrl();
+  // Build HLS fallback URL
+  const buildHlsUrl = useCallback((): string => {
+    const key = extractStreamKey();
+    if (!key) return '';
 
-  // Determine stream type
-  useEffect(() => {
-    if (!url) return;
-    if (useIframe) {
-      setStreamType('iframe');
-    } else if (url.includes('.m3u8')) {
-      setStreamType('hls');
-    } else {
-      setStreamType('webrtc');
+    if (window.location.protocol === 'https:' && isLocalInstallation()) {
+      return `${window.location.origin}/hls/${key}/index.m3u8`;
     }
-  }, [url, useIframe]);
+
+    const host = mediaServerIp || window.location.hostname;
+    return `http://${host}:${hlsPort}/${key}/index.m3u8`;
+  }, [extractStreamKey, mediaServerIp, hlsPort]);
+
+  const webrtcUrl = buildWebRtcUrl();
+  const hlsUrl = buildHlsUrl();
+
+  // Determine initial stream mode
+  useEffect(() => {
+    if (!webrtcUrl) return;
+    if (useIframe) {
+      setStreamMode('webrtc-iframe');
+    } else {
+      setStreamMode('webrtc-iframe');
+    }
+  }, [webrtcUrl, useIframe]);
+
+  // HLS playback via native video element
+  useEffect(() => {
+    if (streamMode !== 'hls' || !hlsUrl || !videoRef.current) return;
+    const video = videoRef.current;
+
+    const startHls = async () => {
+      // Try native HLS first (Safari)
+      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = hlsUrl;
+        video.play().catch(() => {});
+        setConnectionStatus('connected');
+        return;
+      }
+
+      // Use hls.js dynamically
+      try {
+        const Hls = (await import('hls.js')).default;
+        if (!Hls.isSupported()) {
+          setConnectionStatus('error');
+          return;
+        }
+        const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+        hls.loadSource(hlsUrl);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play().catch(() => {});
+          setConnectionStatus('connected');
+          reconnectAttemptsRef.current = 0;
+        });
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (data.fatal) {
+            setConnectionStatus('error');
+            scheduleReconnect();
+          }
+        });
+        return () => hls.destroy();
+      } catch {
+        setConnectionStatus('error');
+      }
+    };
+
+    startHls();
+  }, [streamMode, hlsUrl]);
 
   // Auto-reconnect logic
   const scheduleReconnect = useCallback(() => {
-    if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) return;
+    if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
+      setConnectionStatus('error');
+      return;
+    }
     reconnectTimerRef.current = setTimeout(() => {
       reconnectAttemptsRef.current += 1;
       setConnectionStatus('loading');
-      // Force iframe reload
-      if (iframeRef.current && streamType === 'iframe') {
-        iframeRef.current.src = url;
+
+      if (streamMode === 'webrtc-iframe' && iframeRef.current) {
+        iframeRef.current.src = webrtcUrl;
       }
     }, RECONNECT_DELAY);
-  }, [url, streamType]);
+  }, [webrtcUrl, streamMode]);
 
   // Monitor iframe load
   useEffect(() => {
-    if (streamType !== 'iframe' || !url) return;
+    if (streamMode !== 'webrtc-iframe' || !webrtcUrl) return;
     setConnectionStatus('loading');
     const timer = setTimeout(() => {
       setConnectionStatus('connected');
       reconnectAttemptsRef.current = 0;
     }, 3000);
     return () => clearTimeout(timer);
-  }, [url, streamType]);
+  }, [webrtcUrl, streamMode]);
 
-  // Latency simulation (real latency monitoring requires WebRTC stats)
+  // Latency monitor
   useEffect(() => {
     if (connectionStatus !== 'connected') return;
     const interval = setInterval(() => {
-      if (streamType === 'webrtc' && pcRef.current) {
+      if (streamMode === 'webrtc-native' && pcRef.current) {
         pcRef.current.getStats().then(stats => {
           stats.forEach(report => {
             if (report.type === 'inbound-rtp' && report.kind === 'video') {
@@ -153,12 +208,11 @@ const CameraPlayer = ({
           });
         });
       } else {
-        // For iframe mode, we approximate based on load success
         setLatency('good');
       }
     }, 5000);
     return () => clearInterval(interval);
-  }, [connectionStatus, streamType]);
+  }, [connectionStatus, streamMode]);
 
   // Cleanup
   useEffect(() => {
@@ -168,10 +222,19 @@ const CameraPlayer = ({
     };
   }, []);
 
+  // Fallback to HLS
+  const switchToHls = useCallback(() => {
+    if (!hlsUrl) return;
+    setStreamMode('hls');
+    setConnectionStatus('loading');
+    reconnectAttemptsRef.current = 0;
+    toast({ title: 'Alternando para HLS', description: 'WebRTC indisponível, usando HLS como fallback.' });
+  }, [hlsUrl, toast]);
+
   // Snapshot
   const handleSnapshot = useCallback(() => {
-    if (streamType === 'iframe') {
-      toast({ title: 'Snapshot', description: 'Capture disponível apenas em modo WebRTC nativo.' });
+    if (streamMode === 'webrtc-iframe') {
+      toast({ title: 'Snapshot', description: 'Capture disponível apenas em modo HLS/WebRTC nativo.' });
       return;
     }
     const video = videoRef.current;
@@ -189,22 +252,32 @@ const CameraPlayer = ({
     link.href = canvas.toDataURL('image/png');
     link.click();
     toast({ title: 'Snapshot salvo!' });
-  }, [streamType, name, toast]);
+  }, [streamMode, name, toast]);
 
   const handleManualReconnect = useCallback(() => {
     reconnectAttemptsRef.current = 0;
+    setStreamMode('webrtc-iframe');
     setConnectionStatus('loading');
     if (iframeRef.current) {
-      iframeRef.current.src = url;
+      iframeRef.current.src = webrtcUrl;
     }
-  }, [url]);
+  }, [webrtcUrl]);
 
-  if (status === 'offline' || !url) {
+  // Fullscreen
+  const handleFullscreen = useCallback(() => {
+    const container = iframeRef.current?.parentElement?.parentElement;
+    if (container?.requestFullscreen) {
+      container.requestFullscreen();
+    }
+  }, []);
+
+  if (status === 'offline' || !webrtcUrl) {
     return (
-      <div className={`relative bg-camera-bg flex items-center justify-center rounded-lg border border-camera-border ${className}`}>
+      <div className={`relative bg-camera-bg flex items-center justify-center rounded-lg border border-camera-border ${className}`} style={{ aspectRatio: '16/9' }}>
         <div className="flex flex-col items-center gap-2 text-muted-foreground">
           <VideoOff className="w-8 h-8" />
-          <span className="text-xs font-mono">SEM SINAL</span>
+          <span className="text-[10px] font-mono tracking-wider">SEM SINAL</span>
+          <span className="text-[9px] font-mono text-muted-foreground/60">{name}</span>
         </div>
       </div>
     );
@@ -214,10 +287,10 @@ const CameraPlayer = ({
     <div className={`relative bg-black rounded-lg border border-camera-border overflow-hidden group ${className}`}>
       {/* Video area */}
       <div className="relative w-full" style={{ aspectRatio: '16/9' }}>
-        {streamType === 'iframe' ? (
+        {streamMode === 'webrtc-iframe' ? (
           <iframe
             ref={iframeRef}
-            src={playing ? url : ''}
+            src={playing ? webrtcUrl : ''}
             className="absolute inset-0 w-full h-full border-0"
             allow="autoplay; encrypted-media"
             sandbox="allow-scripts allow-same-origin"
@@ -236,7 +309,7 @@ const CameraPlayer = ({
         {connectionStatus === 'loading' && (
           <div className="absolute inset-0 flex items-center justify-center bg-camera-bg/80 z-10">
             <Loader2 className="w-6 h-6 text-primary animate-spin" />
-            <span className="text-xs font-mono text-muted-foreground ml-2">Conectando...</span>
+            <span className="text-[10px] font-mono text-muted-foreground ml-2">Conectando...</span>
           </div>
         )}
 
@@ -244,45 +317,60 @@ const CameraPlayer = ({
           <div className="absolute inset-0 flex items-center justify-center bg-camera-bg/80 z-10">
             <div className="flex flex-col items-center gap-2 text-muted-foreground">
               <VideoOff className="w-8 h-8" />
-              <span className="text-xs font-mono">FALHA NA CONEXÃO</span>
-              <Button variant="outline" size="sm" onClick={handleManualReconnect} className="mt-1">
-                <RefreshCw className="w-3 h-3 mr-1" /> Reconectar
-              </Button>
+              <span className="text-[10px] font-mono">FALHA NA CONEXÃO</span>
+              <div className="flex gap-2 mt-1">
+                <Button variant="outline" size="sm" onClick={handleManualReconnect} className="text-[10px] h-7">
+                  <RefreshCw className="w-3 h-3 mr-1" /> WebRTC
+                </Button>
+                {hlsUrl && (
+                  <Button variant="outline" size="sm" onClick={switchToHls} className="text-[10px] h-7">
+                    <Video className="w-3 h-3 mr-1" /> HLS
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         )}
 
-        {/* Top overlay: status + latency */}
-        <div className="absolute top-2 left-2 flex items-center gap-2 z-20">
-          <Badge variant="outline" className="text-[10px] bg-background/70 backdrop-blur-sm border-none gap-1 px-2 py-0.5">
-            <div className={`w-1.5 h-1.5 rounded-full ${status === 'online' ? 'bg-emerald-500' : status === 'recording' ? 'bg-red-500 animate-pulse' : 'bg-muted-foreground'}`} />
-            {status === 'recording' ? 'REC' : status === 'online' ? 'AO VIVO' : status.toUpperCase()}
-          </Badge>
-          {connectionStatus === 'connected' && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className={`w-2 h-2 rounded-full ${latencyColors[latency]}`} />
-              </TooltipTrigger>
-              <TooltipContent>
-                Latência: {latency === 'good' ? 'Boa' : latency === 'fair' ? 'Regular' : 'Alta'}
-              </TooltipContent>
-            </Tooltip>
-          )}
+        {/* Top overlay: camera name + status + latency */}
+        <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-2 z-20 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-[9px] bg-transparent border-none gap-1 px-1.5 py-0 text-white/90 font-mono">
+              <div className={`w-1.5 h-1.5 rounded-full ${status === 'online' ? 'bg-emerald-500' : status === 'recording' ? 'bg-red-500 animate-pulse' : 'bg-muted-foreground'}`} />
+              {status === 'recording' ? 'REC' : 'LIVE'}
+            </Badge>
+            {compact && (
+              <span className="text-[9px] font-mono text-white/70 truncate max-w-[120px]">{name}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            {connectionStatus === 'connected' && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className={`w-1.5 h-1.5 rounded-full ${latencyColors[latency]}`} />
+                </TooltipTrigger>
+                <TooltipContent>
+                  Latência: {latency === 'good' ? 'Boa' : latency === 'fair' ? 'Regular' : 'Alta'}
+                </TooltipContent>
+              </Tooltip>
+            )}
+            <span className="text-[8px] font-mono text-white/40 uppercase">{streamMode === 'hls' ? 'HLS' : 'WebRTC'}</span>
+          </div>
         </div>
+
+        {/* Analytics overlay */}
+        {showAnalytics && connectionStatus === 'connected' && (
+          <AnalyticsOverlay cameraId={cameraId} compact={compact} />
+        )}
 
         {/* Bottom controls - visible on hover */}
         {!compact && (
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/10"
-                      onClick={() => setPlaying(!playing)}
-                    >
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/10" onClick={() => setPlaying(!playing)}>
                       {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                     </Button>
                   </TooltipTrigger>
@@ -291,12 +379,7 @@ const CameraPlayer = ({
 
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/10"
-                      onClick={() => setMuted(!muted)}
-                    >
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/10" onClick={() => setMuted(!muted)}>
                       {muted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
                     </Button>
                   </TooltipTrigger>
@@ -305,12 +388,7 @@ const CameraPlayer = ({
 
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/10"
-                      onClick={handleSnapshot}
-                    >
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/10" onClick={handleSnapshot}>
                       <Download className="w-3.5 h-3.5" />
                     </Button>
                   </TooltipTrigger>
@@ -319,17 +397,32 @@ const CameraPlayer = ({
 
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/10"
-                      onClick={handleManualReconnect}
-                    >
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/10" onClick={handleManualReconnect}>
                       <RefreshCw className="w-3.5 h-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Reconectar</TooltipContent>
                 </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-white/80 hover:text-white hover:bg-white/10" onClick={handleFullscreen}>
+                      <Maximize2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Tela Cheia</TooltipContent>
+                </Tooltip>
+
+                {hlsUrl && streamMode !== 'hls' && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-amber-400/80 hover:text-amber-400 hover:bg-white/10" onClick={switchToHls}>
+                        <Video className="w-3.5 h-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Alternar para HLS</TooltipContent>
+                  </Tooltip>
+                )}
               </div>
 
               <div className="text-[10px] font-mono text-white/60">
