@@ -19,7 +19,13 @@ import RecordingsViewer from '@/components/cameras/RecordingsViewer';
 // ── Options as specified ──
 const PROTOCOL_OPTIONS = ['RTSP', 'RTMP'] as const;
 const RESOLUTION_OPTIONS = ['1920x1080', '1280x720', '640x480'] as const;
-const BRAND_OPTIONS = ['Intelbras', 'Hikvision', 'Dahua', 'Genérica'] as const;
+const BRAND_OPTIONS = [
+  'Intelbras', 'Hikvision', 'Dahua', 'Axis', 'Bosch', 'Samsung', 'Hanwha',
+  'Vivotek', 'Pelco', 'Avigilon', 'Honeywell', 'Uniview', 'TVT', 'Giga',
+  'Motorola', 'TP-Link', 'Reolink', 'Amcrest', 'Lorex', 'Swann',
+  'Milestone', 'Mobotix', 'FLIR', 'Tiandy', 'Provision-ISR', 'Sunell',
+  'Milesight', 'Geovision', 'CP Plus', 'Wisenet', 'Genérica',
+] as const;
 const CODEC_OPTIONS = ['H.264', 'H.265'] as const;
 const BITRATE_OPTIONS = [2048, 4096, 8192] as const;
 const RETENTION_OPTIONS = [0, 5, 10, 15, 20, 25, 30] as const;
