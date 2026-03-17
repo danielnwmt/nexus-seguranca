@@ -362,6 +362,9 @@ const Quotes = () => {
               {viewQuote.discount > 0 && <p className="text-sm text-muted-foreground text-right">Desconto: -R$ {Number(viewQuote.discount).toFixed(2)}</p>}
               <p className="text-right text-lg font-bold">Total: R$ {Number(viewQuote.total).toFixed(2)}</p>
               {viewQuote.notes && <p className="text-sm text-muted-foreground border-t pt-2">{viewQuote.notes}</p>}
+              <Button onClick={handleDownloadPdf} className="w-full mt-2">
+                <Download className="w-4 h-4 mr-2" />Gerar PDF
+              </Button>
             </div>
           )}
         </DialogContent>
