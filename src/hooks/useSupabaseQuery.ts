@@ -318,10 +318,22 @@ export function useDeleteMutation(table: TableName) {
         const { error } = await (supabase.from(table) as any)
           .update({ deleted_at: new Date().toISOString() })
           .eq('id', id);
-        if (error) throw error;
+        if (error) {
+          const refreshed = await handleJwtExpired(error);
+          if (refreshed) {
+            const { error: e2 } = await (supabase.from(table) as any).update({ deleted_at: new Date().toISOString() }).eq('id', id);
+            if (e2) throw e2;
+          } else throw error;
+        }
       } else {
         const { error } = await (supabase.from(table) as any).delete().eq('id', id);
-        if (error) throw error;
+        if (error) {
+          const refreshed = await handleJwtExpired(error);
+          if (refreshed) {
+            const { error: e2 } = await (supabase.from(table) as any).delete().eq('id', id);
+            if (e2) throw e2;
+          } else throw error;
+        }
       }
     },
     onSuccess: () => {
