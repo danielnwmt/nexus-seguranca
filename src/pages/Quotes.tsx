@@ -157,7 +157,6 @@ const Quotes = () => {
       client ? { name: client.name, cpf: (client as any).cpf, email: (client as any).email, phone: (client as any).phone, address: (client as any).address } : null
     );
   };
-  const grandTotal = subtotal - form.discount;
 
   const filteredProducts = products.filter((p: any) =>
     p.name.toLowerCase().includes(productSearch.toLowerCase()) || (p.sku && p.sku.toLowerCase().includes(productSearch.toLowerCase()))
