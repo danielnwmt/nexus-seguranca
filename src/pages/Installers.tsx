@@ -120,7 +120,7 @@ const Installers = () => {
                     <TableCell className="text-muted-foreground text-sm font-mono">{inst.cpf || '—'}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{inst.phone || '—'}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{inst.email || '—'}</TableCell>
-                    <TableCell><Badge variant="secondary">{specialtyLabels[inst.specialty] || inst.specialty}</Badge></TableCell>
+                    <TableCell><Badge variant="secondary">{specialtyLabels[inst.specialty || ''] || inst.specialty || 'Geral'}</Badge></TableCell>
                     <TableCell>
                       <span className={`text-xs font-mono ${inst.status === 'active' ? 'text-success' : 'text-destructive'}`}>
                         {inst.status === 'active' ? 'Ativo' : 'Inativo'}
