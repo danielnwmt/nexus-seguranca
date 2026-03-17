@@ -52,7 +52,7 @@ const Installers = () => {
 
   const openEdit = (inst: Installer) => {
     setEditing(inst);
-    setForm({ name: inst.name, cpf: inst.cpf || '', phone: inst.phone || '', email: inst.email || '', specialty: inst.specialty, status: inst.status });
+    setForm({ name: inst.name, cpf: inst.cpf || '', phone: inst.phone || '', email: inst.email || '', specialty: inst.specialty || 'general', status: inst.status });
     setDialogOpen(true);
   };
 
