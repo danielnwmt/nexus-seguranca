@@ -6,6 +6,7 @@ export interface CompanySettings {
   id: string;
   name: string;
   cnpj: string | null;
+  razao_social: string | null;
   address: string | null;
   phone: string | null;
   email: string | null;
