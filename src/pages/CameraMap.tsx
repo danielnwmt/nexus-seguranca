@@ -85,9 +85,9 @@ const CameraMap = () => {
                           )}
                         </Badge>
                       </div>
-                      {clientName && <p className="text-xs text-gray-600 mb-1">{clientName}</p>}
-                      <p className="text-xs text-gray-500">{cam.protocol} • {cam.resolution}</p>
-                      {cam.location && <p className="text-xs text-gray-500">{cam.location}</p>}
+                      {clientName && <p className="text-xs text-muted-foreground mb-1">{clientName}</p>}
+                      <p className="text-xs text-muted-foreground">{cam.protocol} • {cam.resolution}</p>
+                      {cam.location && <p className="text-xs text-muted-foreground">{cam.location}</p>}
 
                       {/* Live stream popup */}
                       {cam.status === 'online' && cam.stream_url && (
