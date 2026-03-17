@@ -25,6 +25,8 @@ import SystemHealth from "./pages/SystemHealth";
 import CameraMap from "./pages/CameraMap";
 import Timeline from "./pages/Timeline";
 import LiveGrid from "./pages/LiveGrid";
+import Stock from "./pages/Stock";
+import Quotes from "./pages/Quotes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
