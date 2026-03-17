@@ -94,8 +94,11 @@ const Guards = () => {
     queryKey: isLocal ? ['local', 'patrol_routes'] : ['patrol_routes'],
     queryFn: async () => {
       if (isLocal) {
+        const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
         const res = await fetch(`${getLocalApiBase()}/rest/v1/patrol_routes?select=*&order=created_at.desc`, {
-          headers: { 'Content-Type': 'application/json' },
+          headers,
         });
         if (!res.ok) throw new Error('Erro ao buscar rotas');
         return res.json();
