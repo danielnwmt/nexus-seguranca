@@ -9,7 +9,7 @@ import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
  */
 export async function getAccessToken(): Promise<string> {
   if (isLocalInstallation()) {
-    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
     return session.access_token || '';
   }
   const { data } = await supabase.auth.getSession();
@@ -21,7 +21,7 @@ export async function getAccessToken(): Promise<string> {
  */
 export function getLocalUser(): any {
   if (isLocalInstallation()) {
-    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
     return session.user || null;
   }
   return null;
@@ -32,7 +32,7 @@ export function getLocalUser(): any {
  */
 export async function updateUserPassword(password: string): Promise<{ error: string | null }> {
   if (isLocalInstallation()) {
-    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
     const res = await fetch(`${getLocalApiBase()}/api/local/update-password`, {
       method: 'POST',
       headers: {
@@ -46,7 +46,7 @@ export async function updateUserPassword(password: string): Promise<{ error: str
     // Update local session metadata
     if (session.user?.user_metadata) {
       session.user.user_metadata.force_password_change = false;
-      localStorage.setItem('nexus-local-session', JSON.stringify(session));
+      sessionStorage.setItem('nexus-local-session', JSON.stringify(session));
     }
     return { error: null };
   }
@@ -62,7 +62,7 @@ export async function updateUserPassword(password: string): Promise<{ error: str
  */
 export async function fetchTableData(table: string): Promise<any[]> {
   if (isLocalInstallation()) {
-    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
     const res = await fetch(
@@ -82,7 +82,7 @@ export async function fetchTableData(table: string): Promise<any[]> {
  */
 export async function upsertTableData(table: string, row: Record<string, unknown>): Promise<{ error: boolean }> {
   if (isLocalInstallation()) {
-    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Prefer': 'resolution=merge-duplicates,return=representation',
@@ -104,7 +104,7 @@ export async function upsertTableData(table: string, row: Record<string, unknown
  */
 export async function countTableRows(table: string): Promise<number> {
   if (isLocalInstallation()) {
-    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
     const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Prefer': 'count=exact' };
     if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
     const res = await fetch(
