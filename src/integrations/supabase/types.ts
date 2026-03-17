@@ -718,6 +718,155 @@ export type Database = {
           },
         ]
       }
+      products: {
+        Row: {
+          category: string
+          cost_price: number
+          created_at: string
+          description: string | null
+          id: string
+          min_quantity: number
+          name: string
+          quantity: number
+          sale_price: number
+          sku: string | null
+          status: string
+          supplier: string | null
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          cost_price?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          min_quantity?: number
+          name: string
+          quantity?: number
+          sale_price?: number
+          sku?: string | null
+          status?: string
+          supplier?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          cost_price?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          min_quantity?: number
+          name?: string
+          quantity?: number
+          sale_price?: number
+          sku?: string | null
+          status?: string
+          supplier?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      quote_items: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string | null
+          product_name: string
+          quantity: number
+          quote_id: string
+          total: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id?: string | null
+          product_name: string
+          quantity?: number
+          quote_id: string
+          total?: number
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          quote_id?: string
+          total?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotes: {
+        Row: {
+          client_id: string | null
+          client_name: string | null
+          created_at: string
+          discount: number
+          id: string
+          notes: string | null
+          quote_number: string
+          status: string
+          total: number
+          updated_at: string
+          valid_until: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          client_name?: string | null
+          created_at?: string
+          discount?: number
+          id?: string
+          notes?: string | null
+          quote_number?: string
+          status?: string
+          total?: number
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          client_name?: string | null
+          created_at?: string
+          discount?: number
+          id?: string
+          notes?: string | null
+          quote_number?: string
+          status?: string
+          total?: number
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recordings: {
         Row: {
           camera_id: string | null

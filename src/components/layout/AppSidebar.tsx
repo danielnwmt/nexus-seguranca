@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Camera, Users, Bell, DollarSign, Shield, Settings, LogOut, Headphones, ClipboardList, Wrench, Brain, Film, Activity, MapPin, Clock, Monitor } from 'lucide-react';
+import { LayoutDashboard, Camera, Users, Bell, DollarSign, Shield, Settings, LogOut, Headphones, ClipboardList, Wrench, Brain, Film, Activity, MapPin, Clock, Monitor, Package, FileText } from 'lucide-react';
 import nexusLogo from '@/assets/nexus-logo.png';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
@@ -15,6 +15,8 @@ const navItems = [
   { to: '/guards', icon: Shield, label: 'Vigilantes' },
   { to: '/installers', icon: Wrench, label: 'Técnicos' },
   { to: '/service-orders', icon: ClipboardList, label: 'Ordens de Serviço' },
+  { to: '/stock', icon: Package, label: 'Estoque' },
+  { to: '/quotes', icon: FileText, label: 'Orçamentos' },
   { to: '/financial', icon: DollarSign, label: 'Financeiro' },
   { to: '/alarms', icon: Bell, label: 'Alarmes' },
   { to: '/analytics', icon: Brain, label: 'Analíticos IA' },
