@@ -1,17 +1,15 @@
 import { Camera, Users, Bell, AlertTriangle, Video, Shield, UserX, Grid2X2, Grid3X3, LayoutGrid } from 'lucide-react';
 import StatsCard from '@/components/dashboard/StatsCard';
-import CameraFeed from '@/components/dashboard/CameraFeed';
+import CameraPlayer from '@/components/CameraPlayer';
 import AlarmItem from '@/components/dashboard/AlarmItem';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useTableQuery, useUpdateMutation } from '@/hooks/useSupabaseQuery';
+import { useUpdateMutation, useTableQuery } from '@/hooks/useSupabaseQuery';
 import { useState } from 'react';
-import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { useCameras } from '@/hooks/useCameras';
 
 const Index = () => {
-  const { data: cameras = [] } = useTableQuery('cameras');
-  const { data: clients = [] } = useTableQuery('clients');
+  const { cameras: filteredCameras, allCameras, clients, onlineCount, offlineCount, getClientName } = useCameras();
   const { data: alarms = [] } = useTableQuery('alarms');
   const { data: mediaServers = [] } = useTableQuery('media_servers');
   const updateAlarm = useUpdateMutation('alarms');
@@ -22,27 +20,12 @@ const Index = () => {
   const serverList = mediaServers as any[];
   const firstServer = serverList.length > 0 ? serverList[0] : null;
   const mediaServerIp = firstServer?.ip_address || '';
-  const webrtcPort = firstServer?.webrtc_base_port || 8889;
 
-  const filteredCameras = selectedClient === 'all' ? cameras : cameras.filter((c: any) => c.client_id === selectedClient);
-  const onlineCameras = filteredCameras.filter((c: any) => c.status !== 'offline').length;
-  const offlineCameras = filteredCameras.filter((c: any) => c.status === 'offline').length;
+  const displayCameras = selectedClient === 'all' ? allCameras : allCameras.filter(c => c.client_id === selectedClient);
   const activeAlarms = alarms.filter((a: any) => !a.acknowledged).length;
 
   const handleAcknowledge = (id: string) => {
     updateAlarm.mutate({ id, acknowledged: true } as any);
-  };
-
-  const mapCamera = (c: any) => {
-    const client = clients.find((cl: any) => cl.id === c.client_id);
-    // Pass raw stream_url — CameraFeed converts RTMP/RTSP to WebRTC internally
-    const streamUrl = c.stream_url || '';
-    return {
-      id: c.id, name: c.name, clientId: c.client_id || '', clientName: client?.name || '',
-      streamUrl, protocol: c.protocol || 'RTSP', status: c.status || 'online',
-      location: c.location || '', resolution: c.resolution || '', storagePath: c.storage_path || '',
-      retentionDays: c.retention_days ?? 30, analytics: c.analytics || [],
-    };
   };
 
   const mapAlarm = (a: any) => ({
@@ -58,8 +41,8 @@ const Index = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatsCard title="Câmeras Online" value={onlineCameras} icon={Video} variant="success" trend={`${filteredCameras.length} total`} />
-        <StatsCard title="Câmeras Offline" value={offlineCameras} icon={Camera} variant="danger" />
+        <StatsCard title="Câmeras Online" value={onlineCount} icon={Video} variant="success" trend={`${allCameras.length} total`} />
+        <StatsCard title="Câmeras Offline" value={offlineCount} icon={Camera} variant="danger" />
         <StatsCard title="Clientes Ativos" value={clients.filter((c: any) => c.status === 'active').length} icon={Users} trend={`${clients.length} total`} />
         <StatsCard title="Clientes Inativos" value={clients.filter((c: any) => c.status === 'inactive').length} icon={UserX} variant={clients.filter((c: any) => c.status === 'inactive').length > 0 ? 'danger' : 'default'} />
         <StatsCard title="Alarmes Ativos" value={activeAlarms} icon={Bell} variant={activeAlarms > 0 ? 'warning' : 'default'} />
@@ -119,12 +102,21 @@ const Index = () => {
                   ))}
                 </SelectContent>
               </Select>
-              <span className="text-[10px] font-mono text-muted-foreground">{filteredCameras.length} câmeras</span>
+              <span className="text-[10px] font-mono text-muted-foreground">{displayCameras.length} câmeras</span>
             </div>
           </div>
           <div className={`camera-grid camera-grid-${gridLayout}`}>
-            {filteredCameras.map((camera: any) => (
-              <CameraFeed key={camera.id} camera={mapCamera(camera) as any} compact={gridLayout !== '2x2'} />
+            {displayCameras.map((cam) => (
+              <CameraPlayer
+                key={cam.id}
+                name={cam.name}
+                streamUrl={cam.stream_url || ''}
+                protocol={cam.protocol}
+                status={cam.status}
+                resolution={cam.resolution || ''}
+                compact={gridLayout !== '2x2'}
+                mediaServerIp={mediaServerIp}
+              />
             ))}
           </div>
         </div>
