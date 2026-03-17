@@ -62,7 +62,7 @@ export async function updateUserPassword(password: string): Promise<{ error: str
  */
 export async function fetchTableData(table: string): Promise<any[]> {
   if (isLocalInstallation()) {
-    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
     const res = await fetch(
