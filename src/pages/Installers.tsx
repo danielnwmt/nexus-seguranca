@@ -17,9 +17,10 @@ interface Installer {
   cpf: string | null;
   phone: string | null;
   email: string | null;
-  specialty: string;
+  specialty: string | null;
   status: string;
   created_at: string;
+  updated_at: string;
 }
 
 const specialtyLabels: Record<string, string> = {
