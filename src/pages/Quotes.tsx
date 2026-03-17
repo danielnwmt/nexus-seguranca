@@ -10,8 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
-import { Plus, FileText, Search, Trash2, Eye, ShoppingCart } from 'lucide-react';
+import { Plus, FileText, Search, Trash2, Eye, ShoppingCart, Download } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { generateQuotePdf } from '@/lib/generateQuotePdf';
 
 const STATUS_MAP: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Rascunho', variant: 'secondary' },
@@ -30,6 +32,7 @@ interface QuoteItem {
 
 const Quotes = () => {
   const queryClient = useQueryClient();
+  const { data: company } = useCompanySettings();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewQuote, setViewQuote] = useState<any>(null);
   const [form, setForm] = useState({ client_id: '', client_name: '', notes: '', valid_until: '', discount: 0 });
@@ -49,7 +52,7 @@ const Quotes = () => {
   const { data: clients = [] } = useQuery({
     queryKey: ['clients'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('clients').select('id, name').is('deleted_at', null).order('name');
+      const { data, error } = await supabase.from('clients').select('id, name, cpf, email, phone, address').is('deleted_at', null).order('name');
       if (error) throw error;
       return data;
     },
@@ -135,6 +138,25 @@ const Quotes = () => {
   const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
   const subtotal = items.reduce((s, i) => s + i.total, 0);
   const grandTotal = subtotal - form.discount;
+
+  const handleDownloadPdf = async () => {
+    if (!viewQuote) return;
+    const client = clients.find((c: any) => c.id === viewQuote.client_id);
+    await generateQuotePdf(
+      {
+        name: company?.name || 'Nexus Monitoramento',
+        cnpj: company?.cnpj,
+        address: company?.address,
+        phone: company?.phone,
+        email: company?.email,
+        logo_url: company?.logo_url,
+        razao_social: (company as any)?.razao_social,
+      },
+      viewQuote,
+      quoteItems,
+      client ? { name: client.name, cpf: (client as any).cpf, email: (client as any).email, phone: (client as any).phone, address: (client as any).address } : null
+    );
+  };
 
   const filteredProducts = products.filter((p: any) =>
     p.name.toLowerCase().includes(productSearch.toLowerCase()) || (p.sku && p.sku.toLowerCase().includes(productSearch.toLowerCase()))
@@ -340,6 +362,9 @@ const Quotes = () => {
               {viewQuote.discount > 0 && <p className="text-sm text-muted-foreground text-right">Desconto: -R$ {Number(viewQuote.discount).toFixed(2)}</p>}
               <p className="text-right text-lg font-bold">Total: R$ {Number(viewQuote.total).toFixed(2)}</p>
               {viewQuote.notes && <p className="text-sm text-muted-foreground border-t pt-2">{viewQuote.notes}</p>}
+              <Button onClick={handleDownloadPdf} className="w-full mt-2">
+                <Download className="w-4 h-4 mr-2" />Gerar PDF
+              </Button>
             </div>
           )}
         </DialogContent>
