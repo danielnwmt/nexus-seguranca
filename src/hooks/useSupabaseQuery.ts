@@ -4,6 +4,30 @@ import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 
 type TableName = 'clients' | 'cameras' | 'guards' | 'alarms' | 'invoices' | 'storage_servers' | 'installers' | 'service_orders' | 'bills' | 'media_servers' | 'recordings' | 'analytics_events' | 'guard_clients';
 
+/**
+ * Detects JWT expired errors and attempts a session refresh.
+ * Returns true if the session was successfully refreshed.
+ */
+async function handleJwtExpired(error: any): Promise<boolean> {
+  const msg = typeof error === 'string' ? error : (error?.message || error?.code || '');
+  const isJwtError = /jwt expired|jwt.*(invalid|malformed)|token.*expired|pgrst301/i.test(msg);
+  if (!isJwtError) return false;
+
+  try {
+    const { data, error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError || !data.session) {
+      // Refresh failed — force re-login
+      await supabase.auth.signOut();
+      window.location.href = '/login';
+      return false;
+    }
+    return true; // Refreshed successfully, caller should retry
+  } catch {
+    window.location.href = '/login';
+    return false;
+  }
+}
+
 // Tables that support soft delete (deleted_at column)
 const SOFT_DELETE_TABLES: Set<string> = new Set(['clients', 'cameras', 'guards']);
 
