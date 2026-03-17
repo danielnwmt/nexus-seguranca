@@ -91,7 +91,7 @@ const CameraMap = () => {
 
                       {/* Live stream popup */}
                       {cam.status === 'online' && cam.stream_url && (
-                        <div className="mt-2 rounded overflow-hidden border border-gray-200">
+                        <div className="mt-2 rounded overflow-hidden border border-border">
                           <CameraPlayer
                             name={cam.name}
                             streamUrl={cam.stream_url}
