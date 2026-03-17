@@ -139,6 +139,26 @@ const Quotes = () => {
   const subtotal = items.reduce((s, i) => s + i.total, 0);
   const grandTotal = subtotal - form.discount;
 
+  const handleDownloadPdf = async () => {
+    if (!viewQuote) return;
+    const client = clients.find((c: any) => c.id === viewQuote.client_id);
+    await generateQuotePdf(
+      {
+        name: company?.name || 'Nexus Monitoramento',
+        cnpj: company?.cnpj,
+        address: company?.address,
+        phone: company?.phone,
+        email: company?.email,
+        logo_url: company?.logo_url,
+        razao_social: (company as any)?.razao_social,
+      },
+      viewQuote,
+      quoteItems,
+      client ? { name: client.name, cpf: (client as any).cpf, email: (client as any).email, phone: (client as any).phone, address: (client as any).address } : null
+    );
+  };
+  const grandTotal = subtotal - form.discount;
+
   const filteredProducts = products.filter((p: any) =>
     p.name.toLowerCase().includes(productSearch.toLowerCase()) || (p.sku && p.sku.toLowerCase().includes(productSearch.toLowerCase()))
   );
