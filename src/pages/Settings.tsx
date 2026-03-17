@@ -188,7 +188,7 @@ const Settings = () => {
     setUsersLoading(true);
     try {
       if (isLocalInstallation()) {
-        const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+        const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
         const res = await fetch(`${getLocalApiBase()}/api/local/manage-users`, {
           headers: { 'Authorization': `Bearer ${session.access_token || ''}` },
         });
