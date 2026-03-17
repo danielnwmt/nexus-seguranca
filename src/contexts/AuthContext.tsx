@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     // For local installations, check if we have a locally-stored session
     if (isLocalInstallation()) {
-      const stored = localStorage.getItem('nexus-local-session');
+      const stored = sessionStorage.getItem('nexus-local-session');
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
@@ -34,30 +34,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // IMPORTANT: First restore session from storage, THEN listen for changes.
-    // This prevents the race condition where onAuthStateChange fires INITIAL_SESSION
-    // before the session is fully restored, causing a false redirect to /login.
-    let initialised = false;
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    // Cloud: clear persisted session on page load so user must login again
+    supabase.auth.signOut().then(() => {
+      setUser(null);
+      setSession(null);
       setLoading(false);
-      initialised = true;
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // Skip the initial event — getSession already handled it
-      if (!initialised && event === 'INITIAL_SESSION') return;
-
+    // Still listen for new sign-ins during this page session
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-
-      // If token refresh failed or user was signed out, redirect to login
-      if (event === 'SIGNED_OUT') {
-        window.location.href = '/login';
-      }
     });
 
     return () => subscription.unsubscribe();
@@ -125,7 +113,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               expires_in: data.expires_in,
               user: data.user,
             };
-            localStorage.setItem('nexus-local-session', JSON.stringify(localSession));
+            sessionStorage.setItem('nexus-local-session', JSON.stringify(localSession));
             setUser(data.user);
             setSession(localSession as any);
 
@@ -190,7 +178,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     if (isLocal) {
-      localStorage.removeItem('nexus-local-session');
+      sessionStorage.removeItem('nexus-local-session');
       setUser(null);
       setSession(null);
       return;

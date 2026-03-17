@@ -34,7 +34,7 @@ const SOFT_DELETE_TABLES: Set<string> = new Set(['clients', 'cameras', 'guards']
 function getLocalHeaders(extra?: Record<string, string>): Record<string, string> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extra };
   try {
-    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || '{}');
     if (session.access_token) {
       headers['Authorization'] = `Bearer ${session.access_token}`;
     }
