@@ -1,5 +1,5 @@
 import { Alarm } from '@/types/monitoring';
-import { AlertTriangle, Wifi, WifiOff, Eye, ShieldAlert, Check } from 'lucide-react';
+import { AlertTriangle, WifiOff, Eye, ShieldAlert, Check } from 'lucide-react';
 
 interface AlarmItemProps {
   alarm: Alarm;
@@ -11,33 +11,35 @@ const typeIcons = {
   connection_lost: WifiOff,
   tampering: AlertTriangle,
   intrusion: ShieldAlert,
-};
+} as const;
 
 const severityStyles = {
   critical: 'border-l-alarm-critical bg-alarm-critical/5',
   warning: 'border-l-alarm-warning bg-alarm-warning/5',
   info: 'border-l-alarm-info bg-alarm-info/5',
-};
+} as const;
 
 const severityTextStyles = {
   critical: 'text-alarm-critical',
   warning: 'text-alarm-warning',
   info: 'text-alarm-info',
-};
+} as const;
 
 const AlarmItem = ({ alarm, onAcknowledge }: AlarmItemProps) => {
-  const Icon = typeIcons[alarm.type];
+  const Icon = typeIcons[alarm.type as keyof typeof typeIcons] ?? AlertTriangle;
+  const severityClass = severityStyles[alarm.severity as keyof typeof severityStyles] ?? severityStyles.warning;
+  const severityTextClass = severityTextStyles[alarm.severity as keyof typeof severityTextStyles] ?? severityTextStyles.warning;
   const time = new Date(alarm.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div className={`border-l-2 rounded-r-md p-3 ${severityStyles[alarm.severity]} ${!alarm.acknowledged ? 'pulse-alarm' : 'opacity-60'}`}>
+    <div className={`border-l-2 rounded-r-md p-3 ${severityClass} ${!alarm.acknowledged ? 'pulse-alarm' : 'opacity-60'}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-start gap-2">
-          <Icon className={`w-4 h-4 mt-0.5 ${severityTextStyles[alarm.severity]}`} />
+          <Icon className={`w-4 h-4 mt-0.5 ${severityTextClass}`} />
           <div>
-            <p className="text-xs font-medium text-foreground">{alarm.message}</p>
+            <p className="text-xs font-medium text-foreground">{alarm.message || 'Alarme sem descrição'}</p>
             <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
-              {alarm.cameraName} • {alarm.clientName}
+              {alarm.cameraName || 'Câmera não informada'} • {alarm.clientName || 'Cliente não informado'}
             </p>
           </div>
         </div>
