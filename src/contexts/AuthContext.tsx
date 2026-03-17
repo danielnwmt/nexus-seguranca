@@ -34,21 +34,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-
-      // If token refresh failed or user was signed out, redirect to login
-      if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
-        window.location.href = '/login';
-      }
-    });
+    // IMPORTANT: First restore session from storage, THEN listen for changes.
+    // This prevents the race condition where onAuthStateChange fires INITIAL_SESSION
+    // before the session is fully restored, causing a false redirect to /login.
+    let initialised = false;
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      initialised = true;
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Skip the initial event — getSession already handled it
+      if (!initialised && event === 'INITIAL_SESSION') return;
+
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+
+      // If token refresh failed or user was signed out, redirect to login
+      if (event === 'SIGNED_OUT') {
+        window.location.href = '/login';
+      }
     });
 
     return () => subscription.unsubscribe();
