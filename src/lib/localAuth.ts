@@ -32,7 +32,7 @@ export function getLocalUser(): any {
  */
 export async function updateUserPassword(password: string): Promise<{ error: string | null }> {
   if (isLocalInstallation()) {
-    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
     const res = await fetch(`${getLocalApiBase()}/api/local/update-password`, {
       method: 'POST',
       headers: {
