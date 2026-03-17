@@ -4,6 +4,30 @@ import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 
 type TableName = 'clients' | 'cameras' | 'guards' | 'alarms' | 'invoices' | 'storage_servers' | 'installers' | 'service_orders' | 'bills' | 'media_servers' | 'recordings' | 'analytics_events' | 'guard_clients';
 
+/**
+ * Detects JWT expired errors and attempts a session refresh.
+ * Returns true if the session was successfully refreshed.
+ */
+async function handleJwtExpired(error: any): Promise<boolean> {
+  const msg = typeof error === 'string' ? error : (error?.message || error?.code || '');
+  const isJwtError = /jwt expired|jwt.*(invalid|malformed)|token.*expired|pgrst301/i.test(msg);
+  if (!isJwtError) return false;
+
+  try {
+    const { data, error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError || !data.session) {
+      // Refresh failed — force re-login
+      await supabase.auth.signOut();
+      window.location.href = '/login';
+      return false;
+    }
+    return true; // Refreshed successfully, caller should retry
+  } catch {
+    window.location.href = '/login';
+    return false;
+  }
+}
+
 // Tables that support soft delete (deleted_at column)
 const SOFT_DELETE_TABLES: Set<string> = new Set(['clients', 'cameras', 'guards']);
 
@@ -74,7 +98,18 @@ export function useTableQuery<T = any>(table: TableName, orderBy = 'created_at',
         query = query.is('deleted_at', null);
       }
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        const refreshed = await handleJwtExpired(error);
+        if (refreshed) {
+          // Retry after refresh
+          let retryQuery = (supabase.from(table) as any).select('*').order(orderBy, { ascending });
+          if (SOFT_DELETE_TABLES.has(table)) retryQuery = retryQuery.is('deleted_at', null);
+          const { data: d2, error: e2 } = await retryQuery;
+          if (e2) throw e2;
+          return d2 as T[];
+        }
+        throw error;
+      }
       return data as T[];
     },
     enabled,
@@ -193,7 +228,15 @@ export function useInsertMutation(table: TableName) {
         return Array.isArray(result) ? result[0] : result;
       }
       const { data, error } = await (supabase.from(table) as any).insert(row).select().single();
-      if (error) throw error;
+      if (error) {
+        const refreshed = await handleJwtExpired(error);
+        if (refreshed) {
+          const { data: d2, error: e2 } = await (supabase.from(table) as any).insert(row).select().single();
+          if (e2) throw e2;
+          return d2;
+        }
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {
@@ -222,7 +265,15 @@ export function useUpdateMutation(table: TableName) {
         return Array.isArray(result) ? result[0] : result;
       }
       const { data, error } = await (supabase.from(table) as any).update(updates).eq('id', id).select().single();
-      if (error) throw error;
+      if (error) {
+        const refreshed = await handleJwtExpired(error);
+        if (refreshed) {
+          const { data: d2, error: e2 } = await (supabase.from(table) as any).update(updates).eq('id', id).select().single();
+          if (e2) throw e2;
+          return d2;
+        }
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {
@@ -267,10 +318,22 @@ export function useDeleteMutation(table: TableName) {
         const { error } = await (supabase.from(table) as any)
           .update({ deleted_at: new Date().toISOString() })
           .eq('id', id);
-        if (error) throw error;
+        if (error) {
+          const refreshed = await handleJwtExpired(error);
+          if (refreshed) {
+            const { error: e2 } = await (supabase.from(table) as any).update({ deleted_at: new Date().toISOString() }).eq('id', id);
+            if (e2) throw e2;
+          } else throw error;
+        }
       } else {
         const { error } = await (supabase.from(table) as any).delete().eq('id', id);
-        if (error) throw error;
+        if (error) {
+          const refreshed = await handleJwtExpired(error);
+          if (refreshed) {
+            const { error: e2 } = await (supabase.from(table) as any).delete().eq('id', id);
+            if (e2) throw e2;
+          } else throw error;
+        }
       }
     },
     onSuccess: () => {
