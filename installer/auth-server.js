@@ -95,6 +95,121 @@ function sendJSON(res, status, data) {
   res.end(JSON.stringify(data));
 }
 
+function getLocalServerContext() {
+  const nets = os.networkInterfaces();
+  let localIp = '127.0.0.1';
+
+  for (const name of Object.keys(nets)) {
+    for (const netInfo of nets[name] || []) {
+      if (netInfo.family === 'IPv4' && !netInfo.internal) {
+        localIp = netInfo.address;
+        break;
+      }
+    }
+    if (localIp !== '127.0.0.1') break;
+  }
+
+  return {
+    localIp,
+    detectedOs: process.platform === 'win32' ? 'windows' : 'linux',
+  };
+}
+
+async function probeLocalMediaServer(localIp, rtmpPort) {
+  let apiOk = false;
+  let rtmpOk = false;
+  let serviceActive = false;
+
+  await new Promise((resolve) => {
+    const req = http.get('http://127.0.0.1:9997/v3/paths/list', { timeout: 3000 }, (resp) => {
+      apiOk = resp.statusCode === 200;
+      resp.resume();
+      resolve();
+    });
+    req.on('error', () => resolve());
+    req.on('timeout', () => {
+      req.destroy();
+      resolve();
+    });
+  });
+
+  try {
+    const net = require('net');
+    rtmpOk = await new Promise((resolve) => {
+      const sock = net.createConnection({ host: localIp || '127.0.0.1', port: rtmpPort || 1935, timeout: 3000 });
+      sock.on('connect', () => {
+        sock.destroy();
+        resolve(true);
+      });
+      sock.on('error', () => resolve(false));
+      sock.on('timeout', () => {
+        sock.destroy();
+        resolve(false);
+      });
+    });
+  } catch {}
+
+  if (!apiOk && process.platform !== 'win32') {
+    try {
+      const status = execSync('systemctl is-active mediamtx 2>/dev/null || systemctl is-active nexus-mediamtx 2>/dev/null', { encoding: 'utf8' }).trim();
+      serviceActive = status === 'active';
+    } catch {}
+  }
+
+  return {
+    api: apiOk,
+    rtmp: rtmpOk,
+    service: serviceActive,
+    online: apiOk || rtmpOk || serviceActive,
+  };
+}
+
+async function ensureLocalMediaServerEntry(status) {
+  const { localIp, detectedOs } = getLocalServerContext();
+
+  try {
+    const existing = await pool.query(
+      `SELECT * FROM media_servers
+       WHERE ip_address = $1 OR name IN ('Servidor Local', 'Servidor MediaMTX')
+       ORDER BY CASE WHEN ip_address = $1 THEN 0 ELSE 1 END, created_at ASC
+       LIMIT 1`,
+      [localIp]
+    );
+
+    let server;
+    if (existing.rows.length > 0) {
+      const updated = await pool.query(
+        `UPDATE media_servers
+         SET name = $1,
+             ip_address = $2,
+             instances = 1,
+             rtmp_base_port = 1935,
+             hls_base_port = 8888,
+             webrtc_base_port = 8889,
+             status = $3,
+             os = $4,
+             updated_at = NOW()
+         WHERE id = $5
+         RETURNING *`,
+        ['Servidor Local', localIp, status, detectedOs, existing.rows[0].id]
+      );
+      server = updated.rows[0];
+    } else {
+      const inserted = await pool.query(
+        `INSERT INTO media_servers (name, ip_address, instances, rtmp_base_port, hls_base_port, webrtc_base_port, status, os)
+         VALUES ($1, $2, 1, 1935, 8888, 8889, $3, $4)
+         RETURNING *`,
+        ['Servidor Local', localIp, status, detectedOs]
+      );
+      server = inserted.rows[0];
+    }
+
+    return { server, localIp, detectedOs };
+  } catch {
+    return { server: null, localIp, detectedOs };
+  }
+}
+
 function buildUserResponse(user, token) {
   return {
     access_token: token,
@@ -548,66 +663,20 @@ const server = http.createServer(async (req, res) => {
     // ---- AUTO-REGISTER: detecta IP local e cadastra servidor de mídia se não existir ----
     if (path === '/api/local/media-servers/auto-register' && req.method === 'POST') {
       try {
-        // Detectar IP local
-        const nets = os.networkInterfaces();
-        let localIp = '127.0.0.1';
-        for (const name of Object.keys(nets)) {
-          for (const net of nets[name]) {
-            if (net.family === 'IPv4' && !net.internal) {
-              localIp = net.address;
-              break;
-            }
-          }
-          if (localIp !== '127.0.0.1') break;
-        }
+        const { localIp, detectedOs } = getLocalServerContext();
+        const probe = await probeLocalMediaServer(localIp, 1935);
+        const newStatus = probe.online ? 'online' : 'offline';
+        const { server } = await ensureLocalMediaServerEntry(newStatus);
 
-        // Detectar OS
-        const detectedOs = process.platform === 'win32' ? 'windows' : 'linux';
-
-        // Verificar se já existe servidor cadastrado com esse IP
-        const existing = await pool.query('SELECT * FROM media_servers WHERE ip_address = $1', [localIp]);
-        let server;
-        if (existing.rows.length > 0) {
-          server = existing.rows[0];
-        } else {
-          // Cadastrar automaticamente
-          const insertResult = await pool.query(
-            `INSERT INTO media_servers (name, ip_address, instances, rtmp_base_port, hls_base_port, webrtc_base_port, status, os)
-             VALUES ($1,$2,1,1935,8888,8889,'active',$3) RETURNING *`,
-            ['Servidor Local', localIp, detectedOs]
-          );
-          server = insertResult.rows[0];
-        }
-
-        // Testar conexão MediaMTX (HLS e RTMP)
-        let hlsOk = false, rtmpOk = false;
-        try {
-          const hlsTest = await new Promise((resolve) => {
-            const req = http.get(`http://${localIp}:${server.hls_base_port}/v3/paths/list`, { timeout: 4000 }, (r) => resolve(r.statusCode < 500));
-            req.on('error', () => resolve(false));
-            req.on('timeout', () => { req.destroy(); resolve(false); });
-          });
-          hlsOk = hlsTest;
-        } catch(e) {}
-
-        try {
-          const net = require('net');
-          rtmpOk = await new Promise((resolve) => {
-            const sock = net.createConnection({ host: localIp, port: server.rtmp_base_port, timeout: 4000 });
-            sock.on('connect', () => { sock.destroy(); resolve(true); });
-            sock.on('error', () => resolve(false));
-            sock.on('timeout', () => { sock.destroy(); resolve(false); });
-          });
-        } catch(e) {}
-
-        const isOnline = hlsOk || rtmpOk;
-        const newStatus = isOnline ? 'online' : 'offline';
-
-        // Atualizar status
-        await pool.query('UPDATE media_servers SET status=$1, updated_at=NOW() WHERE id=$2', [newStatus, server.id]);
-        server.status = newStatus;
-
-        return sendJSON(res, 200, { server, detected_ip: localIp, detected_os: detectedOs, online: isOnline, hls: hlsOk, rtmp: rtmpOk });
+        return sendJSON(res, 200, {
+          server,
+          detected_ip: localIp,
+          detected_os: detectedOs,
+          online: probe.online,
+          hls: probe.api,
+          rtmp: probe.rtmp,
+          service: probe.service,
+        });
       } catch (e) { return sendJSON(res, 500, { error: e.message }); }
     }
 
@@ -2409,29 +2478,13 @@ async function getSystemHealth() {
     services.postgresql = 'offline';
   }
 
-  // MediaMTX - considera API local e fallback pelo systemd para evitar falso offline
+  // MediaMTX - autodetecta e normaliza cadastro local para evitar status "sem servidor"
   try {
-    const httpLib = require('http');
-    let mediamtxOnline = false;
-
-    await new Promise((resolve) => {
-      const r = httpLib.get('http://127.0.0.1:9997/v3/paths/list', { timeout: 3000 }, (resp) => {
-        mediamtxOnline = resp.statusCode === 200;
-        resp.resume();
-        resolve();
-      });
-      r.on('error', () => resolve());
-      r.on('timeout', () => { r.destroy(); resolve(); });
-    });
-
-    if (!mediamtxOnline && process.platform !== 'win32') {
-      try {
-        const mediamtxStatus = execSync('systemctl is-active mediamtx 2>/dev/null || systemctl is-active nexus-mediamtx 2>/dev/null', { encoding: 'utf8' }).trim();
-        mediamtxOnline = mediamtxStatus === 'active';
-      } catch {}
-    }
-
-    services.mediamtx = mediamtxOnline ? 'online' : 'offline';
+    const { localIp } = getLocalServerContext();
+    const probe = await probeLocalMediaServer(localIp, 1935);
+    const newStatus = probe.online ? 'online' : 'offline';
+    await ensureLocalMediaServerEntry(newStatus);
+    services.mediamtx = newStatus;
   } catch {
     services.mediamtx = 'offline';
   }
