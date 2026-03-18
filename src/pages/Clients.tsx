@@ -54,7 +54,7 @@ const Clients = () => {
   const [cameraViewerClient, setCameraViewerClient] = useState<any>(null);
   const { data: allCameras = [] } = useTableQuery('cameras');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '' });
+  const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '', latitude: '', longitude: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { data: storageServers = [] } = useTableQuery('storage_servers');
   const [page, setPage] = useState(0);
