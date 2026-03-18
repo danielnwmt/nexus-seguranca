@@ -70,6 +70,7 @@ const CompanySettings = () => {
         email: data.email || '',
         logo_url: data.logo_url || '',
         login_bg_url: (data as any).login_bg_url || '',
+        recording_segment_minutes: (data as any).recording_segment_minutes || 30,
       });
       if (data.logo_url) setLogoPreview(data.logo_url);
       if ((data as any).login_bg_url) setLoginBgPreview((data as any).login_bg_url);
