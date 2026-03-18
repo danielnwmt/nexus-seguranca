@@ -195,8 +195,6 @@ const Cameras = () => {
       video_encoding: newCamera.videoEncoding,
       max_bitrate: Number(newCamera.maxBitrate),
       brand: newCamera.brand || null,
-      latitude: newCamera.latitude ? Number(newCamera.latitude) : null,
-      longitude: newCamera.longitude ? Number(newCamera.longitude) : null,
       ...(includeAnalyticsConfig ? { analytics_config: newCamera.analyticsConfig || {} } : {}),
     });
 
