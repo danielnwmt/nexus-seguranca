@@ -1075,7 +1075,7 @@ WantedBy=multi-user.target
         let mediaIp = '127.0.0.1';
         let hlsPort = 8888;
         try {
-          const msResult = await pool.query(`SELECT ip_address, hls_base_port FROM media_servers WHERE status = 'online' LIMIT 1`);
+          const msResult = await pool.query(`SELECT ip_address, hls_base_port FROM media_servers WHERE status IN ('online', 'active') ORDER BY CASE WHEN status = 'online' THEN 0 ELSE 1 END LIMIT 1`);
           if (msResult.rows.length > 0) {
             mediaIp = msResult.rows[0].ip_address || '127.0.0.1';
             hlsPort = msResult.rows[0].hls_base_port || 8888;
@@ -1126,7 +1126,7 @@ WantedBy=multi-user.target
         let mediaIp = '127.0.0.1';
         let hlsPort = 8888;
         try {
-          const msResult = await pool.query(`SELECT ip_address, hls_base_port FROM media_servers WHERE status = 'online' LIMIT 1`);
+          const msResult = await pool.query(`SELECT ip_address, hls_base_port FROM media_servers WHERE status IN ('online', 'active') ORDER BY CASE WHEN status = 'online' THEN 0 ELSE 1 END LIMIT 1`);
           if (msResult.rows.length > 0) {
             mediaIp = msResult.rows[0].ip_address || '127.0.0.1';
             hlsPort = msResult.rows[0].hls_base_port || 8888;
@@ -1796,7 +1796,8 @@ async function getMediaServer() {
   let mediaIp = '127.0.0.1';
   let hlsPort = 8888;
   try {
-    const msResult = await pool.query(`SELECT ip_address, hls_base_port FROM media_servers WHERE status = 'online' LIMIT 1`);
+    // Aceitar status 'online' ou 'active' (padrão da instalação)
+    const msResult = await pool.query(`SELECT ip_address, hls_base_port FROM media_servers WHERE status IN ('online', 'active') ORDER BY CASE WHEN status = 'online' THEN 0 ELSE 1 END LIMIT 1`);
     if (msResult.rows.length > 0) {
       mediaIp = msResult.rows[0].ip_address || '127.0.0.1';
       hlsPort = msResult.rows[0].hls_base_port || 8888;
@@ -2257,18 +2258,35 @@ async function startAutoRecording(cam, mediaIp, hlsPort) {
       '-f', 'mp4', filePath
     ];
 
+    console.log(`[auto-rec] FFmpeg args: ${ffmpegArgs.join(' ')}`);
+
     const ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
       detached: false,
-      stdio: ['ignore', 'ignore', 'ignore'],
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
+
+    // Capturar stderr do FFmpeg para diagnóstico
+    let stderrBuf = '';
+    if (ffmpegProcess.stderr) {
+      ffmpegProcess.stderr.on('data', (chunk) => {
+        stderrBuf += chunk.toString();
+        // Manter apenas últimos 2KB
+        if (stderrBuf.length > 2048) stderrBuf = stderrBuf.slice(-2048);
+      });
+    }
 
     ffmpegProcess.on('error', (err) => {
       console.error(`[auto-rec] FFmpeg error for ${cam.name}:`, err.message);
+      if (stderrBuf) console.error(`[auto-rec] FFmpeg stderr: ${stderrBuf.slice(-500)}`);
       delete autoRecordingState.cameras[cam.id];
     });
 
     ffmpegProcess.on('exit', async (code) => {
       const rec = autoRecordingState.cameras[cam.id];
+      if (code !== 0 && code !== 255) {
+        console.warn(`[auto-rec] FFmpeg saiu com código ${code} para ${cam.name}`);
+        if (stderrBuf) console.warn(`[auto-rec] FFmpeg stderr: ${stderrBuf.slice(-500)}`);
+      }
       if (rec) {
         // Salvar no banco
         await saveRecordingToDb(cam.id, cam.name, cam.client_id, cam.client_name, rec.startTime, rec.filePath);
