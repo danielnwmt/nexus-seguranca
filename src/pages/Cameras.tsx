@@ -254,8 +254,6 @@ const Cameras = () => {
       videoEncoding: camera.video_encoding || 'H.264',
       maxBitrate: String(camera.max_bitrate || 4096),
       brand: camera.brand || '',
-      latitude: camera.latitude ? String(camera.latitude) : '',
-      longitude: camera.longitude ? String(camera.longitude) : '',
       analyticsConfig: camera.analytics_config || {},
     });
     setDialogOpen(true);
