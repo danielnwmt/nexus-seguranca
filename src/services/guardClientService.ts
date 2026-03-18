@@ -4,7 +4,7 @@ import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 function getLocalHeaders(extra?: Record<string, string>): Record<string, string> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extra };
   try {
-    const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+    const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
     if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
   } catch {}
   return headers;
