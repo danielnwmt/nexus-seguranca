@@ -60,9 +60,12 @@ interface CameraForm {
   analyticsConfig: { line_crossing_lines?: LineCrossingLine[]; [key: string]: any };
 }
 
+// Analíticos padrão habilitados automaticamente (IA de segurança)
+const DEFAULT_ANALYTICS: AnalyticType[] = ['weapon_detection', 'area_intrusion', 'fallen_person', 'tampering'];
+
 const emptyForm: CameraForm = {
   name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080',
-  clientId: '', storagePath: '', retentionDays: '30', analytics: [],
+  clientId: '', storagePath: '', retentionDays: '30', analytics: [...DEFAULT_ANALYTICS],
   videoEncoding: 'H.264', maxBitrate: '4096', brand: '',
   analyticsConfig: {},
 };
