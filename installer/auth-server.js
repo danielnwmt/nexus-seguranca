@@ -2478,29 +2478,13 @@ async function getSystemHealth() {
     services.postgresql = 'offline';
   }
 
-  // MediaMTX - considera API local e fallback pelo systemd para evitar falso offline
+  // MediaMTX - autodetecta e normaliza cadastro local para evitar status "sem servidor"
   try {
-    const httpLib = require('http');
-    let mediamtxOnline = false;
-
-    await new Promise((resolve) => {
-      const r = httpLib.get('http://127.0.0.1:9997/v3/paths/list', { timeout: 3000 }, (resp) => {
-        mediamtxOnline = resp.statusCode === 200;
-        resp.resume();
-        resolve();
-      });
-      r.on('error', () => resolve());
-      r.on('timeout', () => { r.destroy(); resolve(); });
-    });
-
-    if (!mediamtxOnline && process.platform !== 'win32') {
-      try {
-        const mediamtxStatus = execSync('systemctl is-active mediamtx 2>/dev/null || systemctl is-active nexus-mediamtx 2>/dev/null', { encoding: 'utf8' }).trim();
-        mediamtxOnline = mediamtxStatus === 'active';
-      } catch {}
-    }
-
-    services.mediamtx = mediamtxOnline ? 'online' : 'offline';
+    const { localIp } = getLocalServerContext();
+    const probe = await probeLocalMediaServer(localIp, 1935);
+    const newStatus = probe.online ? 'online' : 'offline';
+    await ensureLocalMediaServerEntry(newStatus);
+    services.mediamtx = newStatus;
   } catch {
     services.mediamtx = 'offline';
   }
