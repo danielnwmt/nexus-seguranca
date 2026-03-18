@@ -46,6 +46,7 @@ const CompanySettings = () => {
     email: '',
     logo_url: '',
     login_bg_url: '',
+    recording_segment_minutes: 30,
   });
 
   useEffect(() => {
