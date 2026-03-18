@@ -348,6 +348,8 @@ export type Database = {
           deleted_at: string | null
           email: string | null
           id: string
+          latitude: number | null
+          longitude: number | null
           monthly_fee: number | null
           name: string
           payment_due_day: number | null
@@ -364,6 +366,8 @@ export type Database = {
           deleted_at?: string | null
           email?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           monthly_fee?: number | null
           name: string
           payment_due_day?: number | null
@@ -380,6 +384,8 @@ export type Database = {
           deleted_at?: string | null
           email?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           monthly_fee?: number | null
           name?: string
           payment_due_day?: number | null

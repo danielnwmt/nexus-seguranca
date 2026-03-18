@@ -57,15 +57,13 @@ interface CameraForm {
   videoEncoding: string;
   maxBitrate: string;
   brand: string;
-  latitude: string;
-  longitude: string;
   analyticsConfig: { line_crossing_lines?: LineCrossingLine[]; [key: string]: any };
 }
 
 const emptyForm: CameraForm = {
   name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080',
   clientId: '', storagePath: '', retentionDays: '30', analytics: [],
-  videoEncoding: 'H.264', maxBitrate: '4096', brand: '', latitude: '', longitude: '',
+  videoEncoding: 'H.264', maxBitrate: '4096', brand: '',
   analyticsConfig: {},
 };
 
@@ -197,8 +195,6 @@ const Cameras = () => {
       video_encoding: newCamera.videoEncoding,
       max_bitrate: Number(newCamera.maxBitrate),
       brand: newCamera.brand || null,
-      latitude: newCamera.latitude ? Number(newCamera.latitude) : null,
-      longitude: newCamera.longitude ? Number(newCamera.longitude) : null,
       ...(includeAnalyticsConfig ? { analytics_config: newCamera.analyticsConfig || {} } : {}),
     });
 
@@ -258,8 +254,6 @@ const Cameras = () => {
       videoEncoding: camera.video_encoding || 'H.264',
       maxBitrate: String(camera.max_bitrate || 4096),
       brand: camera.brand || '',
-      latitude: camera.latitude ? String(camera.latitude) : '',
-      longitude: camera.longitude ? String(camera.longitude) : '',
       analyticsConfig: camera.analytics_config || {},
     });
     setDialogOpen(true);
@@ -679,16 +673,6 @@ const Cameras = () => {
             )}
 
             {/* Coordenadas */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" /> Latitude</Label>
-                <Input type="number" step="any" value={newCamera.latitude} onChange={e => setNewCamera(p => ({ ...p, latitude: e.target.value }))} placeholder="-23.5505" className="bg-muted border-border font-mono text-xs" />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" /> Longitude</Label>
-                <Input type="number" step="any" value={newCamera.longitude} onChange={e => setNewCamera(p => ({ ...p, longitude: e.target.value }))} placeholder="-46.6333" className="bg-muted border-border font-mono text-xs" />
-              </div>
-            </div>
 
             <Button onClick={handleSave} disabled={isSaving || insertMutation.isPending || updateMutation.isPending} className="w-full">
               {isSaving ? 'Salvando...' : editingId ? 'Salvar Alterações' : 'Adicionar Câmera'}

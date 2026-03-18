@@ -77,6 +77,8 @@ CREATE TABLE IF NOT EXISTS public.clients (
   monthly_fee NUMERIC,
   payment_due_day INTEGER,
   storage_server_id UUID,
+  latitude NUMERIC,
+  longitude NUMERIC,
   deleted_at TIMESTAMPTZ DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()

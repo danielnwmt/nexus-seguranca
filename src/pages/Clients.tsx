@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { isValidCpfCnpj } from '@/lib/validators';
-import { Plus, Search, Users, Pencil, Trash2, Camera, Printer, UserX, UserCheck, Eye } from 'lucide-react';
+import { Plus, Search, Users, Pencil, Trash2, Camera, Printer, UserX, UserCheck, Eye, MapPin } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -54,7 +54,7 @@ const Clients = () => {
   const [cameraViewerClient, setCameraViewerClient] = useState<any>(null);
   const { data: allCameras = [] } = useTableQuery('cameras');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '' });
+  const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '', latitude: '', longitude: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { data: storageServers = [] } = useTableQuery('storage_servers');
   const [page, setPage] = useState(0);
@@ -112,6 +112,8 @@ const Clients = () => {
       monthly_fee: form.monthlyFee ? Number(form.monthlyFee) : null,
       payment_due_day: form.paymentDueDay ? Number(form.paymentDueDay) : null,
       storage_server_id: form.storageServerId || null,
+      latitude: form.latitude ? Number(form.latitude) : null,
+      longitude: form.longitude ? Number(form.longitude) : null,
     };
 
     if (editingId) {
@@ -151,6 +153,8 @@ const Clients = () => {
       monthlyFee: client.monthly_fee ? String(client.monthly_fee) : '',
       paymentDueDay: client.payment_due_day ? String(client.payment_due_day) : '',
       storageServerId: client.storage_server_id || '',
+      latitude: client.latitude ? String(client.latitude) : '',
+      longitude: client.longitude ? String(client.longitude) : '',
     });
     setDialogOpen(true);
   };
@@ -159,7 +163,7 @@ const Clients = () => {
     deleteMutation.mutate(id);
   };
 
-  const defaultForm = { name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '' };
+  const defaultForm = { name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '', latitude: '', longitude: '' };
   const resetForm = () => {
     setForm(defaultForm);
     setErrors({});
@@ -265,6 +269,16 @@ const Clients = () => {
                     {storageServers.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name} ({s.ip_address})</SelectItem>)}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" /> Latitude</Label>
+                  <Input type="number" step="any" value={form.latitude} onChange={e => setForm(p => ({ ...p, latitude: e.target.value }))} placeholder="-23.5505" className="bg-muted border-border font-mono text-xs" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" /> Longitude</Label>
+                  <Input type="number" step="any" value={form.longitude} onChange={e => setForm(p => ({ ...p, longitude: e.target.value }))} placeholder="-46.6333" className="bg-muted border-border font-mono text-xs" />
+                </div>
               </div>
               <Button onClick={handleSave} className="w-full">{editingId ? 'Salvar Alterações' : 'Adicionar Cliente'}</Button>
             </div>
