@@ -1796,7 +1796,8 @@ async function getMediaServer() {
   let mediaIp = '127.0.0.1';
   let hlsPort = 8888;
   try {
-    const msResult = await pool.query(`SELECT ip_address, hls_base_port FROM media_servers WHERE status = 'online' LIMIT 1`);
+    // Aceitar status 'online' ou 'active' (padrão da instalação)
+    const msResult = await pool.query(`SELECT ip_address, hls_base_port FROM media_servers WHERE status IN ('online', 'active') ORDER BY CASE WHEN status = 'online' THEN 0 ELSE 1 END LIMIT 1`);
     if (msResult.rows.length > 0) {
       mediaIp = msResult.rows[0].ip_address || '127.0.0.1';
       hlsPort = msResult.rows[0].hls_base_port || 8888;
