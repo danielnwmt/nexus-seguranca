@@ -150,6 +150,7 @@ const CompanySettings = () => {
         email: form.email,
         logo_url: form.logo_url,
         login_bg_url: form.login_bg_url,
+        recording_segment_minutes: form.recording_segment_minutes,
         updated_at: new Date().toISOString(),
       } as any)
       .eq('id', form.id);

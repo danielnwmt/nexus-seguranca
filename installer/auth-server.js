@@ -2144,8 +2144,21 @@ const autoRecordingState = {
   running: false,
   cameras: {},  // { cameraId: { process, filePath, startTime, ... } }
   checkInterval: null,
-  segmentMinutes: 30, // Segmentar gravações a cada 30 min
+  segmentMinutes: 30, // Default - será atualizado do banco
 };
+
+// Carregar tempo de segmento do banco (company_settings)
+async function loadSegmentMinutes() {
+  try {
+    const result = await pool.query(`SELECT recording_segment_minutes FROM company_settings LIMIT 1`);
+    if (result.rows.length > 0 && result.rows[0].recording_segment_minutes) {
+      autoRecordingState.segmentMinutes = result.rows[0].recording_segment_minutes;
+      console.log(`[auto-rec] Tempo de segmento configurado: ${autoRecordingState.segmentMinutes} minutos`);
+    }
+  } catch (err) {
+    console.log('[auto-rec] Usando tempo de segmento padrão: 30 min');
+  }
+}
 
 async function autoRecordingCheck() {
   try {
