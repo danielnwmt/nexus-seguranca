@@ -2081,13 +2081,20 @@ async function autoRecordingCheck() {
   try {
     // Buscar câmeras online com retention > 0 (0 = sem gravação)
     const camResult = await pool.query(`
-      SELECT c.id, c.name, c.stream_key, c.retention_days, c.storage_path, c.client_id, cl.name as client_name
+      SELECT c.id, c.name, c.stream_key, c.stream_url, c.protocol, c.retention_days, c.storage_path, c.client_id, cl.name as client_name
       FROM cameras c
       LEFT JOIN clients cl ON c.client_id = cl.id
-      WHERE c.status = 'online' AND c.retention_days > 0 AND c.stream_key != ''
+      WHERE c.status = 'online' AND c.retention_days > 0 AND c.stream_key != '' AND c.deleted_at IS NULL
     `);
 
-    const { mediaIp, hlsPort } = await getMediaServer();
+    let mediaIp = null, hlsPort = null;
+    try {
+      const ms = await getMediaServer();
+      mediaIp = ms.mediaIp;
+      hlsPort = ms.hlsPort;
+    } catch (e) {
+      console.log('[auto-rec] MediaMTX indisponível, usando stream_url direto das câmeras');
+    }
     const now = new Date();
 
     for (const cam of camResult.rows) {
@@ -2120,7 +2127,29 @@ async function autoRecordingCheck() {
 }
 
 async function startAutoRecording(cam, mediaIp, hlsPort) {
-  const sourceUrl = `http://${mediaIp}:${hlsPort}/${cam.stream_key}/`;
+  // Prioridade: 1) stream_url direto (RTSP/RTMP), 2) HLS via MediaMTX
+  let sourceUrl = null;
+  let inputArgs = [];
+
+  if (cam.stream_url && cam.stream_url.trim()) {
+    // Usar URL direta da câmera (RTSP, RTMP, HTTP)
+    sourceUrl = cam.stream_url.trim();
+    inputArgs = [
+      '-rtsp_transport', 'tcp',
+      '-stimeout', '10000000',
+      '-y', '-i', sourceUrl,
+    ];
+    console.log(`[auto-rec] Usando stream direto: ${sourceUrl}`);
+  } else if (mediaIp && hlsPort) {
+    // Fallback: HLS via MediaMTX
+    sourceUrl = `http://${mediaIp}:${hlsPort}/${cam.stream_key}/`;
+    inputArgs = ['-y', '-i', sourceUrl];
+    console.log(`[auto-rec] Usando HLS via MediaMTX: ${sourceUrl}`);
+  } else {
+    console.warn(`[auto-rec] Sem fonte disponível para ${cam.name} (sem stream_url e MediaMTX offline)`);
+    return;
+  }
+
   const baseDir = cam.storage_path || '/opt/nexus-monitoramento/recordings';
   const dateStr = new Date().toISOString().split('T')[0];
   const recDir = pathMod.join(baseDir, cam.id, dateStr);
@@ -2147,10 +2176,10 @@ async function startAutoRecording(cam, mediaIp, hlsPort) {
   try {
     const { spawn } = require('child_process');
     const ffmpegArgs = [
-      '-y', '-i', sourceUrl,
+      ...inputArgs,
       '-c', 'copy',
       '-movflags', '+frag_keyframe+empty_moov+faststart',
-      '-t', String(autoRecordingState.segmentMinutes * 60), // Duração máxima do segmento
+      '-t', String(autoRecordingState.segmentMinutes * 60),
       '-f', 'mp4', filePath
     ];
 
