@@ -2409,25 +2409,19 @@ async function getSystemHealth() {
     services.postgresql = 'offline';
   }
 
-  // MediaMTX
+  // MediaMTX - API roda na porta 9997
   try {
-    const msResult = await pool.query(`SELECT ip_address, hls_base_port FROM media_servers WHERE status = 'online' LIMIT 1`);
-    if (msResult.rows.length > 0) {
-      const ip = msResult.rows[0].ip_address || '127.0.0.1';
-      const port = msResult.rows[0].hls_base_port || 8888;
-      const httpLib = require('http');
-      await new Promise((resolve) => {
-        const r = httpLib.get(`http://${ip}:${port}/v3/paths/list`, { timeout: 3000 }, (resp) => {
-          services.mediamtx = resp.statusCode === 200 ? 'online' : 'offline';
-          resp.resume();
-          resolve();
-        });
-        r.on('error', () => { services.mediamtx = 'offline'; resolve(); });
-        r.on('timeout', () => { r.destroy(); services.mediamtx = 'offline'; resolve(); });
+    const httpLib = require('http');
+    // Primeiro tenta a API local na porta 9997
+    await new Promise((resolve) => {
+      const r = httpLib.get(`http://127.0.0.1:9997/v3/paths/list`, { timeout: 3000 }, (resp) => {
+        services.mediamtx = resp.statusCode === 200 ? 'online' : 'offline';
+        resp.resume();
+        resolve();
       });
-    } else {
-      services.mediamtx = 'not_configured';
-    }
+      r.on('error', () => { services.mediamtx = 'offline'; resolve(); });
+      r.on('timeout', () => { r.destroy(); services.mediamtx = 'offline'; resolve(); });
+    });
   } catch {
     services.mediamtx = 'offline';
   }
