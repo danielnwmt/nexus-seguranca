@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { isValidCpfCnpj } from '@/lib/validators';
-import { Plus, Search, Users, Pencil, Trash2, Camera, Printer, UserX, UserCheck, Eye } from 'lucide-react';
+import { Plus, Search, Users, Pencil, Trash2, Camera, Printer, UserX, UserCheck, Eye, MapPin } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
