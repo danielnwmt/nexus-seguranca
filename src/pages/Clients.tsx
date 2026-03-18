@@ -112,6 +112,8 @@ const Clients = () => {
       monthly_fee: form.monthlyFee ? Number(form.monthlyFee) : null,
       payment_due_day: form.paymentDueDay ? Number(form.paymentDueDay) : null,
       storage_server_id: form.storageServerId || null,
+      latitude: form.latitude ? Number(form.latitude) : null,
+      longitude: form.longitude ? Number(form.longitude) : null,
     };
 
     if (editingId) {
