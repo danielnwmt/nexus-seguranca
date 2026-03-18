@@ -163,7 +163,7 @@ const Clients = () => {
     deleteMutation.mutate(id);
   };
 
-  const defaultForm = { name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '' };
+  const defaultForm = { name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '', latitude: '', longitude: '' };
   const resetForm = () => {
     setForm(defaultForm);
     setErrors({});
