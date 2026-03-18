@@ -2409,19 +2409,29 @@ async function getSystemHealth() {
     services.postgresql = 'offline';
   }
 
-  // MediaMTX - API roda na porta 9997
+  // MediaMTX - considera API local e fallback pelo systemd para evitar falso offline
   try {
     const httpLib = require('http');
-    // Primeiro tenta a API local na porta 9997
+    let mediamtxOnline = false;
+
     await new Promise((resolve) => {
-      const r = httpLib.get(`http://127.0.0.1:9997/v3/paths/list`, { timeout: 3000 }, (resp) => {
-        services.mediamtx = resp.statusCode === 200 ? 'online' : 'offline';
+      const r = httpLib.get('http://127.0.0.1:9997/v3/paths/list', { timeout: 3000 }, (resp) => {
+        mediamtxOnline = resp.statusCode === 200;
         resp.resume();
         resolve();
       });
-      r.on('error', () => { services.mediamtx = 'offline'; resolve(); });
-      r.on('timeout', () => { r.destroy(); services.mediamtx = 'offline'; resolve(); });
+      r.on('error', () => resolve());
+      r.on('timeout', () => { r.destroy(); resolve(); });
     });
+
+    if (!mediamtxOnline && process.platform !== 'win32') {
+      try {
+        const mediamtxStatus = execSync('systemctl is-active mediamtx 2>/dev/null || systemctl is-active nexus-mediamtx 2>/dev/null', { encoding: 'utf8' }).trim();
+        mediamtxOnline = mediamtxStatus === 'active';
+      } catch {}
+    }
+
+    services.mediamtx = mediamtxOnline ? 'online' : 'offline';
   } catch {
     services.mediamtx = 'offline';
   }
