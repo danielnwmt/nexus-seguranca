@@ -2497,75 +2497,128 @@ async function getSystemHealth() {
 //  Verifica streams a cada 2 min e atualiza status
 // ============================================================
 
-async function checkCamerasOnlineStatus() {
+const cameraHealthState = {
+  consecutiveMisses: {},
+  offlineThreshold: 3,
+};
+
+async function fetchActiveMediaPaths(mediaIp, hlsPort) {
+  let mediaMtxReachable = false;
+  let activePaths = [];
+
+  try {
+    const httpLib = require('http');
+    const pathsData = await new Promise((resolve) => {
+      const r = httpLib.get(`http://${mediaIp}:${hlsPort}/v3/paths/list`, { timeout: 5000 }, (resp) => {
+        let body = '';
+        resp.on('data', c => body += c);
+        resp.on('end', () => {
+          try {
+            const data = JSON.parse(body);
+            mediaMtxReachable = true;
+            resolve(data.items || []);
+          } catch {
+            resolve([]);
+          }
+        });
+      });
+      r.on('error', () => resolve([]));
+      r.on('timeout', () => {
+        r.destroy();
+        resolve([]);
+      });
+    });
+
+    activePaths = pathsData.map((p) => p.name).filter(Boolean);
+  } catch {}
+
+  return { mediaMtxReachable, activePaths };
+}
+
+function isCameraAlive(cam, activePaths) {
+  const hasActivePath = activePaths.includes(cam.stream_key);
+  const hasActiveRecordingWorker = Boolean(autoRecordingState.cameras[cam.id]);
+  return hasActivePath || hasActiveRecordingWorker;
+}
+
+async function updateCameraStatus(cam, newStatus, notify = false) {
+  if (cam.status === newStatus) return;
+
+  await pool.query(`UPDATE cameras SET status = $1, updated_at = now() WHERE id = $2`, [newStatus, cam.id]);
+
+  if (newStatus === 'offline') {
+    let clientName = '';
+    if (cam.client_id) {
+      try {
+        const clResult = await pool.query(`SELECT name FROM clients WHERE id = $1`, [cam.client_id]);
+        clientName = clResult.rows[0]?.name || '';
+      } catch {}
+    }
+
+    await pool.query(
+      `INSERT INTO alarms (camera_id, camera_name, client_name, type, severity, message)
+       VALUES ($1, $2, $3, 'camera_offline', 'critical', $4)`,
+      [cam.id, cam.name, clientName, `Câmera ${cam.name} ficou offline`]
+    );
+
+    console.log(`⚠️ Câmera OFFLINE detectada: ${cam.name}`);
+    if (notify) {
+      sendNotification('camera_offline', `Câmera ${cam.name} ficou OFFLINE`, `Cliente: ${clientName}`);
+    }
+    return;
+  }
+
+  console.log(`✅ Câmera ONLINE: ${cam.stream_key}`);
+  if (notify) {
+    sendNotification('camera_online', `Câmera ${cam.name} voltou ONLINE`, '');
+  }
+}
+
+async function runCameraHealthCheck(notify = false) {
   try {
     const { mediaIp, hlsPort } = await getMediaServer();
     if (!mediaIp) return;
 
-    // Listar paths ativos no MediaMTX
-    let activePaths = [];
-    let mediaMtxReachable = false;
-    try {
-      const httpLib = require('http');
-      const pathsData = await new Promise((resolve, reject) => {
-        const r = httpLib.get(`http://${mediaIp}:${hlsPort}/v3/paths/list`, { timeout: 5000 }, (resp) => {
-          let body = '';
-          resp.on('data', c => body += c);
-          resp.on('end', () => {
-            try {
-              const data = JSON.parse(body);
-              mediaMtxReachable = true;
-              resolve(data.items || []);
-            } catch { resolve([]); }
-          });
-        });
-        r.on('error', () => resolve([]));
-        r.on('timeout', () => { r.destroy(); resolve([]); });
-      });
-      activePaths = pathsData.map(p => p.name);
-    } catch {}
+    const { mediaMtxReachable, activePaths } = await fetchActiveMediaPaths(mediaIp, hlsPort);
 
-    // Se MediaMTX não respondeu, NÃO marcar câmeras como offline
     if (!mediaMtxReachable) {
       console.log('[cam-check] MediaMTX não acessível, pulando verificação de status');
       return;
     }
 
-    // Buscar apenas câmeras ativas (não deletadas) com stream_key
-    const camResult = await pool.query(`SELECT id, stream_key, status FROM cameras WHERE stream_key != '' AND deleted_at IS NULL`);
-    
+    const camResult = await pool.query(`
+      SELECT id, stream_key, status, name, client_id
+      FROM cameras
+      WHERE stream_key != ''
+        AND deleted_at IS NULL
+    `);
+
     for (const cam of camResult.rows) {
-      const isActive = activePaths.includes(cam.stream_key);
-      const newStatus = isActive ? 'online' : 'offline';
-      
-      if (cam.status !== newStatus) {
-        await pool.query(`UPDATE cameras SET status = $1, updated_at = now() WHERE id = $2`, [newStatus, cam.id]);
-        
-        // Gerar alarme se câmera ficou offline
-        if (newStatus === 'offline') {
-          try {
-            const camInfo = await pool.query(`SELECT name, client_id FROM cameras WHERE id = $1`, [cam.id]);
-            const camName = camInfo.rows[0]?.name || '';
-            let clientName = '';
-            if (camInfo.rows[0]?.client_id) {
-              const clResult = await pool.query(`SELECT name FROM clients WHERE id = $1`, [camInfo.rows[0].client_id]);
-              clientName = clResult.rows[0]?.name || '';
-            }
-            await pool.query(
-              `INSERT INTO alarms (camera_id, camera_name, client_name, type, severity, message)
-               VALUES ($1, $2, $3, 'camera_offline', 'critical', $4)`,
-              [cam.id, camName, clientName, `Câmera ${camName} ficou offline`]
-            );
-            console.log(`⚠️ Câmera OFFLINE detectada: ${camName}`);
-          } catch {}
-        } else {
-          console.log(`✅ Câmera ONLINE: ${cam.stream_key}`);
-        }
+      const alive = isCameraAlive(cam, activePaths);
+
+      if (alive) {
+        cameraHealthState.consecutiveMisses[cam.id] = 0;
+        await updateCameraStatus(cam, 'online', notify);
+        continue;
       }
+
+      const misses = (cameraHealthState.consecutiveMisses[cam.id] || 0) + 1;
+      cameraHealthState.consecutiveMisses[cam.id] = misses;
+
+      if (misses < cameraHealthState.offlineThreshold) {
+        console.log(`[cam-check] ${cam.name} sem path ativo (${misses}/${cameraHealthState.offlineThreshold}), aguardando próximas verificações`);
+        continue;
+      }
+
+      await updateCameraStatus(cam, 'offline', notify);
     }
   } catch (err) {
     console.error('[cam-check] Error:', err.message);
   }
+}
+
+async function checkCamerasOnlineStatus() {
+  await runCameraHealthCheck(false);
 }
 
 let cameraCheckInterval = null;
@@ -2700,67 +2753,7 @@ async function sendSmtpEmail(cfg, eventType, message, details) {
 const _originalCheckCamerasOnlineStatus = checkCamerasOnlineStatus;
 // Override to add notifications
 async function checkCamerasOnlineStatusWithNotify() {
-  try {
-    const { mediaIp, hlsPort } = await getMediaServer();
-    if (!mediaIp) return;
-
-    let activePaths = [];
-    let mediaMtxReachable = false;
-    try {
-      const httpLib = require('http');
-      const pathsData = await new Promise((resolve) => {
-        const r = httpLib.get(`http://${mediaIp}:${hlsPort}/v3/paths/list`, { timeout: 5000 }, (resp) => {
-          let body = '';
-          resp.on('data', c => body += c);
-          resp.on('end', () => {
-            try { mediaMtxReachable = true; resolve(JSON.parse(body).items || []); } catch { resolve([]); }
-          });
-        });
-        r.on('error', () => resolve([]));
-        r.on('timeout', () => { r.destroy(); resolve([]); });
-      });
-      activePaths = pathsData.map(p => p.name);
-    } catch {}
-
-    // Se MediaMTX não respondeu, NÃO marcar câmeras como offline
-    if (!mediaMtxReachable) {
-      console.log('[cam-check] MediaMTX não acessível, pulando verificação de status');
-      return;
-    }
-
-    const camResult = await pool.query(`SELECT id, stream_key, status, name, client_id FROM cameras WHERE stream_key != '' AND deleted_at IS NULL`);
-    
-    for (const cam of camResult.rows) {
-      const isActive = activePaths.includes(cam.stream_key);
-      const newStatus = isActive ? 'online' : 'offline';
-      
-      if (cam.status !== newStatus) {
-        await pool.query(`UPDATE cameras SET status = $1, updated_at = now() WHERE id = $2`, [newStatus, cam.id]);
-        
-        if (newStatus === 'offline') {
-          let clientName = '';
-          if (cam.client_id) {
-            try {
-              const clResult = await pool.query(`SELECT name FROM clients WHERE id = $1`, [cam.client_id]);
-              clientName = clResult.rows[0]?.name || '';
-            } catch {}
-          }
-          await pool.query(
-            `INSERT INTO alarms (camera_id, camera_name, client_name, type, severity, message)
-             VALUES ($1, $2, $3, 'camera_offline', 'critical', $4)`,
-            [cam.id, cam.name, clientName, `Câmera ${cam.name} ficou offline`]
-          );
-          console.log(`⚠️ Câmera OFFLINE detectada: ${cam.name}`);
-          sendNotification('camera_offline', `Câmera ${cam.name} ficou OFFLINE`, `Cliente: ${clientName}`);
-        } else {
-          console.log(`✅ Câmera ONLINE: ${cam.stream_key}`);
-          sendNotification('camera_online', `Câmera ${cam.name} voltou ONLINE`, '');
-        }
-      }
-    }
-  } catch (err) {
-    console.error('[cam-check] Error:', err.message);
-  }
+  await runCameraHealthCheck(true);
 }
 
 // Disk usage notification check
