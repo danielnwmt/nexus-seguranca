@@ -2162,6 +2162,8 @@ async function loadSegmentMinutes() {
 
 async function autoRecordingCheck() {
   try {
+    // Atualizar tempo de segmento do banco
+    await loadSegmentMinutes();
     // Buscar câmeras online com retention > 0 (0 = sem gravação)
     const camResult = await pool.query(`
       SELECT c.id, c.name, c.stream_key, c.stream_url, c.protocol, c.retention_days, c.storage_path, c.client_id, cl.name as client_name

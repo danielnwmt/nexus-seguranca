@@ -296,6 +296,30 @@ const CompanySettings = () => {
           </div>
         </div>
 
+        {/* Recording Segment Duration - DVR Style */}
+        <div className="space-y-1 pt-2 border-t border-border">
+          <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <HardDrive className="w-3.5 h-3.5" />
+            Tempo de Gravação (Segmento DVR)
+          </Label>
+          <Select
+            value={String(form.recording_segment_minutes)}
+            onValueChange={v => setForm(p => ({ ...p, recording_segment_minutes: Number(v) }))}
+          >
+            <SelectTrigger className="bg-muted border-border w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">5 minutos</SelectItem>
+              <SelectItem value="10">10 minutos</SelectItem>
+              <SelectItem value="15">15 minutos</SelectItem>
+              <SelectItem value="30">30 minutos</SelectItem>
+              <SelectItem value="60">1 hora</SelectItem>
+              <SelectItem value="120">2 horas</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-[10px] text-muted-foreground">Cada arquivo de gravação terá essa duração, igual a um DVR tradicional.</p>
+        </div>
         <div className="flex justify-end pt-2">
           <Button onClick={handleSave} disabled={loading} className="gap-2">
             <Save className="w-4 h-4" /> {loading ? 'Salvando...' : 'Salvar Dados da Empresa'}
