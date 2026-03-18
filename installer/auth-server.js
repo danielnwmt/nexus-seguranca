@@ -2081,13 +2081,20 @@ async function autoRecordingCheck() {
   try {
     // Buscar câmeras online com retention > 0 (0 = sem gravação)
     const camResult = await pool.query(`
-      SELECT c.id, c.name, c.stream_key, c.retention_days, c.storage_path, c.client_id, cl.name as client_name
+      SELECT c.id, c.name, c.stream_key, c.stream_url, c.protocol, c.retention_days, c.storage_path, c.client_id, cl.name as client_name
       FROM cameras c
       LEFT JOIN clients cl ON c.client_id = cl.id
-      WHERE c.status = 'online' AND c.retention_days > 0 AND c.stream_key != ''
+      WHERE c.status = 'online' AND c.retention_days > 0 AND c.stream_key != '' AND c.deleted_at IS NULL
     `);
 
-    const { mediaIp, hlsPort } = await getMediaServer();
+    let mediaIp = null, hlsPort = null;
+    try {
+      const ms = await getMediaServer();
+      mediaIp = ms.mediaIp;
+      hlsPort = ms.hlsPort;
+    } catch (e) {
+      console.log('[auto-rec] MediaMTX indisponível, usando stream_url direto das câmeras');
+    }
     const now = new Date();
 
     for (const cam of camResult.rows) {
