@@ -57,15 +57,13 @@ interface CameraForm {
   videoEncoding: string;
   maxBitrate: string;
   brand: string;
-  latitude: string;
-  longitude: string;
   analyticsConfig: { line_crossing_lines?: LineCrossingLine[]; [key: string]: any };
 }
 
 const emptyForm: CameraForm = {
   name: '', streamUrl: '', protocol: 'RTSP', location: '', resolution: '1920x1080',
   clientId: '', storagePath: '', retentionDays: '30', analytics: [],
-  videoEncoding: 'H.264', maxBitrate: '4096', brand: '', latitude: '', longitude: '',
+  videoEncoding: 'H.264', maxBitrate: '4096', brand: '',
   analyticsConfig: {},
 };
 
