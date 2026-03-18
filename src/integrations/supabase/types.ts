@@ -417,6 +417,7 @@ export type Database = {
           name: string
           phone: string | null
           razao_social: string | null
+          recording_segment_minutes: number
           updated_at: string
         }
         Insert: {
@@ -431,6 +432,7 @@ export type Database = {
           name?: string
           phone?: string | null
           razao_social?: string | null
+          recording_segment_minutes?: number
           updated_at?: string
         }
         Update: {
@@ -445,6 +447,7 @@ export type Database = {
           name?: string
           phone?: string | null
           razao_social?: string | null
+          recording_segment_minutes?: number
           updated_at?: string
         }
         Relationships: []

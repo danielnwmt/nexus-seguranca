@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Building2, Upload, Save, ImageIcon } from 'lucide-react';
+import { Building2, Upload, Save, ImageIcon, HardDrive } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -46,6 +47,7 @@ const CompanySettings = () => {
     email: '',
     logo_url: '',
     login_bg_url: '',
+    recording_segment_minutes: 30,
   });
 
   useEffect(() => {
@@ -69,6 +71,7 @@ const CompanySettings = () => {
         email: data.email || '',
         logo_url: data.logo_url || '',
         login_bg_url: (data as any).login_bg_url || '',
+        recording_segment_minutes: (data as any).recording_segment_minutes || 30,
       });
       if (data.logo_url) setLogoPreview(data.logo_url);
       if ((data as any).login_bg_url) setLoginBgPreview((data as any).login_bg_url);
@@ -148,6 +151,7 @@ const CompanySettings = () => {
         email: form.email,
         logo_url: form.logo_url,
         login_bg_url: form.login_bg_url,
+        recording_segment_minutes: form.recording_segment_minutes,
         updated_at: new Date().toISOString(),
       } as any)
       .eq('id', form.id);
@@ -288,6 +292,30 @@ const CompanySettings = () => {
           </div>
         </div>
 
+        {/* Recording Segment Duration - DVR Style */}
+        <div className="space-y-1 pt-2 border-t border-border">
+          <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <HardDrive className="w-3.5 h-3.5" />
+            Tempo de Gravação (Segmento DVR)
+          </Label>
+          <Select
+            value={String(form.recording_segment_minutes)}
+            onValueChange={v => setForm(p => ({ ...p, recording_segment_minutes: Number(v) }))}
+          >
+            <SelectTrigger className="bg-muted border-border w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">5 minutos</SelectItem>
+              <SelectItem value="10">10 minutos</SelectItem>
+              <SelectItem value="15">15 minutos</SelectItem>
+              <SelectItem value="30">30 minutos</SelectItem>
+              <SelectItem value="60">1 hora</SelectItem>
+              <SelectItem value="120">2 horas</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-[10px] text-muted-foreground">Cada arquivo de gravação terá essa duração, igual a um DVR tradicional.</p>
+        </div>
         <div className="flex justify-end pt-2">
           <Button onClick={handleSave} disabled={loading} className="gap-2">
             <Save className="w-4 h-4" /> {loading ? 'Salvando...' : 'Salvar Dados da Empresa'}
