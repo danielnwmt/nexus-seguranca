@@ -673,16 +673,6 @@ const Cameras = () => {
             )}
 
             {/* Coordenadas */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" /> Latitude</Label>
-                <Input type="number" step="any" value={newCamera.latitude} onChange={e => setNewCamera(p => ({ ...p, latitude: e.target.value }))} placeholder="-23.5505" className="bg-muted border-border font-mono text-xs" />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" /> Longitude</Label>
-                <Input type="number" step="any" value={newCamera.longitude} onChange={e => setNewCamera(p => ({ ...p, longitude: e.target.value }))} placeholder="-46.6333" className="bg-muted border-border font-mono text-xs" />
-              </div>
-            </div>
 
             <Button onClick={handleSave} disabled={isSaving || insertMutation.isPending || updateMutation.isPending} className="w-full">
               {isSaving ? 'Salvando...' : editingId ? 'Salvar Alterações' : 'Adicionar Câmera'}
