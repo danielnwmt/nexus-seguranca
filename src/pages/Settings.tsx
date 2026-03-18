@@ -101,8 +101,11 @@ const Settings = () => {
     setBanksLoading(true);
     try {
       if (isLocalInstallation()) {
+        const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
+        const bankHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (session.access_token) bankHeaders['Authorization'] = `Bearer ${session.access_token}`;
         const res = await fetch(`${getLocalApiBase()}/rest/v1/bank_configs?select=id,bank,label,agencia,conta,convenio,active,api_key_encrypted,created_at,updated_at&order=label.asc`, {
-          headers: { 'Content-Type': 'application/json' },
+          headers: bankHeaders,
         });
         if (!res.ok) throw new Error('Erro ao buscar bank_configs');
         const rows = await res.json();
