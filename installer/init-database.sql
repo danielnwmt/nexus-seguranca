@@ -468,8 +468,9 @@ CREATE TRIGGER update_company_settings_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
 DROP TRIGGER IF EXISTS update_cameras_count ON public.cameras;
+DROP TRIGGER IF EXISTS cameras_count_trigger ON public.cameras;
 CREATE TRIGGER update_cameras_count
-  AFTER INSERT OR UPDATE OF client_id OR DELETE ON public.cameras
+  AFTER INSERT OR UPDATE OF client_id, deleted_at OR DELETE ON public.cameras
   FOR EACH ROW EXECUTE FUNCTION public.update_client_cameras_count();
 
 -- 7. RLS (Row Level Security)
