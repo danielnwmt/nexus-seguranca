@@ -2132,14 +2132,19 @@ async function startAutoRecording(cam, mediaIp, hlsPort) {
   let inputArgs = [];
 
   if (cam.stream_url && cam.stream_url.trim()) {
-    // Usar URL direta da câmera (RTSP, RTMP, HTTP)
+    // Usar URL direta da câmera
     sourceUrl = cam.stream_url.trim();
-    inputArgs = [
-      '-rtsp_transport', 'tcp',
-      '-stimeout', '10000000',
-      '-y', '-i', sourceUrl,
-    ];
-    console.log(`[auto-rec] Usando stream direto: ${sourceUrl}`);
+    const proto = (cam.protocol || '').toUpperCase();
+    
+    if (proto === 'RTSP' || sourceUrl.startsWith('rtsp://')) {
+      inputArgs = ['-rtsp_transport', 'tcp', '-stimeout', '10000000', '-y', '-i', sourceUrl];
+    } else if (proto === 'RTMP' || sourceUrl.startsWith('rtmp://')) {
+      inputArgs = ['-rw_timeout', '10000000', '-y', '-i', sourceUrl];
+    } else {
+      // HTTP/HLS/outros
+      inputArgs = ['-y', '-i', sourceUrl];
+    }
+    console.log(`[auto-rec] Usando stream direto (${proto || 'auto'}): ${sourceUrl}`);
   } else if (mediaIp && hlsPort) {
     // Fallback: HLS via MediaMTX
     sourceUrl = `http://${mediaIp}:${hlsPort}/${cam.stream_key}/`;
