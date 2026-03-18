@@ -159,9 +159,12 @@ const Settings = () => {
           if (newKey !== undefined && newKey !== '') {
             updates.api_key_encrypted = newKey;
           }
+          const bankSession = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
+          const patchHeaders: Record<string, string> = { 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+          if (bankSession.access_token) patchHeaders['Authorization'] = `Bearer ${bankSession.access_token}`;
           const res = await fetch(`${getLocalApiBase()}/rest/v1/bank_configs?id=eq.${bank.id}`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+            headers: patchHeaders,
             body: JSON.stringify(updates),
           });
           if (!res.ok) throw new Error('Erro ao salvar');
