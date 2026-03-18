@@ -2258,13 +2258,26 @@ async function startAutoRecording(cam, mediaIp, hlsPort) {
       '-f', 'mp4', filePath
     ];
 
+    console.log(`[auto-rec] FFmpeg args: ${ffmpegArgs.join(' ')}`);
+
     const ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
       detached: false,
-      stdio: ['ignore', 'ignore', 'ignore'],
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
+
+    // Capturar stderr do FFmpeg para diagnóstico
+    let stderrBuf = '';
+    if (ffmpegProcess.stderr) {
+      ffmpegProcess.stderr.on('data', (chunk) => {
+        stderrBuf += chunk.toString();
+        // Manter apenas últimos 2KB
+        if (stderrBuf.length > 2048) stderrBuf = stderrBuf.slice(-2048);
+      });
+    }
 
     ffmpegProcess.on('error', (err) => {
       console.error(`[auto-rec] FFmpeg error for ${cam.name}:`, err.message);
+      if (stderrBuf) console.error(`[auto-rec] FFmpeg stderr: ${stderrBuf.slice(-500)}`);
       delete autoRecordingState.cameras[cam.id];
     });
 
