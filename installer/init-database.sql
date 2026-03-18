@@ -396,13 +396,15 @@ AS $$
 BEGIN
   IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
     UPDATE public.clients SET cameras_count = (
-      SELECT COUNT(*) FROM public.cameras WHERE client_id = NEW.client_id
+      SELECT COUNT(*) FROM public.cameras WHERE client_id = NEW.client_id AND deleted_at IS NULL
     ) WHERE id = NEW.client_id;
   END IF;
   IF TG_OP = 'DELETE' OR TG_OP = 'UPDATE' THEN
-    UPDATE public.clients SET cameras_count = (
-      SELECT COUNT(*) FROM public.cameras WHERE client_id = OLD.client_id
-    ) WHERE id = OLD.client_id;
+    IF OLD.client_id IS DISTINCT FROM NEW.client_id OR TG_OP = 'DELETE' THEN
+      UPDATE public.clients SET cameras_count = (
+        SELECT COUNT(*) FROM public.cameras WHERE client_id = OLD.client_id AND deleted_at IS NULL
+      ) WHERE id = OLD.client_id;
+    END IF;
   END IF;
   RETURN COALESCE(NEW, OLD);
 END;
