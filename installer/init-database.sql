@@ -396,13 +396,15 @@ AS $$
 BEGIN
   IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
     UPDATE public.clients SET cameras_count = (
-      SELECT COUNT(*) FROM public.cameras WHERE client_id = NEW.client_id
+      SELECT COUNT(*) FROM public.cameras WHERE client_id = NEW.client_id AND deleted_at IS NULL
     ) WHERE id = NEW.client_id;
   END IF;
   IF TG_OP = 'DELETE' OR TG_OP = 'UPDATE' THEN
-    UPDATE public.clients SET cameras_count = (
-      SELECT COUNT(*) FROM public.cameras WHERE client_id = OLD.client_id
-    ) WHERE id = OLD.client_id;
+    IF OLD.client_id IS DISTINCT FROM NEW.client_id OR TG_OP = 'DELETE' THEN
+      UPDATE public.clients SET cameras_count = (
+        SELECT COUNT(*) FROM public.cameras WHERE client_id = OLD.client_id AND deleted_at IS NULL
+      ) WHERE id = OLD.client_id;
+    END IF;
   END IF;
   RETURN COALESCE(NEW, OLD);
 END;
@@ -466,8 +468,9 @@ CREATE TRIGGER update_company_settings_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
 DROP TRIGGER IF EXISTS update_cameras_count ON public.cameras;
+DROP TRIGGER IF EXISTS cameras_count_trigger ON public.cameras;
 CREATE TRIGGER update_cameras_count
-  AFTER INSERT OR UPDATE OF client_id OR DELETE ON public.cameras
+  AFTER INSERT OR UPDATE OF client_id, deleted_at OR DELETE ON public.cameras
   FOR EACH ROW EXECUTE FUNCTION public.update_client_cameras_count();
 
 -- 7. RLS (Row Level Security)
