@@ -229,6 +229,11 @@ ALTER TABLE public.guards ADD COLUMN IF NOT EXISTS cnv TEXT;
 ALTER TABLE public.guards ADD COLUMN IF NOT EXISTS city TEXT;
 ALTER TABLE public.guards ADD COLUMN IF NOT EXISTS state TEXT;
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS storage_server_id UUID;
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS latitude NUMERIC;
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS longitude NUMERIC;
+
+-- Recarregar cache do PostgREST após alterações DDL
+NOTIFY pgrst, 'reload schema';
 
 -- Garantir coluna os em instalacoes existentes
 ALTER TABLE public.media_servers ADD COLUMN IF NOT EXISTS os TEXT NOT NULL DEFAULT 'linux';
