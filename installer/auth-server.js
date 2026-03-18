@@ -2504,15 +2504,17 @@ async function checkCamerasOnlineStatus() {
 
     // Listar paths ativos no MediaMTX
     let activePaths = [];
+    let mediaMtxReachable = false;
     try {
       const httpLib = require('http');
-      const pathsData = await new Promise((resolve) => {
+      const pathsData = await new Promise((resolve, reject) => {
         const r = httpLib.get(`http://${mediaIp}:${hlsPort}/v3/paths/list`, { timeout: 5000 }, (resp) => {
           let body = '';
           resp.on('data', c => body += c);
           resp.on('end', () => {
             try {
               const data = JSON.parse(body);
+              mediaMtxReachable = true;
               resolve(data.items || []);
             } catch { resolve([]); }
           });
@@ -2523,8 +2525,14 @@ async function checkCamerasOnlineStatus() {
       activePaths = pathsData.map(p => p.name);
     } catch {}
 
-    // Buscar todas as câmeras com stream_key
-    const camResult = await pool.query(`SELECT id, stream_key, status FROM cameras WHERE stream_key != ''`);
+    // Se MediaMTX não respondeu, NÃO marcar câmeras como offline
+    if (!mediaMtxReachable) {
+      console.log('[cam-check] MediaMTX não acessível, pulando verificação de status');
+      return;
+    }
+
+    // Buscar apenas câmeras ativas (não deletadas) com stream_key
+    const camResult = await pool.query(`SELECT id, stream_key, status FROM cameras WHERE stream_key != '' AND deleted_at IS NULL`);
     
     for (const cam of camResult.rows) {
       const isActive = activePaths.includes(cam.stream_key);
