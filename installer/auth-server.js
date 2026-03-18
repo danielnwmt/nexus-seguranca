@@ -2283,6 +2283,10 @@ async function startAutoRecording(cam, mediaIp, hlsPort) {
 
     ffmpegProcess.on('exit', async (code) => {
       const rec = autoRecordingState.cameras[cam.id];
+      if (code !== 0 && code !== 255) {
+        console.warn(`[auto-rec] FFmpeg saiu com código ${code} para ${cam.name}`);
+        if (stderrBuf) console.warn(`[auto-rec] FFmpeg stderr: ${stderrBuf.slice(-500)}`);
+      }
       if (rec) {
         // Salvar no banco
         await saveRecordingToDb(cam.id, cam.name, cam.client_id, cam.client_name, rec.startTime, rec.filePath);
