@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS public.cameras (
   max_bitrate INTEGER,
   storage_path TEXT,
   retention_days INTEGER DEFAULT 30,
-  analytics TEXT[],
+  analytics TEXT[] DEFAULT '{weapon_detection,area_intrusion,fallen_person,tampering}',
   deleted_at TIMESTAMPTZ DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
