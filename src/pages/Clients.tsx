@@ -270,6 +270,16 @@ const Clients = () => {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" /> Latitude</Label>
+                  <Input type="number" step="any" value={form.latitude} onChange={e => setForm(p => ({ ...p, latitude: e.target.value }))} placeholder="-23.5505" className="bg-muted border-border font-mono text-xs" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" /> Longitude</Label>
+                  <Input type="number" step="any" value={form.longitude} onChange={e => setForm(p => ({ ...p, longitude: e.target.value }))} placeholder="-46.6333" className="bg-muted border-border font-mono text-xs" />
+                </div>
+              </div>
               <Button onClick={handleSave} className="w-full">{editingId ? 'Salvar Alterações' : 'Adicionar Cliente'}</Button>
             </div>
           </DialogContent>
