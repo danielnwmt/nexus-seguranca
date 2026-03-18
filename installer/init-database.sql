@@ -186,9 +186,12 @@ CREATE TABLE IF NOT EXISTS public.company_settings (
   logo_url TEXT,
   media_server_ip TEXT DEFAULT '',
   login_bg_url TEXT,
+  recording_segment_minutes INTEGER DEFAULT 30,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS recording_segment_minutes INTEGER DEFAULT 30;
 
 CREATE TABLE IF NOT EXISTS public.storage_servers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
