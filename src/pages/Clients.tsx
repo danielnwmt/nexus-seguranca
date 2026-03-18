@@ -153,6 +153,8 @@ const Clients = () => {
       monthlyFee: client.monthly_fee ? String(client.monthly_fee) : '',
       paymentDueDay: client.payment_due_day ? String(client.payment_due_day) : '',
       storageServerId: client.storage_server_id || '',
+      latitude: client.latitude ? String(client.latitude) : '',
+      longitude: client.longitude ? String(client.longitude) : '',
     });
     setDialogOpen(true);
   };
