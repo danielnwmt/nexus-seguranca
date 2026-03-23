@@ -1,0 +1,1 @@
+ALTER TABLE public.sellers ADD COLUMN address text DEFAULT NULL;
