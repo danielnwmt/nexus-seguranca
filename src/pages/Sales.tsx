@@ -9,9 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Copy, Users, DollarSign, Percent, Link2, Edit, TrendingUp, BarChart3 } from 'lucide-react';
+import { Plus, Copy, Users, DollarSign, Percent, Link2, Edit, BarChart3 } from 'lucide-react';
 import { maskCpf, maskPhone } from '@/lib/masks';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface Seller {
   id: string;
@@ -33,8 +33,6 @@ interface ClientWithSeller {
   status: string;
   seller_id: string | null;
 }
-
-const COLORS = ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 const emptyForm = { name: '', cpf: '', phone: '', email: '', address: '', commission_percent: '10' };
 
@@ -60,24 +58,6 @@ const Sales = () => {
       const { data, error } = await supabase.from('clients').select('id, name, monthly_fee, status, seller_id').not('seller_id', 'is', null);
       if (error) throw error;
       return data as ClientWithSeller[];
-    },
-  });
-
-  const { data: allClients = [] } = useQuery({
-    queryKey: ['all_clients_financial'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('clients').select('id, name, monthly_fee, status');
-      if (error) throw error;
-      return data as ClientWithSeller[];
-    },
-  });
-
-  const { data: invoices = [] } = useQuery({
-    queryKey: ['invoices_dashboard'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('invoices').select('id, amount, status, due_date, paid_at').order('due_date', { ascending: false }).limit(100);
-      if (error) throw error;
-      return data;
     },
   });
 
@@ -147,23 +127,12 @@ const Sales = () => {
 
   const totalCommissions = sellers.reduce((sum, s) => sum + getSellerCommission(s), 0);
   const totalActiveClients = sellers.reduce((sum, s) => sum + getSellerClients(s.id).length, 0);
-  const totalRevenue = allClients.filter(c => c.status === 'active').reduce((sum, c) => sum + (c.monthly_fee || 0), 0);
-  const paidInvoices = invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + (i.amount || 0), 0);
-  const pendingInvoices = invoices.filter(i => i.status === 'pending').reduce((sum, i) => sum + (i.amount || 0), 0);
-  const overdueInvoices = invoices.filter(i => i.status === 'overdue').reduce((sum, i) => sum + (i.amount || 0), 0);
 
-  // Chart data
   const sellerChartData = sellers.filter(s => s.status === 'active').map(s => ({
     name: s.name.split(' ')[0],
     clientes: getSellerClients(s.id).length,
     comissao: getSellerCommission(s),
   }));
-
-  const invoiceStatusData = [
-    { name: 'Pago', value: paidInvoices },
-    { name: 'Pendente', value: pendingInvoices },
-    { name: 'Atrasado', value: overdueInvoices },
-  ].filter(d => d.value > 0);
 
   const copyLink = (code: string) => {
     const link = `${window.location.origin}/indicacao/${code}`;
@@ -186,8 +155,8 @@ const Sales = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Vendedores & Financeiro</h1>
-          <p className="text-muted-foreground text-sm">Dashboard financeiro, vendedores e comissões</p>
+          <h1 className="text-2xl font-bold text-foreground">Vendedores & Comissões</h1>
+          <p className="text-muted-foreground text-sm">Gestão de vendedores, links de indicação e comissões</p>
         </div>
         <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) setForm(emptyForm); }}>
           <DialogTrigger asChild>
@@ -203,67 +172,8 @@ const Sales = () => {
         </Dialog>
       </div>
 
-      {/* Financial Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card><CardContent className="pt-6 flex items-center gap-4">
-          <div className="p-3 rounded-lg bg-primary/10"><TrendingUp className="w-5 h-5 text-primary" /></div>
-          <div><p className="text-sm text-muted-foreground">Receita Mensal</p><p className="text-2xl font-bold">R$ {totalRevenue.toFixed(2)}</p></div>
-        </CardContent></Card>
-        <Card><CardContent className="pt-6 flex items-center gap-4">
-          <div className="p-3 rounded-lg bg-green-500/10"><DollarSign className="w-5 h-5 text-green-500" /></div>
-          <div><p className="text-sm text-muted-foreground">Recebido</p><p className="text-2xl font-bold text-green-500">R$ {paidInvoices.toFixed(2)}</p></div>
-        </CardContent></Card>
-        <Card><CardContent className="pt-6 flex items-center gap-4">
-          <div className="p-3 rounded-lg bg-yellow-500/10"><DollarSign className="w-5 h-5 text-yellow-500" /></div>
-          <div><p className="text-sm text-muted-foreground">Pendente</p><p className="text-2xl font-bold text-yellow-500">R$ {pendingInvoices.toFixed(2)}</p></div>
-        </CardContent></Card>
-        <Card><CardContent className="pt-6 flex items-center gap-4">
-          <div className="p-3 rounded-lg bg-destructive/10"><DollarSign className="w-5 h-5 text-destructive" /></div>
-          <div><p className="text-sm text-muted-foreground">Atrasado</p><p className="text-2xl font-bold text-destructive">R$ {overdueInvoices.toFixed(2)}</p></div>
-        </CardContent></Card>
-        <Card><CardContent className="pt-6 flex items-center gap-4">
-          <div className="p-3 rounded-lg bg-primary/10"><Percent className="w-5 h-5 text-primary" /></div>
-          <div><p className="text-sm text-muted-foreground">Comissões</p><p className="text-2xl font-bold">R$ {totalCommissions.toFixed(2)}</p></div>
-        </CardContent></Card>
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {sellerChartData.length > 0 && (
-          <Card>
-            <CardHeader><CardTitle className="text-base flex items-center gap-2"><BarChart3 className="w-4 h-4" />Comissões por Vendedor</CardTitle></CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={sellerChartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="name" className="text-muted-foreground" tick={{ fontSize: 12 }} />
-                  <YAxis className="text-muted-foreground" tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(v: number) => `R$ ${v.toFixed(2)}`} />
-                  <Bar dataKey="comissao" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Comissão" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
-        {invoiceStatusData.length > 0 && (
-          <Card>
-            <CardHeader><CardTitle className="text-base flex items-center gap-2"><DollarSign className="w-4 h-4" />Faturas por Status</CardTitle></CardHeader>
-            <CardContent className="flex items-center justify-center">
-              <ResponsiveContainer width="100%" height={250}>
-                <PieChart>
-                  <Pie data={invoiceStatusData} cx="50%" cy="50%" outerRadius={90} dataKey="value" label={({ name, value }) => `${name}: R$${value.toFixed(0)}`}>
-                    {invoiceStatusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip formatter={(v: number) => `R$ ${v.toFixed(2)}`} />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
       {/* Seller stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card><CardContent className="pt-6 flex items-center gap-4">
           <div className="p-3 rounded-lg bg-primary/10"><Users className="w-5 h-5 text-primary" /></div>
           <div><p className="text-sm text-muted-foreground">Vendedores Ativos</p><p className="text-2xl font-bold">{sellers.filter(s => s.status === 'active').length}</p></div>
@@ -272,7 +182,29 @@ const Sales = () => {
           <div className="p-3 rounded-lg bg-primary/10"><Users className="w-5 h-5 text-primary" /></div>
           <div><p className="text-sm text-muted-foreground">Clientes por Indicação</p><p className="text-2xl font-bold">{totalActiveClients}</p></div>
         </CardContent></Card>
+        <Card><CardContent className="pt-6 flex items-center gap-4">
+          <div className="p-3 rounded-lg bg-primary/10"><Percent className="w-5 h-5 text-primary" /></div>
+          <div><p className="text-sm text-muted-foreground">Total Comissões</p><p className="text-2xl font-bold">R$ {totalCommissions.toFixed(2)}</p></div>
+        </CardContent></Card>
       </div>
+
+      {/* Chart */}
+      {sellerChartData.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle className="text-base flex items-center gap-2"><BarChart3 className="w-4 h-4" />Comissões por Vendedor</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={sellerChartData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip formatter={(v: number) => `R$ ${v.toFixed(2)}`} />
+                <Bar dataKey="comissao" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Comissão" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Edit dialog */}
       <Dialog open={editOpen} onOpenChange={o => { setEditOpen(o); if (!o) { setEditingSeller(null); setForm(emptyForm); } }}>

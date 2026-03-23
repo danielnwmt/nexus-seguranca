@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DollarSign, Search, Plus, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban, Trash2, Send, XCircle, Receipt, CreditCard, Edit } from 'lucide-react';
+import { DollarSign, Search, Plus, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban, Trash2, Send, XCircle, Receipt, CreditCard, Edit, BarChart3, Percent } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -7,8 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+
+const COLORS = ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 const bankLabels: Record<string, string> = {
   sicredi: 'Sicredi',
@@ -55,7 +59,6 @@ const Financial = () => {
   const [sendingBoleto, setSendingBoleto] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Bills state
   const [billSearch, setBillSearch] = useState('');
   const [billFilterStatus, setBillFilterStatus] = useState<string>('all');
   const [billDialogOpen, setBillDialogOpen] = useState(false);
@@ -85,6 +88,21 @@ const Financial = () => {
   const totalBillsPaid = bills.filter((b: any) => b.status === 'paid').reduce((sum: number, b: any) => sum + Number(b.amount), 0);
   const totalBillsPending = bills.filter((b: any) => b.status === 'pending').reduce((sum: number, b: any) => sum + Number(b.amount), 0);
   const totalBillsOverdue = bills.filter((b: any) => b.status === 'overdue').reduce((sum: number, b: any) => sum + Number(b.amount), 0);
+
+  // Dashboard calculations
+  const totalMonthlyRevenue = (clients as any[]).filter(c => c.status === 'active').reduce((sum, c) => sum + (c.monthly_fee || 0), 0);
+  const netProfit = totalReceita - totalBillsPaid;
+
+  const invoiceStatusData = [
+    { name: 'Pago', value: totalReceita },
+    { name: 'Pendente', value: totalPendente },
+    { name: 'Atrasado', value: totalAtrasado },
+  ].filter(d => d.value > 0);
+
+  const expenseByCategory = Object.entries(billCategories).map(([key, label]) => ({
+    name: label.split(' ')[0],
+    value: bills.filter((b: any) => b.category === key).reduce((sum: number, b: any) => sum + Number(b.amount), 0),
+  })).filter(d => d.value > 0);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -200,8 +218,67 @@ const Financial = () => {
         <DollarSign className="w-6 h-6 text-primary" />
         <div>
           <h1 className="text-2xl font-bold text-foreground">Financeiro</h1>
-          <p className="text-sm text-muted-foreground font-mono">Controle de mensalidades, cobranças e contas a pagar</p>
+          <p className="text-sm text-muted-foreground font-mono">Dashboard financeiro, mensalidades, cobranças e contas a pagar</p>
         </div>
+      </div>
+
+      {/* Financial Dashboard */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card><CardContent className="pt-6 flex items-center gap-4">
+          <div className="p-3 rounded-lg bg-primary/10"><TrendingUp className="w-5 h-5 text-primary" /></div>
+          <div><p className="text-sm text-muted-foreground">Receita Mensal</p><p className="text-2xl font-bold">{formatCurrency(totalMonthlyRevenue)}</p></div>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6 flex items-center gap-4">
+          <div className="p-3 rounded-lg bg-success/10"><DollarSign className="w-5 h-5 text-success" /></div>
+          <div><p className="text-sm text-muted-foreground">Recebido</p><p className="text-2xl font-bold text-success">{formatCurrency(totalReceita)}</p></div>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6 flex items-center gap-4">
+          <div className="p-3 rounded-lg bg-warning/10"><DollarSign className="w-5 h-5 text-warning" /></div>
+          <div><p className="text-sm text-muted-foreground">Pendente</p><p className="text-2xl font-bold text-warning">{formatCurrency(totalPendente)}</p></div>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6 flex items-center gap-4">
+          <div className="p-3 rounded-lg bg-destructive/10"><DollarSign className="w-5 h-5 text-destructive" /></div>
+          <div><p className="text-sm text-muted-foreground">Atrasado</p><p className="text-2xl font-bold text-destructive">{formatCurrency(totalAtrasado)}</p></div>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6 flex items-center gap-4">
+          <div className="p-3 rounded-lg bg-primary/10"><BarChart3 className="w-5 h-5 text-primary" /></div>
+          <div><p className="text-sm text-muted-foreground">Lucro Líquido</p><p className={`text-2xl font-bold ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>{formatCurrency(netProfit)}</p></div>
+        </CardContent></Card>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {invoiceStatusData.length > 0 && (
+          <Card>
+            <CardHeader><CardTitle className="text-base flex items-center gap-2"><DollarSign className="w-4 h-4" />Faturas por Status</CardTitle></CardHeader>
+            <CardContent className="flex items-center justify-center">
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie data={invoiceStatusData} cx="50%" cy="50%" outerRadius={90} dataKey="value" label={({ name, value }) => `${name}: R$${value.toFixed(0)}`}>
+                    {invoiceStatusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => `R$ ${v.toFixed(2)}`} />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+        {expenseByCategory.length > 0 && (
+          <Card>
+            <CardHeader><CardTitle className="text-base flex items-center gap-2"><BarChart3 className="w-4 h-4" />Despesas por Categoria</CardTitle></CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={expenseByCategory}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip formatter={(v: number) => `R$ ${v.toFixed(2)}`} />
+                  <Bar dataKey="value" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} name="Valor" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Tabs defaultValue="receivables" className="space-y-4">
