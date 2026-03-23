@@ -354,6 +354,7 @@ export type Database = {
           name: string
           payment_due_day: number | null
           phone: string | null
+          seller_id: string | null
           status: string
           storage_server_id: string | null
           updated_at: string
@@ -372,6 +373,7 @@ export type Database = {
           name: string
           payment_due_day?: number | null
           phone?: string | null
+          seller_id?: string | null
           status?: string
           storage_server_id?: string | null
           updated_at?: string
@@ -390,11 +392,19 @@ export type Database = {
           name?: string
           payment_due_day?: number | null
           phone?: string | null
+          seller_id?: string | null
           status?: string
           storage_server_id?: string | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "clients_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "sellers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "clients_storage_server_id_fkey"
             columns: ["storage_server_id"]
@@ -935,6 +945,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sellers: {
+        Row: {
+          commission_percent: number
+          cpf: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          referral_code: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          commission_percent?: number
+          cpf?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          referral_code?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          commission_percent?: number
+          cpf?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          referral_code?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       service_orders: {
         Row: {
