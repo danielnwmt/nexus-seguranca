@@ -17,6 +17,7 @@ const navItems = [
   { to: '/service-orders', icon: ClipboardList, label: 'Ordens de Serviço' },
   { to: '/stock', icon: Package, label: 'Estoque' },
   { to: '/quotes', icon: FileText, label: 'Orçamentos' },
+  { to: '/sales', icon: HandCoins, label: 'Vendedores' },
   { to: '/financial', icon: DollarSign, label: 'Financeiro' },
   { to: '/alarms', icon: Bell, label: 'Alarmes' },
   { to: '/analytics', icon: Brain, label: 'Analíticos IA' },

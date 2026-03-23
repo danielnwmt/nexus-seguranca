@@ -61,6 +61,7 @@ const App = () => (
                 <Route path="/live" element={<LiveGrid />} />
                 <Route path="/stock" element={<Stock />} />
                 <Route path="/quotes" element={<Quotes />} />
+                <Route path="/sales" element={<Sales />} />
                 <Route path="/settings" element={<Settings />} />
               </Route>
               <Route path="*" element={<NotFound />} />
