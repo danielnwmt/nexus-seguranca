@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { DollarSign, Search, Plus, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban, Trash2, Send, XCircle, Receipt, CreditCard, Edit, BarChart3, ArrowUpRight, ArrowDownRight, Wallet, PiggyBank } from 'lucide-react';
+import { DollarSign, Search, Plus, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban, Trash2, Send, XCircle, Receipt, CreditCard, Edit, BarChart3, ArrowUpRight, ArrowDownRight, Wallet, PiggyBank, Activity, Target, Percent, FileText } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart, LineChart, Line, Legend, RadialBarChart, RadialBar, ComposedChart } from 'recharts';
 
 const COLORS = ['hsl(142, 70%, 45%)', 'hsl(38, 92%, 50%)', 'hsl(0, 72%, 50%)', 'hsl(175, 80%, 45%)', 'hsl(280, 60%, 50%)'];
 
