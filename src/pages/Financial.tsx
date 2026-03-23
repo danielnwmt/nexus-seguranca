@@ -92,7 +92,11 @@ const Financial = () => {
 
   // Dashboard calculations
   const totalMonthlyRevenue = (clients as any[]).filter(c => c.status === 'active').reduce((sum, c) => sum + (c.monthly_fee || 0), 0);
+  const totalDespesas = totalBillsPaid + totalBillsPending + totalBillsOverdue;
   const netProfit = totalReceita - totalBillsPaid;
+  const totalInvoiceValue = totalReceita + totalPendente + totalAtrasado;
+  const collectionRate = totalInvoiceValue > 0 ? (totalReceita / totalInvoiceValue) * 100 : 0;
+  const overdueRate = totalInvoiceValue > 0 ? (totalAtrasado / totalInvoiceValue) * 100 : 0;
 
   const invoiceStatusData = [
     { name: 'Pago', value: totalReceita },
@@ -104,6 +108,31 @@ const Financial = () => {
     name: label.split(' ')[0],
     value: bills.filter((b: any) => b.category === key).reduce((sum: number, b: any) => sum + Number(b.amount), 0),
   })).filter(d => d.value > 0);
+
+  const cashFlowData = useMemo(() => {
+    const months: Record<string, { receita: number; despesa: number }> = {};
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    invoices.forEach((inv: any) => {
+      if (inv.status === 'paid' && inv.paid_at) {
+        const d = new Date(inv.paid_at);
+        const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+        if (!months[key]) months[key] = { receita: 0, despesa: 0 };
+        months[key].receita += Number(inv.amount);
+      }
+    });
+    bills.forEach((b: any) => {
+      if (b.status === 'paid' && b.paid_at) {
+        const d = new Date(b.paid_at);
+        const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+        if (!months[key]) months[key] = { receita: 0, despesa: 0 };
+        months[key].despesa += Number(b.amount);
+      }
+    });
+    return Object.entries(months).sort(([a], [b]) => a.localeCompare(b)).slice(-6).map(([key, val]) => {
+      const [, m] = key.split('-');
+      return { name: monthNames[parseInt(m)], receita: val.receita, despesa: val.despesa };
+    });
+  }, [invoices, bills]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
