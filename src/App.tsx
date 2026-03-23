@@ -27,6 +27,7 @@ import Timeline from "./pages/Timeline";
 import LiveGrid from "./pages/LiveGrid";
 import Stock from "./pages/Stock";
 import Quotes from "./pages/Quotes";
+import Sales from "./pages/Sales";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
