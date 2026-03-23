@@ -27,6 +27,7 @@ import Timeline from "./pages/Timeline";
 import LiveGrid from "./pages/LiveGrid";
 import Stock from "./pages/Stock";
 import Quotes from "./pages/Quotes";
+import Sales from "./pages/Sales";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -60,6 +61,7 @@ const App = () => (
                 <Route path="/live" element={<LiveGrid />} />
                 <Route path="/stock" element={<Stock />} />
                 <Route path="/quotes" element={<Quotes />} />
+                <Route path="/sales" element={<Sales />} />
                 <Route path="/settings" element={<Settings />} />
               </Route>
               <Route path="*" element={<NotFound />} />
