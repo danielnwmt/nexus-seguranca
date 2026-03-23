@@ -224,177 +224,251 @@ const Financial = () => {
   const handleDeleteInvoice = (id: string) => deleteMutation.mutate(id);
   const formatCurrency = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
+  const monthlyTrend = useMemo(() => {
+    if (cashFlowData.length < 2) return 0;
+    const last = cashFlowData[cashFlowData.length - 1]?.receita || 0;
+    const prev = cashFlowData[cashFlowData.length - 2]?.receita || 0;
+    return prev > 0 ? ((last - prev) / prev) * 100 : 0;
+  }, [cashFlowData]);
+
+  const gaugeData = useMemo(() => [
+    { name: 'Taxa', value: collectionRate, fill: 'hsl(142, 70%, 45%)' },
+  ], [collectionRate]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20">
-          <DollarSign className="w-6 h-6 text-primary" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 border border-primary/20">
+            <DollarSign className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">Financeiro</h1>
+            <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider">Dashboard • Cobranças • Contas</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground tracking-tight">Financeiro</h1>
-          <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider">Dashboard • Cobranças • Contas</p>
+        <div className="hidden md:flex items-center gap-2 text-xs font-mono text-muted-foreground">
+          <Activity className="w-3.5 h-3.5 text-primary animate-pulse" />
+          <span>Atualizado em tempo real</span>
         </div>
       </div>
 
-      {/* ===== KPI Cards ===== */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5 hover:border-primary/30 transition-colors">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-8 translate-x-8" />
-          <div className="flex items-center justify-between mb-3">
+      {/* ===== KPI Row 1 - Main metrics ===== */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        {/* Receita Mensal */}
+        <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-card to-primary/[0.03] p-4 group hover:border-primary/40 transition-all duration-300">
+          <div className="absolute -top-6 -right-6 w-20 h-20 bg-primary/5 rounded-full group-hover:scale-150 transition-transform duration-500" />
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center">
+              <Wallet className="w-3.5 h-3.5 text-primary" />
+            </div>
             <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">Receita Mensal</span>
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center"><Wallet className="w-4 h-4 text-primary" /></div>
           </div>
-          <p className="text-2xl font-bold font-mono text-foreground">{formatCurrency(totalMonthlyRevenue)}</p>
-          <p className="text-[10px] text-muted-foreground mt-1 font-mono">{(clients as any[]).filter(c => c.status === 'active').length} clientes ativos</p>
+          <p className="text-xl font-bold font-mono text-foreground">{formatCurrency(totalMonthlyRevenue)}</p>
+          <div className="flex items-center gap-1 mt-1">
+            <FileText className="w-3 h-3 text-muted-foreground" />
+            <span className="text-[10px] text-muted-foreground font-mono">{(clients as any[]).filter(c => c.status === 'active').length} clientes</span>
+          </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-xl border border-success/20 bg-card p-5 hover:border-success/40 transition-colors">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-success/5 rounded-full -translate-y-8 translate-x-8" />
-          <div className="flex items-center justify-between mb-3">
+        {/* Recebido */}
+        <div className="relative overflow-hidden rounded-xl border border-success/20 bg-gradient-to-br from-card to-success/[0.03] p-4 group hover:border-success/40 transition-all duration-300">
+          <div className="absolute -top-6 -right-6 w-20 h-20 bg-success/5 rounded-full group-hover:scale-150 transition-transform duration-500" />
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg bg-success/15 flex items-center justify-center">
+              <ArrowUpRight className="w-3.5 h-3.5 text-success" />
+            </div>
             <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">Recebido</span>
-            <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center"><ArrowUpRight className="w-4 h-4 text-success" /></div>
           </div>
-          <p className="text-2xl font-bold font-mono text-success">{formatCurrency(totalReceita)}</p>
-          <div className="flex items-center gap-2 mt-2">
-            <Progress value={collectionRate} className="h-1.5 flex-1 bg-muted [&>div]:bg-success" />
-            <span className="text-[10px] font-mono text-success">{collectionRate.toFixed(0)}%</span>
-          </div>
-        </div>
-
-        <div className="relative overflow-hidden rounded-xl border border-warning/20 bg-card p-5 hover:border-warning/40 transition-colors">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-warning/5 rounded-full -translate-y-8 translate-x-8" />
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">Pendente</span>
-            <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center"><Clock className="w-4 h-4 text-warning" /></div>
-          </div>
-          <p className="text-2xl font-bold font-mono text-warning">{formatCurrency(totalPendente)}</p>
-          {totalAtrasado > 0 && (
-            <div className="flex items-center gap-1.5 mt-1">
-              <AlertTriangle className="w-3 h-3 text-destructive" />
-              <span className="text-[10px] font-mono text-destructive">{formatCurrency(totalAtrasado)} atrasado ({overdueRate.toFixed(0)}%)</span>
+          <p className="text-xl font-bold font-mono text-success">{formatCurrency(totalReceita)}</p>
+          {monthlyTrend !== 0 && (
+            <div className="flex items-center gap-1 mt-1">
+              {monthlyTrend > 0 ? <TrendingUp className="w-3 h-3 text-success" /> : <TrendingDown className="w-3 h-3 text-destructive" />}
+              <span className={`text-[10px] font-mono ${monthlyTrend > 0 ? 'text-success' : 'text-destructive'}`}>{monthlyTrend > 0 ? '+' : ''}{monthlyTrend.toFixed(1)}%</span>
             </div>
           )}
         </div>
 
-        <div className={`relative overflow-hidden rounded-xl border bg-card p-5 transition-colors ${netProfit >= 0 ? 'border-success/20 hover:border-success/40' : 'border-destructive/20 hover:border-destructive/40'}`}>
-          <div className={`absolute top-0 right-0 w-24 h-24 rounded-full -translate-y-8 translate-x-8 ${netProfit >= 0 ? 'bg-success/5' : 'bg-destructive/5'}`} />
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">Lucro Líquido</span>
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${netProfit >= 0 ? 'bg-success/10' : 'bg-destructive/10'}`}>
-              <PiggyBank className={`w-4 h-4 ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`} />
+        {/* Pendente */}
+        <div className="relative overflow-hidden rounded-xl border border-warning/20 bg-gradient-to-br from-card to-warning/[0.03] p-4 group hover:border-warning/40 transition-all duration-300">
+          <div className="absolute -top-6 -right-6 w-20 h-20 bg-warning/5 rounded-full group-hover:scale-150 transition-transform duration-500" />
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg bg-warning/15 flex items-center justify-center">
+              <Clock className="w-3.5 h-3.5 text-warning" />
             </div>
+            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">Pendente</span>
           </div>
-          <p className={`text-2xl font-bold font-mono ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>{formatCurrency(netProfit)}</p>
-          <p className="text-[10px] text-muted-foreground mt-1 font-mono">
-            {netProfit >= 0 ? <ArrowUpRight className="w-3 h-3 inline text-success" /> : <ArrowDownRight className="w-3 h-3 inline text-destructive" />}
-            {' '}Receitas - Despesas
-          </p>
+          <p className="text-xl font-bold font-mono text-warning">{formatCurrency(totalPendente)}</p>
+          <span className="text-[10px] text-muted-foreground font-mono">{invoices.filter((i: any) => i.status === 'pending').length} faturas</span>
+        </div>
+
+        {/* Inadimplência */}
+        <div className="relative overflow-hidden rounded-xl border border-destructive/20 bg-gradient-to-br from-card to-destructive/[0.03] p-4 group hover:border-destructive/40 transition-all duration-300">
+          <div className="absolute -top-6 -right-6 w-20 h-20 bg-destructive/5 rounded-full group-hover:scale-150 transition-transform duration-500" />
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg bg-destructive/15 flex items-center justify-center">
+              <AlertTriangle className="w-3.5 h-3.5 text-destructive" />
+            </div>
+            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">Atrasado</span>
+          </div>
+          <p className="text-xl font-bold font-mono text-destructive">{formatCurrency(totalAtrasado)}</p>
+          <span className="text-[10px] text-destructive/80 font-mono">{overdueRate.toFixed(1)}% da carteira</span>
+        </div>
+
+        {/* Lucro Líquido */}
+        <div className={`relative overflow-hidden rounded-xl border bg-gradient-to-br from-card p-4 group transition-all duration-300 col-span-2 lg:col-span-1 ${netProfit >= 0 ? 'border-success/20 to-success/[0.03] hover:border-success/40' : 'border-destructive/20 to-destructive/[0.03] hover:border-destructive/40'}`}>
+          <div className={`absolute -top-6 -right-6 w-20 h-20 rounded-full group-hover:scale-150 transition-transform duration-500 ${netProfit >= 0 ? 'bg-success/5' : 'bg-destructive/5'}`} />
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${netProfit >= 0 ? 'bg-success/15' : 'bg-destructive/15'}`}>
+              <PiggyBank className={`w-3.5 h-3.5 ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`} />
+            </div>
+            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">Lucro Líquido</span>
+          </div>
+          <p className={`text-xl font-bold font-mono ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>{formatCurrency(netProfit)}</p>
+          <span className="text-[10px] text-muted-foreground font-mono">Receitas - Despesas</span>
         </div>
       </div>
 
-      {/* ===== Charts ===== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Cash Flow */}
-        <div className="lg:col-span-2 rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between mb-4">
+      {/* ===== Charts Row ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* Cash Flow - Line Chart */}
+        <div className="lg:col-span-7 rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 className="text-sm font-semibold text-foreground">Fluxo de Caixa</h3>
-              <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Últimos 6 meses</p>
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Activity className="w-4 h-4 text-primary" />
+                Fluxo de Caixa
+              </h3>
+              <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mt-0.5">Receitas vs Despesas • Últimos 6 meses</p>
             </div>
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-success" /><span className="text-[10px] font-mono text-muted-foreground">Receita</span></div>
-              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-destructive" /><span className="text-[10px] font-mono text-muted-foreground">Despesa</span></div>
+              <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-primary" /><span className="text-[10px] font-mono text-muted-foreground">Receita</span></div>
+              <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-warning" /><span className="text-[10px] font-mono text-muted-foreground">Despesa</span></div>
             </div>
           </div>
           {cashFlowData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={cashFlowData}>
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart data={cashFlowData}>
                 <defs>
-                  <linearGradient id="gradReceita" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(142, 70%, 45%)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(142, 70%, 45%)" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gradDespesa" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(0, 72%, 50%)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(0, 72%, 50%)" stopOpacity={0} />
+                  <linearGradient id="gradReceita2" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(175, 80%, 45%)" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="hsl(175, 80%, 45%)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 18%)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 15%)" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(215, 15%, 50%)' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: 'hsl(215, 15%, 50%)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 15%, 18%)', borderRadius: 8, fontSize: 12 }} />
-                <Area type="monotone" dataKey="receita" stroke="hsl(142, 70%, 45%)" fill="url(#gradReceita)" strokeWidth={2} name="Receita" />
-                <Area type="monotone" dataKey="despesa" stroke="hsl(0, 72%, 50%)" fill="url(#gradDespesa)" strokeWidth={2} name="Despesa" />
-              </AreaChart>
+                <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 15%, 20%)', borderRadius: 12, fontSize: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }} />
+                <Area type="monotone" dataKey="receita" fill="url(#gradReceita2)" stroke="none" />
+                <Line type="monotone" dataKey="receita" stroke="hsl(175, 80%, 45%)" strokeWidth={2.5} dot={{ fill: 'hsl(175, 80%, 45%)', r: 4, strokeWidth: 2, stroke: 'hsl(220, 18%, 10%)' }} activeDot={{ r: 6, strokeWidth: 2 }} name="Receita" />
+                <Bar dataKey="despesa" fill="hsl(38, 92%, 50%)" radius={[4, 4, 0, 0]} barSize={24} opacity={0.7} name="Despesa" />
+              </ComposedChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex items-center justify-center h-[220px] text-muted-foreground">
+            <div className="flex items-center justify-center h-[260px] text-muted-foreground">
               <div className="text-center">
-                <BarChart3 className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-20" />
                 <p className="text-xs font-mono">Dados insuficientes para gráfico</p>
+                <p className="text-[10px] text-muted-foreground/60 mt-1">Adicione cobranças e contas para visualizar</p>
               </div>
             </div>
           )}
         </div>
 
-        {/* Donut Chart */}
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold text-foreground">Distribuição de Faturas</h3>
-            <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Por status</p>
-          </div>
-          {invoiceStatusData.length > 0 ? (
-            <>
-              <ResponsiveContainer width="100%" height={160}>
-                <PieChart>
-                  <Pie data={invoiceStatusData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" paddingAngle={3} strokeWidth={0}>
-                    {invoiceStatusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 15%, 18%)', borderRadius: 8, fontSize: 12 }} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="space-y-2 mt-3">
-                {invoiceStatusData.map((item, i) => (
-                  <div key={item.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i] }} />
-                      <span className="text-xs text-muted-foreground">{item.name}</span>
-                    </div>
-                    <span className="text-xs font-mono text-foreground">{formatCurrency(item.value)}</span>
-                  </div>
-                ))}
+        {/* Right column: Gauge + Donut */}
+        <div className="lg:col-span-5 grid grid-rows-2 gap-4">
+          {/* Collection Rate Gauge */}
+          <div className="rounded-xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Target className="w-4 h-4 text-primary" />
+                  Taxa de Cobrança
+                </h3>
+                <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mt-0.5">Eficiência de recebimento</p>
               </div>
-            </>
-          ) : (
-            <div className="flex items-center justify-center h-[220px] text-muted-foreground">
-              <div className="text-center">
-                <DollarSign className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p className="text-xs font-mono">Nenhuma fatura registrada</p>
+              <div className="text-right">
+                <p className="text-2xl font-bold font-mono text-primary">{collectionRate.toFixed(1)}%</p>
               </div>
             </div>
-          )}
+            <div className="relative mt-3">
+              <div className="w-full h-3 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-1000 ease-out"
+                  style={{
+                    width: `${Math.min(collectionRate, 100)}%`,
+                    background: collectionRate >= 80
+                      ? 'linear-gradient(90deg, hsl(142, 70%, 45%), hsl(160, 70%, 40%))'
+                      : collectionRate >= 50
+                        ? 'linear-gradient(90deg, hsl(38, 92%, 50%), hsl(45, 92%, 50%))'
+                        : 'linear-gradient(90deg, hsl(0, 72%, 50%), hsl(15, 72%, 50%))',
+                  }}
+                />
+              </div>
+              <div className="flex justify-between mt-1.5">
+                <span className="text-[9px] font-mono text-muted-foreground">0%</span>
+                <span className="text-[9px] font-mono text-muted-foreground">50%</span>
+                <span className="text-[9px] font-mono text-muted-foreground">100%</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              <div className="text-center p-2 rounded-lg bg-success/5 border border-success/10">
+                <p className="text-xs font-bold font-mono text-success">{invoices.filter((i: any) => i.status === 'paid').length}</p>
+                <p className="text-[9px] text-muted-foreground">Pagas</p>
+              </div>
+              <div className="text-center p-2 rounded-lg bg-warning/5 border border-warning/10">
+                <p className="text-xs font-bold font-mono text-warning">{invoices.filter((i: any) => i.status === 'pending').length}</p>
+                <p className="text-[9px] text-muted-foreground">Pendentes</p>
+              </div>
+              <div className="text-center p-2 rounded-lg bg-destructive/5 border border-destructive/10">
+                <p className="text-xs font-bold font-mono text-destructive">{invoices.filter((i: any) => i.status === 'overdue').length}</p>
+                <p className="text-[9px] text-muted-foreground">Atrasadas</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Expense breakdown mini */}
+          <div className="rounded-xl border border-border bg-card p-5">
+            <div className="mb-3">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Percent className="w-4 h-4 text-warning" />
+                Despesas por Categoria
+              </h3>
+              <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mt-0.5">Total: {formatCurrency(totalDespesas)}</p>
+            </div>
+            {expenseByCategory.length > 0 ? (
+              <div className="space-y-2.5">
+                {expenseByCategory.sort((a, b) => b.value - a.value).slice(0, 5).map((cat, i) => {
+                  const pct = totalDespesas > 0 ? (cat.value / totalDespesas) * 100 : 0;
+                  const colors = ['hsl(175, 80%, 45%)', 'hsl(38, 92%, 50%)', 'hsl(280, 60%, 50%)', 'hsl(142, 70%, 45%)', 'hsl(0, 72%, 50%)'];
+                  return (
+                    <div key={cat.name}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: colors[i % colors.length] }} />
+                          <span className="text-[11px] text-foreground">{cat.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono text-muted-foreground">{pct.toFixed(0)}%</span>
+                          <span className="text-[11px] font-mono text-foreground">{formatCurrency(cat.value)}</span>
+                        </div>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: colors[i % colors.length] }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-20 text-muted-foreground">
+                <p className="text-[11px] font-mono">Nenhuma despesa registrada</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-
-      {/* Expense by category */}
-      {expenseByCategory.length > 0 && (
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold text-foreground">Despesas por Categoria</h3>
-            <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Total: {formatCurrency(totalDespesas)}</p>
-          </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={expenseByCategory} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 18%)" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 11, fill: 'hsl(215, 15%, 50%)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v.toFixed(0)}`} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'hsl(215, 15%, 50%)' }} axisLine={false} tickLine={false} width={80} />
-              <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 15%, 18%)', borderRadius: 8, fontSize: 12 }} />
-              <Bar dataKey="value" fill="hsl(38, 92%, 50%)" radius={[0, 4, 4, 0]} name="Valor" barSize={16} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
 
       {/* ===== Tabs: Contas a Receber / Pagar ===== */}
       <Tabs defaultValue="receivables" className="space-y-4">
