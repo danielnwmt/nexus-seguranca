@@ -1,18 +1,18 @@
-import { useState } from 'react';
-import { DollarSign, Search, Plus, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban, Trash2, Send, XCircle, Receipt, CreditCard, Edit, BarChart3, Percent } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { useState, useMemo } from 'react';
+import { DollarSign, Search, Plus, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Ban, Trash2, Send, XCircle, Receipt, CreditCard, Edit, BarChart3, ArrowUpRight, ArrowDownRight, Wallet, PiggyBank } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { useTableQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Area, AreaChart } from 'recharts';
 
-const COLORS = ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+const COLORS = ['hsl(142, 70%, 45%)', 'hsl(38, 92%, 50%)', 'hsl(0, 72%, 50%)', 'hsl(175, 80%, 45%)', 'hsl(280, 60%, 50%)'];
 
 const bankLabels: Record<string, string> = {
   sicredi: 'Sicredi',
@@ -89,9 +89,12 @@ const Financial = () => {
   const totalBillsPending = bills.filter((b: any) => b.status === 'pending').reduce((sum: number, b: any) => sum + Number(b.amount), 0);
   const totalBillsOverdue = bills.filter((b: any) => b.status === 'overdue').reduce((sum: number, b: any) => sum + Number(b.amount), 0);
 
-  // Dashboard calculations
   const totalMonthlyRevenue = (clients as any[]).filter(c => c.status === 'active').reduce((sum, c) => sum + (c.monthly_fee || 0), 0);
+  const totalDespesas = totalBillsPaid + totalBillsPending + totalBillsOverdue;
   const netProfit = totalReceita - totalBillsPaid;
+  const totalInvoiceValue = totalReceita + totalPendente + totalAtrasado;
+  const collectionRate = totalInvoiceValue > 0 ? (totalReceita / totalInvoiceValue) * 100 : 0;
+  const overdueRate = totalInvoiceValue > 0 ? (totalAtrasado / totalInvoiceValue) * 100 : 0;
 
   const invoiceStatusData = [
     { name: 'Pago', value: totalReceita },
@@ -103,6 +106,31 @@ const Financial = () => {
     name: label.split(' ')[0],
     value: bills.filter((b: any) => b.category === key).reduce((sum: number, b: any) => sum + Number(b.amount), 0),
   })).filter(d => d.value > 0);
+
+  const cashFlowData = useMemo(() => {
+    const months: Record<string, { receita: number; despesa: number }> = {};
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    invoices.forEach((inv: any) => {
+      if (inv.status === 'paid' && inv.paid_at) {
+        const d = new Date(inv.paid_at);
+        const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+        if (!months[key]) months[key] = { receita: 0, despesa: 0 };
+        months[key].receita += Number(inv.amount);
+      }
+    });
+    bills.forEach((b: any) => {
+      if (b.status === 'paid' && b.paid_at) {
+        const d = new Date(b.paid_at);
+        const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+        if (!months[key]) months[key] = { receita: 0, despesa: 0 };
+        months[key].despesa += Number(b.amount);
+      }
+    });
+    return Object.entries(months).sort(([a], [b]) => a.localeCompare(b)).slice(-6).map(([key, val]) => {
+      const [, m] = key.split('-');
+      return { name: monthNames[parseInt(m)], receita: val.receita, despesa: val.despesa };
+    });
+  }, [invoices, bills]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -154,7 +182,6 @@ const Financial = () => {
       supplier: billForm.supplier || null,
       notes: billForm.notes || null,
     } as any;
-
     if (editingBill) {
       updateBillMutation.mutate({ id: editingBill.id, ...data } as any);
     } else {
@@ -168,14 +195,7 @@ const Financial = () => {
 
   const openEditBill = (bill: any) => {
     setEditingBill(bill);
-    setBillForm({
-      description: bill.description || '',
-      category: bill.category || 'general',
-      amount: String(bill.amount || ''),
-      dueDate: bill.due_date || '',
-      supplier: bill.supplier || '',
-      notes: bill.notes || '',
-    });
+    setBillForm({ description: bill.description || '', category: bill.category || 'general', amount: String(bill.amount || ''), dueDate: bill.due_date || '', supplier: bill.supplier || '', notes: bill.notes || '' });
     setBillDialogOpen(true);
   };
 
@@ -190,9 +210,7 @@ const Financial = () => {
     toast({ title: 'Conta marcada como paga' });
   };
 
-  const handleDeleteBill = (id: string) => {
-    deleteBillMutation.mutate(id);
-  };
+  const handleDeleteBill = (id: string) => deleteBillMutation.mutate(id);
 
   const handleSendBoleto = (inv: any) => {
     setSendingBoleto(inv.id);
@@ -202,111 +220,204 @@ const Financial = () => {
     }, 1500);
   };
 
-  const handleCancelBoleto = (inv: any) => {
-    updateMutation.mutate({ id: inv.id, boleto_url: null } as any);
-  };
-
-  const handleDeleteInvoice = (id: string) => {
-    deleteMutation.mutate(id);
-  };
-
+  const handleCancelBoleto = (inv: any) => updateMutation.mutate({ id: inv.id, boleto_url: null } as any);
+  const handleDeleteInvoice = (id: string) => deleteMutation.mutate(id);
   const formatCurrency = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-3">
-        <DollarSign className="w-6 h-6 text-primary" />
+        <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20">
+          <DollarSign className="w-6 h-6 text-primary" />
+        </div>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Financeiro</h1>
-          <p className="text-sm text-muted-foreground font-mono">Dashboard financeiro, mensalidades, cobranças e contas a pagar</p>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">Financeiro</h1>
+          <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider">Dashboard • Cobranças • Contas</p>
         </div>
       </div>
 
-      {/* Financial Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card><CardContent className="pt-6 flex items-center gap-4">
-          <div className="p-3 rounded-lg bg-primary/10"><TrendingUp className="w-5 h-5 text-primary" /></div>
-          <div><p className="text-sm text-muted-foreground">Receita Mensal</p><p className="text-2xl font-bold">{formatCurrency(totalMonthlyRevenue)}</p></div>
-        </CardContent></Card>
-        <Card><CardContent className="pt-6 flex items-center gap-4">
-          <div className="p-3 rounded-lg bg-success/10"><DollarSign className="w-5 h-5 text-success" /></div>
-          <div><p className="text-sm text-muted-foreground">Recebido</p><p className="text-2xl font-bold text-success">{formatCurrency(totalReceita)}</p></div>
-        </CardContent></Card>
-        <Card><CardContent className="pt-6 flex items-center gap-4">
-          <div className="p-3 rounded-lg bg-warning/10"><DollarSign className="w-5 h-5 text-warning" /></div>
-          <div><p className="text-sm text-muted-foreground">Pendente</p><p className="text-2xl font-bold text-warning">{formatCurrency(totalPendente)}</p></div>
-        </CardContent></Card>
-        <Card><CardContent className="pt-6 flex items-center gap-4">
-          <div className="p-3 rounded-lg bg-destructive/10"><DollarSign className="w-5 h-5 text-destructive" /></div>
-          <div><p className="text-sm text-muted-foreground">Atrasado</p><p className="text-2xl font-bold text-destructive">{formatCurrency(totalAtrasado)}</p></div>
-        </CardContent></Card>
-        <Card><CardContent className="pt-6 flex items-center gap-4">
-          <div className="p-3 rounded-lg bg-primary/10"><BarChart3 className="w-5 h-5 text-primary" /></div>
-          <div><p className="text-sm text-muted-foreground">Lucro Líquido</p><p className={`text-2xl font-bold ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>{formatCurrency(netProfit)}</p></div>
-        </CardContent></Card>
+      {/* ===== KPI Cards ===== */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5 hover:border-primary/30 transition-colors">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-8 translate-x-8" />
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">Receita Mensal</span>
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center"><Wallet className="w-4 h-4 text-primary" /></div>
+          </div>
+          <p className="text-2xl font-bold font-mono text-foreground">{formatCurrency(totalMonthlyRevenue)}</p>
+          <p className="text-[10px] text-muted-foreground mt-1 font-mono">{(clients as any[]).filter(c => c.status === 'active').length} clientes ativos</p>
+        </div>
+
+        <div className="relative overflow-hidden rounded-xl border border-success/20 bg-card p-5 hover:border-success/40 transition-colors">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-success/5 rounded-full -translate-y-8 translate-x-8" />
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">Recebido</span>
+            <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center"><ArrowUpRight className="w-4 h-4 text-success" /></div>
+          </div>
+          <p className="text-2xl font-bold font-mono text-success">{formatCurrency(totalReceita)}</p>
+          <div className="flex items-center gap-2 mt-2">
+            <Progress value={collectionRate} className="h-1.5 flex-1 bg-muted [&>div]:bg-success" />
+            <span className="text-[10px] font-mono text-success">{collectionRate.toFixed(0)}%</span>
+          </div>
+        </div>
+
+        <div className="relative overflow-hidden rounded-xl border border-warning/20 bg-card p-5 hover:border-warning/40 transition-colors">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-warning/5 rounded-full -translate-y-8 translate-x-8" />
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">Pendente</span>
+            <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center"><Clock className="w-4 h-4 text-warning" /></div>
+          </div>
+          <p className="text-2xl font-bold font-mono text-warning">{formatCurrency(totalPendente)}</p>
+          {totalAtrasado > 0 && (
+            <div className="flex items-center gap-1.5 mt-1">
+              <AlertTriangle className="w-3 h-3 text-destructive" />
+              <span className="text-[10px] font-mono text-destructive">{formatCurrency(totalAtrasado)} atrasado ({overdueRate.toFixed(0)}%)</span>
+            </div>
+          )}
+        </div>
+
+        <div className={`relative overflow-hidden rounded-xl border bg-card p-5 transition-colors ${netProfit >= 0 ? 'border-success/20 hover:border-success/40' : 'border-destructive/20 hover:border-destructive/40'}`}>
+          <div className={`absolute top-0 right-0 w-24 h-24 rounded-full -translate-y-8 translate-x-8 ${netProfit >= 0 ? 'bg-success/5' : 'bg-destructive/5'}`} />
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">Lucro Líquido</span>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${netProfit >= 0 ? 'bg-success/10' : 'bg-destructive/10'}`}>
+              <PiggyBank className={`w-4 h-4 ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`} />
+            </div>
+          </div>
+          <p className={`text-2xl font-bold font-mono ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>{formatCurrency(netProfit)}</p>
+          <p className="text-[10px] text-muted-foreground mt-1 font-mono">
+            {netProfit >= 0 ? <ArrowUpRight className="w-3 h-3 inline text-success" /> : <ArrowDownRight className="w-3 h-3 inline text-destructive" />}
+            {' '}Receitas - Despesas
+          </p>
+        </div>
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {invoiceStatusData.length > 0 && (
-          <Card>
-            <CardHeader><CardTitle className="text-base flex items-center gap-2"><DollarSign className="w-4 h-4" />Faturas por Status</CardTitle></CardHeader>
-            <CardContent className="flex items-center justify-center">
-              <ResponsiveContainer width="100%" height={250}>
+      {/* ===== Charts ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Cash Flow */}
+        <div className="lg:col-span-2 rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Fluxo de Caixa</h3>
+              <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Últimos 6 meses</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-success" /><span className="text-[10px] font-mono text-muted-foreground">Receita</span></div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-destructive" /><span className="text-[10px] font-mono text-muted-foreground">Despesa</span></div>
+            </div>
+          </div>
+          {cashFlowData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={cashFlowData}>
+                <defs>
+                  <linearGradient id="gradReceita" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(142, 70%, 45%)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(142, 70%, 45%)" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gradDespesa" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(0, 72%, 50%)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(0, 72%, 50%)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 18%)" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(215, 15%, 50%)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: 'hsl(215, 15%, 50%)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 15%, 18%)', borderRadius: 8, fontSize: 12 }} />
+                <Area type="monotone" dataKey="receita" stroke="hsl(142, 70%, 45%)" fill="url(#gradReceita)" strokeWidth={2} name="Receita" />
+                <Area type="monotone" dataKey="despesa" stroke="hsl(0, 72%, 50%)" fill="url(#gradDespesa)" strokeWidth={2} name="Despesa" />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[220px] text-muted-foreground">
+              <div className="text-center">
+                <BarChart3 className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <p className="text-xs font-mono">Dados insuficientes para gráfico</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Donut Chart */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-foreground">Distribuição de Faturas</h3>
+            <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Por status</p>
+          </div>
+          {invoiceStatusData.length > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={160}>
                 <PieChart>
-                  <Pie data={invoiceStatusData} cx="50%" cy="50%" outerRadius={90} dataKey="value" label={({ name, value }) => `${name}: R$${value.toFixed(0)}`}>
+                  <Pie data={invoiceStatusData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" paddingAngle={3} strokeWidth={0}>
                     {invoiceStatusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
-                  <Tooltip formatter={(v: number) => `R$ ${v.toFixed(2)}`} />
+                  <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 15%, 18%)', borderRadius: 8, fontSize: 12 }} />
                 </PieChart>
               </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
-        {expenseByCategory.length > 0 && (
-          <Card>
-            <CardHeader><CardTitle className="text-base flex items-center gap-2"><BarChart3 className="w-4 h-4" />Despesas por Categoria</CardTitle></CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={expenseByCategory}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(v: number) => `R$ ${v.toFixed(2)}`} />
-                  <Bar dataKey="value" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} name="Valor" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
+              <div className="space-y-2 mt-3">
+                {invoiceStatusData.map((item, i) => (
+                  <div key={item.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i] }} />
+                      <span className="text-xs text-muted-foreground">{item.name}</span>
+                    </div>
+                    <span className="text-xs font-mono text-foreground">{formatCurrency(item.value)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-center h-[220px] text-muted-foreground">
+              <div className="text-center">
+                <DollarSign className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <p className="text-xs font-mono">Nenhuma fatura registrada</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
+      {/* Expense by category */}
+      {expenseByCategory.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-foreground">Despesas por Categoria</h3>
+            <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Total: {formatCurrency(totalDespesas)}</p>
+          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={expenseByCategory} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 15%, 18%)" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 11, fill: 'hsl(215, 15%, 50%)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${v.toFixed(0)}`} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'hsl(215, 15%, 50%)' }} axisLine={false} tickLine={false} width={80} />
+              <Tooltip formatter={(v: number) => formatCurrency(v)} contentStyle={{ background: 'hsl(220, 18%, 10%)', border: '1px solid hsl(220, 15%, 18%)', borderRadius: 8, fontSize: 12 }} />
+              <Bar dataKey="value" fill="hsl(38, 92%, 50%)" radius={[0, 4, 4, 0]} name="Valor" barSize={16} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* ===== Tabs: Contas a Receber / Pagar ===== */}
       <Tabs defaultValue="receivables" className="space-y-4">
         <TabsList className="bg-card border border-border">
           <TabsTrigger value="receivables" className="gap-2"><Receipt className="w-4 h-4" />Contas a Receber</TabsTrigger>
           <TabsTrigger value="payables" className="gap-2"><CreditCard className="w-4 h-4" />Contas a Pagar</TabsTrigger>
         </TabsList>
 
-        {/* ===== CONTAS A RECEBER ===== */}
         <TabsContent value="receivables" className="space-y-4">
           <div className="flex items-center justify-between">
             <div />
-            <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) { setErrors({}); } setDialogOpen(v); }}>
+            <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) setErrors({}); setDialogOpen(v); }}>
               <DialogTrigger asChild>
                 <Button className="gap-2"><Plus className="w-4 h-4" /> Nova Cobrança</Button>
               </DialogTrigger>
               <DialogContent className="bg-card border-border">
-                <DialogHeader>
-                  <DialogTitle className="text-foreground">Nova Cobrança</DialogTitle>
-                </DialogHeader>
+                <DialogHeader><DialogTitle className="text-foreground">Nova Cobrança</DialogTitle></DialogHeader>
                 <div className="space-y-4">
                   <div>
                     <Label className="text-xs text-muted-foreground">Cliente *</Label>
                     <Select value={form.clientId} onValueChange={v => setForm(p => ({ ...p, clientId: v }))}>
                       <SelectTrigger className={`bg-muted border-border ${errors.clientId ? 'border-destructive' : ''}`}><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
-                      <SelectContent>
-                        {clients.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                      </SelectContent>
+                      <SelectContent>{clients.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                     </Select>
                     {errors.clientId && <p className="text-[10px] text-destructive mt-1">{errors.clientId}</p>}
                   </div>
@@ -327,11 +438,7 @@ const Financial = () => {
                     <Select value={form.bank} onValueChange={v => setForm(p => ({ ...p, bank: v }))}>
                       <SelectTrigger className={`bg-muted border-border ${errors.bank ? 'border-destructive' : ''}`}><SelectValue placeholder="Selecione o banco" /></SelectTrigger>
                       <SelectContent>
-                        {activeBanks.length > 0 ? (
-                          activeBanks.map(bank => (
-                            <SelectItem key={bank} value={bank}>{bankLabels[bank] || bank}</SelectItem>
-                          ))
-                        ) : (
+                        {activeBanks.length > 0 ? activeBanks.map(bank => <SelectItem key={bank} value={bank}>{bankLabels[bank] || bank}</SelectItem>) : (
                           <>
                             <SelectItem value="sicredi">Sicredi</SelectItem>
                             <SelectItem value="caixa">Caixa Econômica</SelectItem>
@@ -389,7 +496,7 @@ const Financial = () => {
             </Select>
           </div>
 
-          <div className="rounded-lg border border-border overflow-hidden">
+          <div className="rounded-xl border border-border overflow-hidden">
             <table className="w-full">
               <thead>
                 <tr className="bg-muted/50 border-b border-border">
@@ -416,8 +523,7 @@ const Financial = () => {
                       <td className="px-4 py-3"><p className="text-xs text-foreground">{inv.bank ? bankLabels[inv.bank] || inv.bank : '-'}</p></td>
                       <td className="px-4 py-3 text-center">
                         <span className={`inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full ${st.className}`}>
-                          <StatusIcon className="w-3 h-3" />
-                          {st.label}
+                          <StatusIcon className="w-3 h-3" />{st.label}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -451,13 +557,12 @@ const Financial = () => {
 
           {!isLoading && filtered.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <DollarSign className="w-12 h-12 mb-3" />
-              <p className="text-sm">Nenhuma cobrança encontrada</p>
+              <DollarSign className="w-12 h-12 mb-3 opacity-30" />
+              <p className="text-sm font-mono">Nenhuma cobrança encontrada</p>
             </div>
           )}
         </TabsContent>
 
-        {/* ===== CONTAS A PAGAR ===== */}
         <TabsContent value="payables" className="space-y-4">
           <div className="flex items-center justify-between">
             <div />
@@ -504,7 +609,7 @@ const Financial = () => {
             </Select>
           </div>
 
-          <div className="rounded-lg border border-border overflow-hidden">
+          <div className="rounded-xl border border-border overflow-hidden">
             <table className="w-full">
               <thead>
                 <tr className="bg-muted/50 border-b border-border">
@@ -536,8 +641,7 @@ const Financial = () => {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={`inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full ${st.className}`}>
-                          <StatusIcon className="w-3 h-3" />
-                          {st.label}
+                          <StatusIcon className="w-3 h-3" />{st.label}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -566,19 +670,17 @@ const Financial = () => {
 
           {!billsLoading && filteredBills.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <CreditCard className="w-12 h-12 mb-3" />
-              <p className="text-sm">Nenhuma conta a pagar encontrada</p>
+              <CreditCard className="w-12 h-12 mb-3 opacity-30" />
+              <p className="text-sm font-mono">Nenhuma conta a pagar encontrada</p>
             </div>
           )}
         </TabsContent>
       </Tabs>
 
-      {/* Dialog de Conta a Pagar */}
+      {/* Bill Dialog */}
       <Dialog open={billDialogOpen} onOpenChange={(v) => { if (!v) { setBillErrors({}); setEditingBill(null); } setBillDialogOpen(v); }}>
         <DialogContent className="bg-card border-border">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">{editingBill ? 'Editar Conta' : 'Nova Conta a Pagar'}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle className="text-foreground">{editingBill ? 'Editar Conta' : 'Nova Conta a Pagar'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
               <Label className="text-xs text-muted-foreground">Descrição *</Label>
@@ -590,11 +692,7 @@ const Financial = () => {
                 <Label className="text-xs text-muted-foreground">Categoria</Label>
                 <Select value={billForm.category} onValueChange={v => setBillForm(p => ({ ...p, category: v }))}>
                   <SelectTrigger className="bg-muted border-border"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(billCategories).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
+                  <SelectContent>{Object.entries(billCategories).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div>
