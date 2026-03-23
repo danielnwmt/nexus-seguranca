@@ -948,6 +948,7 @@ export type Database = {
       }
       sellers: {
         Row: {
+          address: string | null
           commission_percent: number
           cpf: string | null
           created_at: string
@@ -960,6 +961,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          address?: string | null
           commission_percent?: number
           cpf?: string | null
           created_at?: string
@@ -972,6 +974,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          address?: string | null
           commission_percent?: number
           cpf?: string | null
           created_at?: string
