@@ -32,10 +32,22 @@ const maskPhone = (value: string) => {
     .replace(/(\d{5})(\d)/, '$1-$2');
 };
 
+const getLocalHeaders = () => {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  try {
+    const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || '{}');
+    if (session.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+  } catch {}
+  return headers;
+};
+
 const CompanySettings = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
+  const isLocal = isLocalInstallation();
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [loginBgPreview, setLoginBgPreview] = useState<string | null>(null);
   const [form, setForm] = useState({
