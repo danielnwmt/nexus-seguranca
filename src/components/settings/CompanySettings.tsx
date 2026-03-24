@@ -165,21 +165,45 @@ const CompanySettings = () => {
 
   const handleSave = async () => {
     setLoading(true);
-    const { error } = await supabase
-      .from('company_settings')
-      .update({
-        name: form.name,
-        razao_social: form.razao_social,
-        cnpj: form.cnpj,
-        address: form.address,
-        phone: form.phone,
-        email: form.email,
-        logo_url: form.logo_url,
-        login_bg_url: form.login_bg_url,
-        recording_segment_minutes: form.recording_segment_minutes,
-        updated_at: new Date().toISOString(),
-      } as any)
-      .eq('id', form.id);
+    const payload = {
+      name: form.name,
+      razao_social: form.razao_social,
+      cnpj: form.cnpj,
+      address: form.address,
+      phone: form.phone,
+      email: form.email,
+      logo_url: form.logo_url,
+      login_bg_url: form.login_bg_url,
+      recording_segment_minutes: form.recording_segment_minutes,
+      updated_at: new Date().toISOString(),
+    };
+
+    let error: any = null;
+
+    if (isLocal) {
+      try {
+        const res = await fetch(
+          `${getLocalApiBase()}/rest/v1/company_settings?id=eq.${form.id}`,
+          {
+            method: 'PATCH',
+            headers: getLocalHeaders(),
+            body: JSON.stringify(payload),
+          }
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ message: 'Erro ao salvar' }));
+          error = { message: err.message || err.details || 'Erro ao salvar' };
+        }
+      } catch (e: any) {
+        error = { message: e.message || 'Erro de conexão' };
+      }
+    } else {
+      const result = await supabase
+        .from('company_settings')
+        .update(payload as any)
+        .eq('id', form.id);
+      error = result.error;
+    }
 
     setLoading(false);
     if (error) {
