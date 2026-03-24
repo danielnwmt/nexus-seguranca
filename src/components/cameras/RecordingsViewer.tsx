@@ -52,8 +52,47 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
   const [pointB, setPointB] = useState<number | null>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
+  const [autoDateDone, setAutoDateDone] = useState(false);
+
+  // When opening, find the most recent date with recordings for this camera
   useEffect(() => {
-    if (!open || !camera) return;
+    if (!open || !camera) {
+      setAutoDateDone(false);
+      return;
+    }
+    const findLatestDate = async () => {
+      if (isLocalInstallation()) {
+        try {
+          const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+          const url = `${getLocalApiBase()}/rest/v1/recordings?select=start_time&camera_id=eq.${camera.id}&order=start_time.desc&limit=1`;
+          const res = await fetch(url, { headers });
+          if (res.ok) {
+            const rows = await res.json();
+            if (rows.length > 0) {
+              setDate(new Date(rows[0].start_time));
+            }
+          }
+        } catch {}
+      } else {
+        const { data } = await supabase
+          .from('recordings')
+          .select('start_time')
+          .eq('camera_id', camera.id)
+          .order('start_time', { ascending: false })
+          .limit(1);
+        if (data && data.length > 0) {
+          setDate(new Date(data[0].start_time));
+        }
+      }
+      setAutoDateDone(true);
+    };
+    findLatestDate();
+  }, [open, camera]);
+
+  useEffect(() => {
+    if (!open || !camera || !autoDateDone) return;
     const fetchRecordings = async () => {
       setLoading(true);
       const startOfDay = new Date(date);
@@ -86,7 +125,7 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
       setLoading(false);
     };
     fetchRecordings();
-  }, [open, camera, date]);
+  }, [open, camera, date, autoDateDone]);
 
   const getSegments = () => {
     return recordings.map(rec => {
