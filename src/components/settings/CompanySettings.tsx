@@ -200,9 +200,12 @@ const CompanySettings = () => {
     } else {
       const result = await supabase
         .from('company_settings')
-        .update(payload as any)
+        .update(payload)
         .eq('id', form.id);
       error = result.error;
+      if (!result.error && result.data === null && result.count === 0) {
+        error = { message: 'Nenhum registro atualizado. Verifique permissões.' };
+      }
     }
 
     setLoading(false);
