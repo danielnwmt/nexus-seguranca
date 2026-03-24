@@ -117,7 +117,9 @@ const Settings = () => {
         }));
         setBanks(mapped);
       } else {
-        const { data, error } = await supabase.functions.invoke('manage-bank-config', { method: 'GET' });
+        const { data, error } = await supabase.functions.invoke('manage-bank-config', {
+          body: { action: 'list' },
+        });
         if (error) throw error;
         setBanks(data || []);
       }
