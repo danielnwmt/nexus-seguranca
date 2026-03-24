@@ -93,9 +93,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (method === "PUT") {
-      const body = await req.json();
-      const { id, agencia, conta, convenio, active, api_key } = body;
+    if (action === "update") {
+      const { id, agencia, conta, convenio, active, api_key } = body || {};
 
       if (!id || typeof id !== "string") {
         return new Response(JSON.stringify({ error: "Invalid bank config ID" }), {
