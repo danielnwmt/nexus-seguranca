@@ -1110,7 +1110,27 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      company_branding_public: {
+        Row: {
+          id: string | null
+          login_bg_url: string | null
+          logo_url: string | null
+          name: string | null
+        }
+        Insert: {
+          id?: string | null
+          login_bg_url?: string | null
+          logo_url?: string | null
+          name?: string | null
+        }
+        Update: {
+          id?: string | null
+          login_bg_url?: string | null
+          logo_url?: string | null
+          name?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       check_rate_limit: {

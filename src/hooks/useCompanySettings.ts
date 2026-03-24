@@ -27,6 +27,34 @@ export function useCompanySettings() {
         if (!res.ok) throw new Error('Erro ao buscar configurações');
         return (await res.json()) as CompanySettings;
       }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        const { data, error } = await supabase
+          .from('company_branding_public')
+          .select('id, name, logo_url, login_bg_url')
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        return {
+          id: data?.id || '',
+          name: data?.name || 'Nexus Monitoramento',
+          cnpj: null,
+          razao_social: null,
+          address: null,
+          phone: null,
+          email: null,
+          logo_url: data?.logo_url || null,
+          media_server_ip: null,
+          login_bg_url: data?.login_bg_url || null,
+        } as CompanySettings;
+      }
+
       const { data, error } = await supabase
         .from('company_settings')
         .select('*')
