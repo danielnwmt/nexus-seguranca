@@ -68,26 +68,38 @@ const CompanySettings = () => {
   }, []);
 
   const loadCompanySettings = async () => {
-    const { data } = await supabase
-      .from('company_settings')
-      .select('*')
-      .limit(1)
-      .single();
+    let data: any = null;
+    if (isLocal) {
+      try {
+        const res = await fetch(
+          `${getLocalApiBase()}/rest/v1/company_settings?select=*&limit=1`,
+          { headers: { ...getLocalHeaders(), 'Accept': 'application/vnd.pgrst.object+json' } }
+        );
+        if (res.ok) data = await res.json();
+      } catch {}
+    } else {
+      const { data: d } = await supabase
+        .from('company_settings')
+        .select('*')
+        .limit(1)
+        .maybeSingle();
+      data = d;
+    }
     if (data) {
       setForm({
         id: data.id,
         name: data.name || '',
-        razao_social: (data as any).razao_social || '',
+        razao_social: data.razao_social || '',
         cnpj: data.cnpj || '',
         address: data.address || '',
         phone: data.phone || '',
         email: data.email || '',
         logo_url: data.logo_url || '',
-        login_bg_url: (data as any).login_bg_url || '',
-        recording_segment_minutes: (data as any).recording_segment_minutes || 30,
+        login_bg_url: data.login_bg_url || '',
+        recording_segment_minutes: data.recording_segment_minutes || 30,
       });
       if (data.logo_url) setLogoPreview(data.logo_url);
-      if ((data as any).login_bg_url) setLoginBgPreview((data as any).login_bg_url);
+      if (data.login_bg_url) setLoginBgPreview(data.login_bg_url);
     }
   };
 
