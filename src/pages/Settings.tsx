@@ -117,7 +117,9 @@ const Settings = () => {
         }));
         setBanks(mapped);
       } else {
-        const { data, error } = await supabase.functions.invoke('manage-bank-config', { method: 'GET' });
+        const { data, error } = await supabase.functions.invoke('manage-bank-config', {
+          body: { action: 'list' },
+        });
         if (error) throw error;
         setBanks(data || []);
       }
@@ -170,8 +172,7 @@ const Settings = () => {
           if (!res.ok) throw new Error('Erro ao salvar');
         } else {
           await supabase.functions.invoke('manage-bank-config', {
-            method: 'PUT',
-            body: payload,
+            body: { ...payload, action: 'update' },
           });
         }
       }

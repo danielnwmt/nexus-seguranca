@@ -54,9 +54,19 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Support both HTTP method and body-based action routing
     const method = req.method;
+    let body: any = null;
+    
+    try {
+      if (method === "POST" || method === "PUT") {
+        body = await req.json();
+      }
+    } catch {}
 
-    if (method === "GET") {
+    const action = body?.action || (method === "GET" ? "list" : method === "PUT" ? "update" : method);
+
+    if (action === "list" || (method === "GET" && !body)) {
       // Return bank configs with API keys masked
       const { data, error } = await adminClient
         .from("bank_configs")
@@ -83,9 +93,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (method === "PUT") {
-      const body = await req.json();
-      const { id, agencia, conta, convenio, active, api_key } = body;
+    if (action === "update") {
+      const { id, agencia, conta, convenio, active, api_key } = body || {};
 
       if (!id || typeof id !== "string") {
         return new Response(JSON.stringify({ error: "Invalid bank config ID" }), {
