@@ -43,8 +43,38 @@ const Recordings = () => {
   const [playingRecording, setPlayingRecording] = useState<any | null>(null);
   const [viewerCamera, setViewerCamera] = useState<{ id: string; name: string; clientName?: string } | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [autoDateDone, setAutoDateDone] = useState(false);
+
+  // Auto-navigate to the most recent date with recordings
+  useEffect(() => {
+    const findLatestDate = async () => {
+      if (isLocalInstallation()) {
+        try {
+          const session = JSON.parse(localStorage.getItem('nexus-local-session') || '{}');
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (session.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+          const url = `${getLocalApiBase()}/rest/v1/recordings?select=start_time&order=start_time.desc&limit=1`;
+          const res = await fetch(url, { headers });
+          if (res.ok) {
+            const rows = await res.json();
+            if (rows.length > 0) setDate(new Date(rows[0].start_time));
+          }
+        } catch {}
+      } else {
+        const { data } = await supabase
+          .from('recordings')
+          .select('start_time')
+          .order('start_time', { ascending: false })
+          .limit(1);
+        if (data && data.length > 0) setDate(new Date(data[0].start_time));
+      }
+      setAutoDateDone(true);
+    };
+    findLatestDate();
+  }, []);
 
   useEffect(() => {
+    if (!autoDateDone) return;
     const fetchRecordings = async () => {
       setLoading(true);
       const startOfDay = new Date(date);
@@ -85,7 +115,7 @@ const Recordings = () => {
       setLoading(false);
     };
     fetchRecordings();
-  }, [date, selectedCameraId]);
+  }, [date, selectedCameraId, autoDateDone]);
 
   const filteredRecordings = search
     ? recordings.filter(r =>
