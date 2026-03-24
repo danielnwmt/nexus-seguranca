@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 
 const maskCNPJ = (value: string) => {
   return value
@@ -31,10 +32,22 @@ const maskPhone = (value: string) => {
     .replace(/(\d{5})(\d)/, '$1-$2');
 };
 
+const getLocalHeaders = () => {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  try {
+    const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || '{}');
+    if (session.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+  } catch {}
+  return headers;
+};
+
 const CompanySettings = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
+  const isLocal = isLocalInstallation();
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [loginBgPreview, setLoginBgPreview] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -55,26 +68,38 @@ const CompanySettings = () => {
   }, []);
 
   const loadCompanySettings = async () => {
-    const { data } = await supabase
-      .from('company_settings')
-      .select('*')
-      .limit(1)
-      .single();
+    let data: any = null;
+    if (isLocal) {
+      try {
+        const res = await fetch(
+          `${getLocalApiBase()}/rest/v1/company_settings?select=*&limit=1`,
+          { headers: { ...getLocalHeaders(), 'Accept': 'application/vnd.pgrst.object+json' } }
+        );
+        if (res.ok) data = await res.json();
+      } catch {}
+    } else {
+      const { data: d } = await supabase
+        .from('company_settings')
+        .select('*')
+        .limit(1)
+        .maybeSingle();
+      data = d;
+    }
     if (data) {
       setForm({
         id: data.id,
         name: data.name || '',
-        razao_social: (data as any).razao_social || '',
+        razao_social: data.razao_social || '',
         cnpj: data.cnpj || '',
         address: data.address || '',
         phone: data.phone || '',
         email: data.email || '',
         logo_url: data.logo_url || '',
-        login_bg_url: (data as any).login_bg_url || '',
-        recording_segment_minutes: (data as any).recording_segment_minutes || 30,
+        login_bg_url: data.login_bg_url || '',
+        recording_segment_minutes: data.recording_segment_minutes || 30,
       });
       if (data.logo_url) setLogoPreview(data.logo_url);
-      if ((data as any).login_bg_url) setLoginBgPreview((data as any).login_bg_url);
+      if (data.login_bg_url) setLoginBgPreview(data.login_bg_url);
     }
   };
 
@@ -140,21 +165,45 @@ const CompanySettings = () => {
 
   const handleSave = async () => {
     setLoading(true);
-    const { error } = await supabase
-      .from('company_settings')
-      .update({
-        name: form.name,
-        razao_social: form.razao_social,
-        cnpj: form.cnpj,
-        address: form.address,
-        phone: form.phone,
-        email: form.email,
-        logo_url: form.logo_url,
-        login_bg_url: form.login_bg_url,
-        recording_segment_minutes: form.recording_segment_minutes,
-        updated_at: new Date().toISOString(),
-      } as any)
-      .eq('id', form.id);
+    const payload = {
+      name: form.name,
+      razao_social: form.razao_social,
+      cnpj: form.cnpj,
+      address: form.address,
+      phone: form.phone,
+      email: form.email,
+      logo_url: form.logo_url,
+      login_bg_url: form.login_bg_url,
+      recording_segment_minutes: form.recording_segment_minutes,
+      updated_at: new Date().toISOString(),
+    };
+
+    let error: any = null;
+
+    if (isLocal) {
+      try {
+        const res = await fetch(
+          `${getLocalApiBase()}/rest/v1/company_settings?id=eq.${form.id}`,
+          {
+            method: 'PATCH',
+            headers: getLocalHeaders(),
+            body: JSON.stringify(payload),
+          }
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ message: 'Erro ao salvar' }));
+          error = { message: err.message || err.details || 'Erro ao salvar' };
+        }
+      } catch (e: any) {
+        error = { message: e.message || 'Erro de conexão' };
+      }
+    } else {
+      const result = await supabase
+        .from('company_settings')
+        .update(payload as any)
+        .eq('id', form.id);
+      error = result.error;
+    }
 
     setLoading(false);
     if (error) {
