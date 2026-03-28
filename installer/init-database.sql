@@ -363,6 +363,20 @@ ALTER TABLE public.notification_configs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth_all_notification_configs" ON public.notification_configs;
 CREATE POLICY "auth_all_notification_configs" ON public.notification_configs FOR ALL USING (auth.uid() IS NOT NULL);
 
+CREATE TABLE IF NOT EXISTS public.role_permissions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  role TEXT NOT NULL,
+  module TEXT NOT NULL,
+  allowed BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(role, module)
+);
+
+ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "auth_all_role_permissions" ON public.role_permissions;
+CREATE POLICY "auth_all_role_permissions" ON public.role_permissions FOR ALL USING (auth.uid() IS NOT NULL);
+
 -- 5. Funcoes auxiliares
 CREATE OR REPLACE FUNCTION public.is_authenticated()
 RETURNS BOOLEAN
@@ -582,7 +596,25 @@ INSERT INTO public.bank_configs (bank, label, active) VALUES
   ('inter', 'Banco Inter', false)
 ON CONFLICT DO NOTHING;
 
--- 10. Usuario administrador padrao (apenas primeiro setup)
+-- Seed role_permissions
+INSERT INTO public.role_permissions (role, module, allowed) VALUES
+  ('n1', 'dashboard', true), ('n1', 'cameras_view', true), ('n1', 'cameras_edit', false),
+  ('n1', 'clients_view', false), ('n1', 'clients_edit', false), ('n1', 'guards', false),
+  ('n1', 'installers', false), ('n1', 'service_orders', false), ('n1', 'financial', false),
+  ('n1', 'alarms', true), ('n1', 'support', false), ('n1', 'settings', false), ('n1', 'users', false),
+  ('n2', 'dashboard', true), ('n2', 'cameras_view', true), ('n2', 'cameras_edit', true),
+  ('n2', 'clients_view', true), ('n2', 'clients_edit', false), ('n2', 'guards', true),
+  ('n2', 'installers', false), ('n2', 'service_orders', false), ('n2', 'financial', false),
+  ('n2', 'alarms', true), ('n2', 'support', true), ('n2', 'settings', false), ('n2', 'users', false),
+  ('n3', 'dashboard', true), ('n3', 'cameras_view', true), ('n3', 'cameras_edit', true),
+  ('n3', 'clients_view', true), ('n3', 'clients_edit', true), ('n3', 'guards', true),
+  ('n3', 'installers', true), ('n3', 'service_orders', true), ('n3', 'financial', true),
+  ('n3', 'alarms', true), ('n3', 'support', true), ('n3', 'settings', false), ('n3', 'users', false),
+  ('admin', 'dashboard', true), ('admin', 'cameras_view', true), ('admin', 'cameras_edit', true),
+  ('admin', 'clients_view', true), ('admin', 'clients_edit', true), ('admin', 'guards', true),
+  ('admin', 'installers', true), ('admin', 'service_orders', true), ('admin', 'financial', true),
+  ('admin', 'alarms', true), ('admin', 'support', true), ('admin', 'settings', true), ('admin', 'users', true)
+ON CONFLICT (role, module) DO NOTHING;
 INSERT INTO auth.users (email, encrypted_password, raw_user_meta_data)
 VALUES (
   'admin@protenexus.com',

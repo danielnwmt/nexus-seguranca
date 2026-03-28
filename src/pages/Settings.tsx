@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store, Server, HardDrive, Bot, Globe, Palette, Loader2, KeyRound, Eye, EyeOff, Bell } from 'lucide-react';
+import { useRolePermissions, useUpdateRolePermission, buildPermissionMap } from '@/hooks/useRolePermissions';
 import CompanySettings from '@/components/settings/CompanySettings';
 import StorageServers from '@/components/settings/StorageServers';
 import MediaServerSettings from '@/components/settings/MediaServerSettings';
@@ -90,6 +91,23 @@ const defaultPermissions: Record<string, Record<string, boolean>> = {
 
 const Settings = () => {
   const { toast } = useToast();
+
+  // ---- Role Permissions (editable matrix) ----
+  const { data: rolePermissionsData, isLoading: permissionsLoading } = useRolePermissions();
+  const updatePermissionMutation = useUpdateRolePermission();
+  const permissionMap = buildPermissionMap(rolePermissionsData, defaultPermissions);
+
+  const handleTogglePermission = (role: string, module: string, currentValue: boolean) => {
+    // Admin always has all permissions - don't allow toggling
+    if (role === 'admin') return;
+    updatePermissionMutation.mutate(
+      { role, module, allowed: !currentValue },
+      {
+        onSuccess: () => toast({ title: 'Permissão atualizada' }),
+        onError: () => toast({ title: 'Erro ao atualizar permissão', variant: 'destructive' }),
+      }
+    );
+  };
 
   // ---- Bank Configs (server-side) ----
   const [banks, setBanks] = useState<BankConfig[]>([]);
@@ -492,11 +510,16 @@ const Settings = () => {
                <div>
                  <CardTitle className="text-base">Matriz de Permissões</CardTitle>
                  <CardDescription className="text-xs">
-                   Referência visual dos acessos de cada nível. As permissões são aplicadas automaticamente no banco de dados via políticas de segurança (RLS).
+                   Clique nos toggles para ajustar as permissões de cada nível. As alterações são salvas automaticamente. O nível Admin sempre tem acesso total.
                  </CardDescription>
                </div>
              </CardHeader>
             <CardContent>
+              {permissionsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -511,19 +534,25 @@ const Settings = () => {
                   {permissionModules.map(mod => (
                     <TableRow key={mod.key}>
                       <TableCell className="font-medium text-sm">{mod.label}</TableCell>
-                      {(['n1', 'n2', 'n3', 'admin'] as const).map(level => (
-                        <TableCell key={level} className="text-center">
-                          <Switch
-                             checked={defaultPermissions[level][mod.key]}
-                             disabled={true}
-                             className="mx-auto"
-                           />
-                        </TableCell>
-                      ))}
+                      {(['n1', 'n2', 'n3', 'admin'] as const).map(level => {
+                        const isChecked = permissionMap[level]?.[mod.key] ?? false;
+                        const isAdmin = level === 'admin';
+                        return (
+                          <TableCell key={level} className="text-center">
+                            <Switch
+                              checked={isChecked}
+                              disabled={isAdmin}
+                              onCheckedChange={() => handleTogglePermission(level, mod.key, isChecked)}
+                              className="mx-auto"
+                            />
+                          </TableCell>
+                        );
+                      })}
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+              )}
             </CardContent>
           </Card>
 

@@ -3,33 +3,68 @@ import { LayoutDashboard, Camera, Users, Bell, DollarSign, Shield, Settings, Log
 import nexusLogo from '@/assets/nexus-logo.png';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { useRolePermissions, buildPermissionMap } from '@/hooks/useRolePermissions';
 
-const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/cameras', icon: Camera, label: 'Câmeras' },
-  { to: '/live', icon: Monitor, label: 'Ao Vivo' },
-  { to: '/camera-map', icon: MapPin, label: 'Mapa' },
-  { to: '/recordings', icon: Film, label: 'Gravações' },
-  { to: '/timeline', icon: Clock, label: 'Timeline' },
-  { to: '/clients', icon: Users, label: 'Clientes' },
-  { to: '/guards', icon: Shield, label: 'Vigilantes' },
-  { to: '/installers', icon: Wrench, label: 'Técnicos' },
-  { to: '/service-orders', icon: ClipboardList, label: 'Ordens de Serviço' },
-  { to: '/stock', icon: Package, label: 'Estoque' },
-  { to: '/quotes', icon: FileText, label: 'Orçamentos' },
-  { to: '/sales', icon: HandCoins, label: 'Vendedores' },
-  { to: '/financial', icon: DollarSign, label: 'Financeiro' },
-  { to: '/alarms', icon: Bell, label: 'Alarmes' },
-  { to: '/analytics', icon: Brain, label: 'Analíticos IA' },
-  { to: '/system-health', icon: Activity, label: 'Saúde do Sistema' },
-  { to: '/support', icon: Headphones, label: 'Atendimento' },
-  { to: '/settings', icon: Settings, label: 'Configurações' },
+// Map route to permission module key
+const navItems: { to: string; icon: any; label: string; permModule?: string }[] = [
+  { to: '/', icon: LayoutDashboard, label: 'Dashboard', permModule: 'dashboard' },
+  { to: '/cameras', icon: Camera, label: 'Câmeras', permModule: 'cameras_view' },
+  { to: '/live', icon: Monitor, label: 'Ao Vivo', permModule: 'cameras_view' },
+  { to: '/camera-map', icon: MapPin, label: 'Mapa', permModule: 'cameras_view' },
+  { to: '/recordings', icon: Film, label: 'Gravações', permModule: 'cameras_view' },
+  { to: '/timeline', icon: Clock, label: 'Timeline', permModule: 'cameras_view' },
+  { to: '/clients', icon: Users, label: 'Clientes', permModule: 'clients_view' },
+  { to: '/guards', icon: Shield, label: 'Vigilantes', permModule: 'guards' },
+  { to: '/installers', icon: Wrench, label: 'Técnicos', permModule: 'installers' },
+  { to: '/service-orders', icon: ClipboardList, label: 'Ordens de Serviço', permModule: 'service_orders' },
+  { to: '/stock', icon: Package, label: 'Estoque', permModule: 'financial' },
+  { to: '/quotes', icon: FileText, label: 'Orçamentos', permModule: 'financial' },
+  { to: '/sales', icon: HandCoins, label: 'Vendedores', permModule: 'financial' },
+  { to: '/financial', icon: DollarSign, label: 'Financeiro', permModule: 'financial' },
+  { to: '/alarms', icon: Bell, label: 'Alarmes', permModule: 'alarms' },
+  { to: '/analytics', icon: Brain, label: 'Analíticos IA', permModule: 'cameras_view' },
+  { to: '/system-health', icon: Activity, label: 'Saúde do Sistema', permModule: 'settings' },
+  { to: '/support', icon: Headphones, label: 'Atendimento', permModule: 'support' },
+  { to: '/settings', icon: Settings, label: 'Configurações', permModule: 'settings' },
 ];
+
+const defaultPermissions: Record<string, Record<string, boolean>> = {
+  n1: {
+    dashboard: true, cameras_view: true, cameras_edit: false, clients_view: false, clients_edit: false,
+    guards: false, installers: false, service_orders: false, financial: false, alarms: true, support: false, settings: false, users: false,
+  },
+  n2: {
+    dashboard: true, cameras_view: true, cameras_edit: true, clients_view: true, clients_edit: false,
+    guards: true, installers: false, service_orders: false, financial: false, alarms: true, support: true, settings: false, users: false,
+  },
+  n3: {
+    dashboard: true, cameras_view: true, cameras_edit: true, clients_view: true, clients_edit: true,
+    guards: true, installers: true, service_orders: true, financial: true, alarms: true, support: true, settings: false, users: false,
+  },
+  admin: {
+    dashboard: true, cameras_view: true, cameras_edit: true, clients_view: true, clients_edit: true,
+    guards: true, installers: true, service_orders: true, financial: true, alarms: true, support: true, settings: true, users: true,
+  },
+};
 
 const AppSidebar = () => {
   const location = useLocation();
-  const { signOut, user } = useAuth();
+  const { signOut, user, userRole } = useAuth();
   const { data: company } = useCompanySettings();
+  const { data: rolePermissionsData } = useRolePermissions();
+
+  const permissionMap = buildPermissionMap(rolePermissionsData, defaultPermissions);
+  const role = userRole || 'n1';
+  const myPerms = permissionMap[role] || defaultPermissions[role] || {};
+
+  // Admin sees everything
+  const isAdmin = role === 'admin';
+
+  const visibleItems = navItems.filter(item => {
+    if (isAdmin) return true;
+    if (!item.permModule) return true;
+    return myPerms[item.permModule] === true;
+  });
 
   return (
     <aside className="w-64 h-screen bg-sidebar border-r border-sidebar-border flex flex-col fixed left-0 top-0 z-30">
@@ -44,7 +79,7 @@ const AppSidebar = () => {
       </div>
 
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-thin">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive = location.pathname === item.to;
           return (
             <NavLink
