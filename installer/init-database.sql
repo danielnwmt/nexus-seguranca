@@ -574,6 +574,14 @@ INSERT INTO public.company_settings (name)
 VALUES ('Nexus Segurança')
 ON CONFLICT DO NOTHING;
 
+-- Dados iniciais dos bancos
+INSERT INTO public.bank_configs (bank, label, active) VALUES
+  ('sicredi', 'Sicredi', false),
+  ('caixa', 'Caixa Econômica', false),
+  ('banco_do_brasil', 'Banco do Brasil', false),
+  ('inter', 'Banco Inter', false)
+ON CONFLICT DO NOTHING;
+
 -- 10. Usuario administrador padrao (apenas primeiro setup)
 INSERT INTO auth.users (email, encrypted_password, raw_user_meta_data)
 VALUES (
