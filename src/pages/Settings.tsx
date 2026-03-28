@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store, Server, HardDrive, Bot, Globe, Palette, Loader2, KeyRound, Eye, EyeOff, Bell } from 'lucide-react';
+import { useRolePermissions, useUpdateRolePermission, buildPermissionMap } from '@/hooks/useRolePermissions';
 import CompanySettings from '@/components/settings/CompanySettings';
 import StorageServers from '@/components/settings/StorageServers';
 import MediaServerSettings from '@/components/settings/MediaServerSettings';
