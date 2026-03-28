@@ -292,32 +292,6 @@ const CompanySettings = () => {
           </div>
         </div>
 
-        {/* Login Background */}
-        <div className="flex items-center gap-4">
-          <div className="w-32 h-20 rounded-lg border border-border bg-muted flex items-center justify-center overflow-hidden">
-            {loginBgPreview ? (
-              <img src={loginBgPreview} alt="Fundo Login" className="w-full h-full object-cover" />
-            ) : (
-              <ImageIcon className="w-8 h-8 text-muted-foreground/50" />
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Imagem de Fundo do Login</Label>
-            <div>
-              <label htmlFor="login-bg-upload">
-                <Button variant="outline" size="sm" className="gap-2 cursor-pointer" asChild>
-                  <span>
-                    <Upload className="w-3.5 h-3.5" /> Enviar Imagem
-                  </span>
-                </Button>
-              </label>
-              <input id="login-bg-upload" type="file" accept="image/*" className="hidden" onChange={handleLoginBgUpload} />
-            </div>
-            <p className="text-[10px] text-muted-foreground">
-              Tamanho recomendado: <strong>1920×1080px</strong> (Full HD). PNG ou JPG. Máx 5MB.
-            </p>
-          </div>
-        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="space-y-1">
