@@ -95,18 +95,57 @@ const Settings = () => {
   // ---- Role Permissions (editable matrix) ----
   const { data: rolePermissionsData, isLoading: permissionsLoading } = useRolePermissions();
   const updatePermissionMutation = useUpdateRolePermission();
-  const permissionMap = buildPermissionMap(rolePermissionsData, defaultPermissions);
+  const [localPermissions, setLocalPermissions] = useState<Record<string, Record<string, boolean>> | null>(null);
+  const [permissionsDirty, setPermissionsDirty] = useState(false);
+  const [permissionsSaving, setPermissionsSaving] = useState(false);
+
+  // Build the "saved" map from DB data
+  const savedPermissionMap = buildPermissionMap(rolePermissionsData, defaultPermissions);
+  // Use local edits if they exist, otherwise use saved
+  const permissionMap = localPermissions || savedPermissionMap;
+
+  // Reset local state when DB data loads/changes
+  useEffect(() => {
+    if (rolePermissionsData && rolePermissionsData.length > 0) {
+      setLocalPermissions(null);
+      setPermissionsDirty(false);
+    }
+  }, [rolePermissionsData]);
 
   const handleTogglePermission = (role: string, module: string, currentValue: boolean) => {
-    // Admin always has all permissions - don't allow toggling
     if (role === 'admin') return;
-    updatePermissionMutation.mutate(
-      { role, module, allowed: !currentValue },
-      {
-        onSuccess: () => toast({ title: 'Permissão atualizada' }),
-        onError: () => toast({ title: 'Erro ao atualizar permissão', variant: 'destructive' }),
+    setLocalPermissions(prev => {
+      const base = prev || { ...savedPermissionMap };
+      return {
+        ...base,
+        [role]: { ...(base[role] || {}), [module]: !currentValue },
+      };
+    });
+    setPermissionsDirty(true);
+  };
+
+  const handleSavePermissions = async () => {
+    if (!localPermissions) return;
+    setPermissionsSaving(true);
+    try {
+      const promises: Promise<any>[] = [];
+      for (const role of ['n1', 'n2', 'n3']) {
+        const rolePerms = localPermissions[role] || {};
+        for (const [mod, allowed] of Object.entries(rolePerms)) {
+          // Only save if different from saved
+          if (savedPermissionMap[role]?.[mod] !== allowed) {
+            promises.push(updatePermissionMutation.mutateAsync({ role, module: mod, allowed }));
+          }
+        }
       }
-    );
+      await Promise.all(promises);
+      setPermissionsDirty(false);
+      toast({ title: 'Permissões salvas com sucesso' });
+    } catch {
+      toast({ title: 'Erro ao salvar permissões', variant: 'destructive' });
+    } finally {
+      setPermissionsSaving(false);
+    }
   };
 
   // ---- Bank Configs (server-side) ----
@@ -507,12 +546,18 @@ const Settings = () => {
            {/* Permissions Matrix */}
            <Card className="bg-card border-border">
              <CardHeader className="pb-3">
-               <div>
-                 <CardTitle className="text-base">Matriz de Permissões</CardTitle>
-                 <CardDescription className="text-xs">
-                   Clique nos toggles para ajustar as permissões de cada nível. As alterações são salvas automaticamente. O nível Admin sempre tem acesso total.
-                 </CardDescription>
-               </div>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">Matriz de Permissões</CardTitle>
+                  {permissionsDirty && (
+                    <Button size="sm" onClick={handleSavePermissions} disabled={permissionsSaving} className="gap-1.5">
+                      {permissionsSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      Salvar Permissões
+                    </Button>
+                  )}
+                </div>
+                <CardDescription className="text-xs">
+                  Ajuste os toggles e clique em &quot;Salvar Permissões&quot; para aplicar. O nível Admin sempre tem acesso total.
+                </CardDescription>
              </CardHeader>
             <CardContent>
               {permissionsLoading ? (
