@@ -19,6 +19,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  // Fetch user role after user is set
+  useEffect(() => {
+    if (!user?.id) { setUserRole(null); return; }
+    const fetchRole = async () => {
+      try {
+        if (isLocalInstallation()) {
+          const stored = sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session');
+          const token = stored ? JSON.parse(stored).access_token : null;
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+          const res = await fetch(`${getLocalApiBase()}/rest/v1/user_roles?user_id=eq.${user.id}&select=role&limit=1`, { headers });
+          if (res.ok) {
+            const rows = await res.json();
+            setUserRole(rows?.[0]?.role || 'n1');
+          }
+        } else {
+          const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).maybeSingle();
+          setUserRole(data?.role || 'n1');
+        }
+      } catch {
+        setUserRole('n1');
+      }
+    };
+    fetchRole();
+  }, [user?.id]);
 
   useEffect(() => {
     // For local installations, check if we have a locally-stored session
