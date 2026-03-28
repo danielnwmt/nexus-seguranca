@@ -212,7 +212,8 @@ const CompanySettings = () => {
     if (error) {
       toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' });
     } else {
-      queryClient.invalidateQueries({ queryKey: ['company_settings'] });
+      await queryClient.invalidateQueries({ queryKey: ['company_settings'] });
+      await queryClient.refetchQueries({ queryKey: ['company_settings'] });
       toast({ title: 'Dados da empresa salvos com sucesso' });
     }
   };
