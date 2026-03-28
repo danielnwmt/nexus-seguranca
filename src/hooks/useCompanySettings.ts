@@ -20,9 +20,19 @@ export function useCompanySettings() {
     queryKey: ['company_settings'],
     queryFn: async () => {
       if (isLocalInstallation()) {
+        const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || '{}');
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'Accept': 'application/vnd.pgrst.object+json',
+        };
+
+        if (session.access_token) {
+          headers.Authorization = `Bearer ${session.access_token}`;
+        }
+
         const res = await fetch(
           `${getLocalApiBase()}/rest/v1/company_settings?select=*&limit=1`,
-          { headers: { 'Content-Type': 'application/json', 'Accept': 'application/vnd.pgrst.object+json' } }
+          { headers, cache: 'no-store' }
         );
         if (!res.ok) throw new Error('Erro ao buscar configurações');
         return (await res.json()) as CompanySettings;
@@ -63,6 +73,10 @@ export function useCompanySettings() {
       if (error) throw error;
       return data as CompanySettings;
     },
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
+    gcTime: 1000 * 30,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 }
