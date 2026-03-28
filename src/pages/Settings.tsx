@@ -92,6 +92,23 @@ const defaultPermissions: Record<string, Record<string, boolean>> = {
 const Settings = () => {
   const { toast } = useToast();
 
+  // ---- Role Permissions (editable matrix) ----
+  const { data: rolePermissionsData, isLoading: permissionsLoading } = useRolePermissions();
+  const updatePermissionMutation = useUpdateRolePermission();
+  const permissionMap = buildPermissionMap(rolePermissionsData, defaultPermissions);
+
+  const handleTogglePermission = (role: string, module: string, currentValue: boolean) => {
+    // Admin always has all permissions - don't allow toggling
+    if (role === 'admin') return;
+    updatePermissionMutation.mutate(
+      { role, module, allowed: !currentValue },
+      {
+        onSuccess: () => toast({ title: 'Permissão atualizada' }),
+        onError: () => toast({ title: 'Erro ao atualizar permissão', variant: 'destructive' }),
+      }
+    );
+  };
+
   // ---- Bank Configs (server-side) ----
   const [banks, setBanks] = useState<BankConfig[]>([]);
   const [banksLoading, setBanksLoading] = useState(true);
