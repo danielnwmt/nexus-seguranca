@@ -363,6 +363,20 @@ ALTER TABLE public.notification_configs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "auth_all_notification_configs" ON public.notification_configs;
 CREATE POLICY "auth_all_notification_configs" ON public.notification_configs FOR ALL USING (auth.uid() IS NOT NULL);
 
+CREATE TABLE IF NOT EXISTS public.role_permissions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  role TEXT NOT NULL,
+  module TEXT NOT NULL,
+  allowed BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(role, module)
+);
+
+ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "auth_all_role_permissions" ON public.role_permissions;
+CREATE POLICY "auth_all_role_permissions" ON public.role_permissions FOR ALL USING (auth.uid() IS NOT NULL);
+
 -- 5. Funcoes auxiliares
 CREATE OR REPLACE FUNCTION public.is_authenticated()
 RETURNS BOOLEAN
