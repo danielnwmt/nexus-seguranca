@@ -326,18 +326,31 @@ const Cameras = () => {
           return (
             <Card key={camera.id} className="group overflow-hidden border-border bg-card hover:border-primary/30 transition-all">
               {/* Thumbnail area */}
-              <div className="relative bg-muted aspect-video flex items-center justify-center">
-                <div className="absolute inset-0 opacity-5" style={{
-                  backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, hsl(var(--primary) / 0.05) 2px, hsl(var(--primary) / 0.05) 4px)',
-                }} />
-
-                {isOnline ? (
-                  <Video className="w-10 h-10 text-primary/20" />
+              <div className="relative bg-black aspect-video flex items-center justify-center overflow-hidden">
+                {isOnline && defaultMediaServerIp ? (
+                  <iframe
+                    src={`http://${getServerIpForClient(camera.client_id)}:${webrtcPort}/${camera.stream_key || camera.id}/`}
+                    className="absolute inset-0 w-full h-full border-0"
+                    allow="autoplay; muted"
+                    loading="lazy"
+                  />
+                ) : camera.snapshot_url ? (
+                  <img
+                    src={camera.snapshot_url}
+                    alt={camera.name}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    loading="lazy"
+                  />
                 ) : (
-                  <div className="flex flex-col items-center gap-1.5 text-muted-foreground">
-                    <VideoOff className="w-8 h-8" />
-                    <span className="text-[10px] font-mono">SEM SINAL</span>
-                  </div>
+                  <>
+                    <div className="absolute inset-0 opacity-5" style={{
+                      backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, hsl(var(--primary) / 0.05) 2px, hsl(var(--primary) / 0.05) 4px)',
+                    }} />
+                    <div className="flex flex-col items-center gap-1.5 text-muted-foreground">
+                      <VideoOff className="w-8 h-8" />
+                      <span className="text-[10px] font-mono">SEM SINAL</span>
+                    </div>
+                  </>
                 )}
 
                 {/* Status badge */}
