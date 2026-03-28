@@ -546,12 +546,18 @@ const Settings = () => {
            {/* Permissions Matrix */}
            <Card className="bg-card border-border">
              <CardHeader className="pb-3">
-               <div>
-                 <CardTitle className="text-base">Matriz de Permissões</CardTitle>
-                 <CardDescription className="text-xs">
-                   Clique nos toggles para ajustar as permissões de cada nível. As alterações são salvas automaticamente. O nível Admin sempre tem acesso total.
-                 </CardDescription>
-               </div>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">Matriz de Permissões</CardTitle>
+                  {permissionsDirty && (
+                    <Button size="sm" onClick={handleSavePermissions} disabled={permissionsSaving} className="gap-1.5">
+                      {permissionsSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      Salvar Permissões
+                    </Button>
+                  )}
+                </div>
+                <CardDescription className="text-xs">
+                  Ajuste os toggles e clique em &quot;Salvar Permissões&quot; para aplicar. O nível Admin sempre tem acesso total.
+                </CardDescription>
              </CardHeader>
             <CardContent>
               {permissionsLoading ? (
