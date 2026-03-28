@@ -510,11 +510,16 @@ const Settings = () => {
                <div>
                  <CardTitle className="text-base">Matriz de Permissões</CardTitle>
                  <CardDescription className="text-xs">
-                   Referência visual dos acessos de cada nível. As permissões são aplicadas automaticamente no banco de dados via políticas de segurança (RLS).
+                   Clique nos toggles para ajustar as permissões de cada nível. As alterações são salvas automaticamente. O nível Admin sempre tem acesso total.
                  </CardDescription>
                </div>
              </CardHeader>
             <CardContent>
+              {permissionsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -529,19 +534,25 @@ const Settings = () => {
                   {permissionModules.map(mod => (
                     <TableRow key={mod.key}>
                       <TableCell className="font-medium text-sm">{mod.label}</TableCell>
-                      {(['n1', 'n2', 'n3', 'admin'] as const).map(level => (
-                        <TableCell key={level} className="text-center">
-                          <Switch
-                             checked={defaultPermissions[level][mod.key]}
-                             disabled={true}
-                             className="mx-auto"
-                           />
-                        </TableCell>
-                      ))}
+                      {(['n1', 'n2', 'n3', 'admin'] as const).map(level => {
+                        const isChecked = permissionMap[level]?.[mod.key] ?? false;
+                        const isAdmin = level === 'admin';
+                        return (
+                          <TableCell key={level} className="text-center">
+                            <Switch
+                              checked={isChecked}
+                              disabled={isAdmin}
+                              onCheckedChange={() => handleTogglePermission(level, mod.key, isChecked)}
+                              className="mx-auto"
+                            />
+                          </TableCell>
+                        );
+                      })}
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+              )}
             </CardContent>
           </Card>
 
