@@ -104,9 +104,35 @@ const CompanySettings = () => {
     }
   };
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: 'Arquivo muito grande', description: 'Máximo permitido: 2MB', variant: 'destructive' });
+      return;
+    }
+
+    if (isLocal) {
+      try {
+        const base64 = await fileToBase64(file);
+        setLogoPreview(base64);
+        setForm(p => ({ ...p, logo_url: base64 }));
+        toast({ title: 'Logo carregado. Clique em Salvar para aplicar.' });
+      } catch {
+        toast({ title: 'Erro ao processar logo', variant: 'destructive' });
+      }
+      return;
+    }
 
     const fileExt = file.name.split('.').pop();
     const filePath = `company/logo.${fileExt}`;
@@ -128,7 +154,7 @@ const CompanySettings = () => {
     const logoUrl = urlData.signedUrl;
     setLogoPreview(logoUrl);
     setForm(p => ({ ...p, logo_url: logoUrl }));
-     queryClient.invalidateQueries({ queryKey: companySettingsQueryKey });
+    queryClient.invalidateQueries({ queryKey: companySettingsQueryKey });
     toast({ title: 'Logo enviado com sucesso' });
   };
 
@@ -138,6 +164,18 @@ const CompanySettings = () => {
 
     if (file.size > 5 * 1024 * 1024) {
       toast({ title: 'Arquivo muito grande', description: 'Máximo permitido: 5MB', variant: 'destructive' });
+      return;
+    }
+
+    if (isLocal) {
+      try {
+        const base64 = await fileToBase64(file);
+        setLoginBgPreview(base64);
+        setForm(p => ({ ...p, login_bg_url: base64 }));
+        toast({ title: 'Imagem carregada. Clique em Salvar para aplicar.' });
+      } catch {
+        toast({ title: 'Erro ao processar imagem', variant: 'destructive' });
+      }
       return;
     }
 
