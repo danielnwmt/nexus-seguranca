@@ -6,9 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Lock, Mail, AlertCircle, ShieldAlert, Smartphone } from 'lucide-react';
+import { Lock, Mail, AlertCircle, ShieldAlert } from 'lucide-react';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
-import { QRCodeSVG } from 'qrcode.react';
 
 // Animated particle network background
 const ParticleBackground = () => {
@@ -236,28 +235,6 @@ const Login = () => {
             )}
           </form>
 
-          {/* QR Code para App Mobile */}
-          <div className="mt-6 pt-5 border-t border-white/10">
-            <div className="flex flex-col items-center gap-3">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Smartphone className="w-3.5 h-3.5 text-primary" />
-                <span>Baixe o App no seu celular</span>
-              </div>
-              <div className="bg-white p-2.5 rounded-xl shadow-lg">
-                <QRCodeSVG
-                  value={`${window.location.origin}/install`}
-                  size={120}
-                  bgColor="#ffffff"
-                  fgColor="#0a0f14"
-                  level="M"
-                  includeMargin={false}
-                />
-              </div>
-              <p className="text-[10px] text-muted-foreground/70 text-center">
-                Escaneie com a câmera para instalar
-              </p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
