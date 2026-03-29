@@ -99,6 +99,9 @@ async function getRecordingBaseDirs() {
   const bases = new Set([
     '/opt/nexus-monitoramento/gravacoes',
     '/opt/nexus-monitoramento/recordings',
+    '/opt/nexus-monitoramento',
+    '/monitoramento/gravacoes',
+    '/monitoramento/recordings',
     'C:\\Gravacoes',
     'D:\\Gravacoes',
   ]);
@@ -214,6 +217,8 @@ async function resolveExistingRecordingPath(filePath) {
 
   pushCandidate(decodedPath);
   pushCandidate(normalizedSlashes);
+  pushCandidate(`/${decodedPath.replace(/^\/+/, '')}`);
+  pushCandidate(`/${normalizedSlashes.replace(/^\/+/, '')}`);
   pushCandidate(decodedPath.replace('/recordings/', '/gravacoes/'));
   pushCandidate(decodedPath.replace('/gravacoes/', '/recordings/'));
   pushCandidate(normalizedSlashes.replace(`${pathMod.sep}recordings${pathMod.sep}`, `${pathMod.sep}gravacoes${pathMod.sep}`));
@@ -274,6 +279,21 @@ async function resolveExistingRecordingPath(filePath) {
   }
 
   return null;
+}
+
+async function getRecordingFilePathById(recordingId) {
+  if (!recordingId) return null;
+
+  try {
+    const result = await pool.query(
+      `SELECT file_path FROM recordings WHERE id = $1 LIMIT 1`,
+      [recordingId]
+    );
+    return result.rows[0] ? result.rows[0].file_path : null;
+  } catch (err) {
+    console.warn('[recording-file] Não foi possível buscar gravação por id:', err.message);
+    return null;
+  }
 }
 
 function getLocalServerContext() {
@@ -1456,16 +1476,33 @@ WantedBy=multi-user.target
       const payload = verifyJWT(token);
       if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
 
+      const recordingId = url.searchParams.get('recording_id') || url.searchParams.get('id');
       const filePath = url.searchParams.get('path');
-      if (!filePath) return sendJSON(res, 400, { error: 'path parameter required' });
+      const dbFilePath = await getRecordingFilePathById(recordingId);
+      const requestedPath = filePath || dbFilePath;
 
-      const resolved = await resolveExistingRecordingPath(filePath);
+      if (!requestedPath) {
+        return sendJSON(res, 400, { error: 'path or recording_id parameter required' });
+      }
+
+      let resolved = await resolveExistingRecordingPath(requestedPath);
+      if (!resolved && dbFilePath && dbFilePath !== requestedPath) {
+        resolved = await resolveExistingRecordingPath(dbFilePath);
+      }
+
       if (!resolved) {
         console.warn('[recording-file] Arquivo não encontrado', {
-          requested_path: filePath,
+          recording_id: recordingId,
+          requested_path: requestedPath,
+          db_file_path: dbFilePath,
           base_dirs: await getRecordingBaseDirs(),
         });
-        return sendJSON(res, 404, { error: 'Arquivo não encontrado', requested_path: filePath });
+        return sendJSON(res, 404, {
+          error: 'Arquivo não encontrado',
+          recording_id: recordingId,
+          requested_path: requestedPath,
+          db_file_path: dbFilePath,
+        });
       }
 
       try {
@@ -1495,6 +1532,8 @@ WantedBy=multi-user.target
             'Content-Type': contentType,
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Headers': CORS_HEADERS,
+            'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Content-Disposition, Content-Type',
+            'Cache-Control': 'no-store',
             ...dispositionHeader,
           });
           fs.createReadStream(resolved, { start, end }).pipe(res);
@@ -1505,6 +1544,8 @@ WantedBy=multi-user.target
             'Accept-Ranges': 'bytes',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Headers': CORS_HEADERS,
+            'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Content-Disposition, Content-Type',
+            'Cache-Control': 'no-store',
             ...dispositionHeader,
           });
           fs.createReadStream(resolved).pipe(res);

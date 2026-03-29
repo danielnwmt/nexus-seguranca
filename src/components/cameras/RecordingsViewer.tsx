@@ -72,6 +72,18 @@ const getRecordingPathVariants = (filePath: string) => {
   return Array.from(variants).filter(Boolean);
 };
 
+const buildLocalRecordingUrl = (rec: any, options?: { path?: string; download?: boolean }) => {
+  const token = getLocalSessionToken();
+  const params = new URLSearchParams();
+
+  if (rec?.id) params.set('recording_id', rec.id);
+  if (options?.path || rec?.file_path) params.set('path', options?.path || rec.file_path);
+  if (token) params.set('token', token);
+  if (options?.download) params.set('download', '1');
+
+  return `${getLocalApiBase()}/api/cameras/recording/file?${params.toString()}`;
+};
+
 type Segment = {
   id: string;
   startPct: number;
@@ -370,14 +382,12 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
     if (rec?.file_path) {
       let url: string;
       if (isLocalInstallation()) {
-        const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
-        const token = session.access_token || '';
-        url = `${getLocalApiBase()}/api/cameras/recording/file?path=${encodeURIComponent(rec.file_path)}&token=${encodeURIComponent(token)}`;
+        url = buildLocalRecordingUrl(rec, { download: true });
       } else {
         url = rec.file_path;
       }
               const a = document.createElement('a');
-      a.href = url + (url.includes('?') ? '&' : '?') + 'download=1';
+      a.href = isLocalInstallation() ? url : url + (url.includes('?') ? '&' : '?') + 'download=1';
       a.download = `${camera?.name || 'gravacao'}_${minutesToTime(pointA).replace(/:/g, '-')}.mp4`;
       document.body.appendChild(a);
       a.click();
@@ -391,8 +401,7 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
   const getVideoSrc = (rec: any) => {
     if (!rec?.file_path) return '';
     if (isLocalInstallation()) {
-      const token = getLocalSessionToken();
-      return `${getLocalApiBase()}/api/cameras/recording/file?path=${encodeURIComponent(rec.file_path)}&token=${encodeURIComponent(token)}`;
+      return buildLocalRecordingUrl(rec);
     }
     return rec.file_path;
   };
@@ -401,9 +410,8 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
     if (!rec?.file_path) return [];
     if (!isLocalInstallation()) return [rec.file_path];
 
-    const token = getLocalSessionToken();
     return getRecordingPathVariants(rec.file_path).map(
-      (path) => `${getLocalApiBase()}/api/cameras/recording/file?path=${encodeURIComponent(path)}&token=${encodeURIComponent(token)}`
+      (path) => buildLocalRecordingUrl(rec, { path })
     );
   };
 
@@ -449,7 +457,7 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
               <>
                 <video
                   ref={videoRef}
-                  key={playingId}
+                  key={`${playingId}-${videoSrcIndex}`}
                   src={currentVideoSources[videoSrcIndex] || getVideoSrc(currentRec)}
                   className="w-full h-full object-contain"
                   autoPlay
@@ -748,6 +756,7 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
                         playingId === rec.id && "bg-primary/10 border-l-2 border-l-primary"
                       )}
                       onClick={() => {
+                        setVideoSrcIndex(0);
                         setPlayingId(rec.id);
                         const start = new Date(rec.start_time);
                         setCursorMinutes(start.getHours() * 60 + start.getMinutes() + start.getSeconds() / 60);
@@ -764,15 +773,15 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
                       </TableCell>
                       <TableCell className="py-1.5">
                         <div className="flex gap-0.5">
-                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setPlayingId(rec.id); }}>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setVideoSrcIndex(0); setPlayingId(rec.id); }}>
                             <Play className="w-3 h-3" />
                           </Button>
                           {rec.file_path && (
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => {
                               e.stopPropagation();
-                              const url = getVideoSrc(rec);
+                              const url = isLocalInstallation() ? buildLocalRecordingUrl(rec, { download: true }) : getVideoSrc(rec);
                               const a = document.createElement('a');
-                              a.href = url + (url.includes('?') ? '&' : '?') + 'download=1';
+                              a.href = isLocalInstallation() ? url : url + (url.includes('?') ? '&' : '?') + 'download=1';
                               a.download = `${rec.camera_name || 'gravacao'}_${format(new Date(rec.start_time), 'HH-mm-ss')}.mp4`;
                               document.body.appendChild(a);
                               a.click();
