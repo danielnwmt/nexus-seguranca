@@ -1309,6 +1309,7 @@ WantedBy=multi-user.target
             'Content-Type': contentType,
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Headers': CORS_HEADERS,
+            ...dispositionHeader,
           });
           fs.createReadStream(resolved, { start, end }).pipe(res);
         } else {
@@ -1318,6 +1319,7 @@ WantedBy=multi-user.target
             'Accept-Ranges': 'bytes',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Headers': CORS_HEADERS,
+            ...dispositionHeader,
           });
           fs.createReadStream(resolved).pipe(res);
         }
