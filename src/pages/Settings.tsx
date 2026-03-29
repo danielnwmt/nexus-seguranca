@@ -731,8 +731,14 @@ const Settings = () => {
                     <p className="text-xs text-muted-foreground">Escaneie com seu celular para acessar o sistema</p>
                   </div>
                 </div>
-                <div className="w-40 h-40 bg-muted border border-border rounded-lg flex items-center justify-center">
-                  <QrCode className="w-20 h-20 text-muted-foreground/50" />
+                <div className="bg-white p-3 rounded-lg inline-block">
+                  <QRCodeSVG
+                    value={`${systemUrl}/install`}
+                    size={140}
+                    bgColor="#ffffff"
+                    fgColor="#0a0f14"
+                    level="M"
+                  />
                 </div>
               </div>
 
