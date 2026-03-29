@@ -278,7 +278,16 @@ const Settings = () => {
 
   // ---- PWA ----
   const [pwaEnabled, setPwaEnabled] = useState(true);
-  const systemUrl = window.location.origin;
+  const defaultUrl = window.location.origin;
+  const [systemUrl, setSystemUrl] = useState(() => {
+    return localStorage.getItem('nexus-system-url') || defaultUrl;
+  });
+
+  useEffect(() => {
+    if (systemUrl && systemUrl !== defaultUrl) {
+      localStorage.setItem('nexus-system-url', systemUrl);
+    }
+  }, [systemUrl, defaultUrl]);
 
   // ---- User Dialog ----
   const [userDialogOpen, setUserDialogOpen] = useState(false);
