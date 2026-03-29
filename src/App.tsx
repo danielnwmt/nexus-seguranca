@@ -29,6 +29,7 @@ import Stock from "./pages/Stock";
 import Quotes from "./pages/Quotes";
 import Sales from "./pages/Sales";
 import NotFound from "./pages/NotFound";
+import Install from "./pages/Install";
 
 const queryClient = new QueryClient();
 
