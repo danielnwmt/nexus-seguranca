@@ -340,7 +340,12 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
       } else {
         url = rec.file_path;
       }
-      window.open(url, '_blank');
+              const a = document.createElement('a');
+      a.href = url + (url.includes('?') ? '&' : '?') + 'download=1';
+      a.download = `${camera?.name || 'gravacao'}_${minutesToTime(pointA).replace(/:/g, '-')}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       toast({ title: `Baixando trecho ${minutesToTime(pointA)} → ${minutesToTime(pointB)}` });
     } else {
       toast({ title: 'Arquivo não disponível para download', variant: 'destructive' });
@@ -707,7 +712,13 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
                           {rec.file_path && (
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => {
                               e.stopPropagation();
-                              window.open(getVideoSrc(rec), '_blank');
+                              const url = getVideoSrc(rec);
+                              const a = document.createElement('a');
+                              a.href = url + (url.includes('?') ? '&' : '?') + 'download=1';
+                              a.download = `${rec.camera_name || 'gravacao'}_${format(new Date(rec.start_time), 'HH-mm-ss')}.mp4`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
                             }}>
                               <Download className="w-3 h-3" />
                             </Button>
