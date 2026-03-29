@@ -344,9 +344,12 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
 
   const getVideoSrc = (rec: any) => {
     if (!rec?.file_path) return '';
-    return isLocalInstallation()
-      ? `${getLocalApiBase()}/api/cameras/recording/file?path=${encodeURIComponent(rec.file_path)}`
-      : rec.file_path;
+    if (isLocalInstallation()) {
+      const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
+      const token = session.access_token || '';
+      return `${getLocalApiBase()}/api/cameras/recording/file?path=${encodeURIComponent(rec.file_path)}&token=${encodeURIComponent(token)}`;
+    }
+    return rec.file_path;
   };
 
   const segments = getSegments();
