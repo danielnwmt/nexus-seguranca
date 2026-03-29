@@ -723,13 +723,22 @@ const Settings = () => {
               </div>
 
               <div className="border-t border-border pt-4 space-y-2">
-                <Label className="text-xs text-muted-foreground">URL do Sistema</Label>
+                <Label className="text-xs text-muted-foreground">URL do Sistema (use o IP da rede local para acesso pelo celular)</Label>
                 <div className="flex gap-2">
-                  <Input value={systemUrl} readOnly className="bg-muted border-border font-mono text-sm" />
+                  <Input 
+                    value={systemUrl} 
+                    onChange={(e) => setSystemUrl(e.target.value)}
+                    placeholder="Ex: http://192.168.1.100:8080"
+                    className="bg-muted border-border font-mono text-sm" 
+                  />
+                  <Button variant="outline" size="sm" onClick={() => setSystemUrl(defaultUrl)} title="Restaurar URL padrão">
+                    <RefreshCw className="w-4 h-4" />
+                  </Button>
                   <Button variant="outline" size="icon" onClick={() => { navigator.clipboard.writeText(systemUrl); toast({ title: 'URL copiada!' }); }}>
                     <Copy className="w-4 h-4" />
                   </Button>
                 </div>
+                <p className="text-[10px] text-muted-foreground">Altere para o IP da sua rede (ex: http://192.168.1.100:8080) para o QR Code funcionar no celular</p>
               </div>
 
               <div className="border-t border-border pt-4">
