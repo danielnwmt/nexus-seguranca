@@ -332,9 +332,14 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
     }
     const rec = recordings.find(r => r.id === overlapping[0].id);
     if (rec?.file_path) {
-      const url = isLocalInstallation()
-        ? `${getLocalApiBase()}/api/cameras/recording/file?path=${encodeURIComponent(rec.file_path)}`
-        : rec.file_path;
+      let url: string;
+      if (isLocalInstallation()) {
+        const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
+        const token = session.access_token || '';
+        url = `${getLocalApiBase()}/api/cameras/recording/file?path=${encodeURIComponent(rec.file_path)}&token=${encodeURIComponent(token)}`;
+      } else {
+        url = rec.file_path;
+      }
       window.open(url, '_blank');
       toast({ title: `Baixando trecho ${minutesToTime(pointA)} → ${minutesToTime(pointB)}` });
     } else {
@@ -344,9 +349,12 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
 
   const getVideoSrc = (rec: any) => {
     if (!rec?.file_path) return '';
-    return isLocalInstallation()
-      ? `${getLocalApiBase()}/api/cameras/recording/file?path=${encodeURIComponent(rec.file_path)}`
-      : rec.file_path;
+    if (isLocalInstallation()) {
+      const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
+      const token = session.access_token || '';
+      return `${getLocalApiBase()}/api/cameras/recording/file?path=${encodeURIComponent(rec.file_path)}&token=${encodeURIComponent(token)}`;
+    }
+    return rec.file_path;
   };
 
   const segments = getSegments();

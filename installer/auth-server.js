@@ -1267,9 +1267,11 @@ WantedBy=multi-user.target
 
     // ---- SERVIR ARQUIVO DE GRAVAÇÃO ----
     if (path.startsWith('/api/cameras/recording/file') && req.method === 'GET') {
+      // Accept token via Authorization header OR ?token= query parameter (needed for <video src>)
       const authHeader = req.headers.authorization;
-      if (!authHeader) return sendJSON(res, 401, { error: 'Not authenticated' });
-      const token = authHeader.replace('Bearer ', '');
+      const queryToken = url.searchParams.get('token');
+      const token = authHeader ? authHeader.replace('Bearer ', '') : queryToken;
+      if (!token) return sendJSON(res, 401, { error: 'Not authenticated' });
       const payload = verifyJWT(token);
       if (!payload) return sendJSON(res, 401, { error: 'Invalid token' });
 
