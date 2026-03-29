@@ -6,8 +6,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Lock, Mail, AlertCircle, ShieldAlert } from 'lucide-react';
+import { Lock, Mail, AlertCircle, ShieldAlert, Smartphone } from 'lucide-react';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { QRCodeSVG } from 'qrcode.react';
 
 // Animated particle network background
 const ParticleBackground = () => {
