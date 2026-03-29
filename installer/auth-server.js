@@ -116,7 +116,18 @@ async function getRecordingBaseDirs() {
 
     for (const row of result.rows) {
       const value = String(row.storage_path || '').trim();
-      if (value) bases.add(pathMod.normalize(value));
+      if (!value) continue;
+
+      const normalized = pathMod.normalize(value);
+      bases.add(normalized);
+
+      if (!pathMod.isAbsolute(normalized) && /^[A-Za-z0-9]/.test(normalized)) {
+        bases.add(pathMod.normalize(`${pathMod.sep}${normalized}`));
+      }
+
+      if (pathMod.basename(normalized)) {
+        bases.add(pathMod.dirname(normalized));
+      }
     }
   } catch (err) {
     console.warn('[recording-file] Não foi possível carregar storage_path do banco:', err.message);
@@ -209,8 +220,24 @@ async function resolveExistingRecordingPath(filePath) {
   pushCandidate(normalizedSlashes.replace(`${pathMod.sep}gravacoes${pathMod.sep}`, `${pathMod.sep}recordings${pathMod.sep}`));
 
   for (const relativeVariant of buildRelativeVariants(normalizedSlashes)) {
+    const relativeParts = relativeVariant.split(pathMod.sep).filter(Boolean);
+
     for (const baseDir of commonBases) {
       pushCandidate(pathMod.join(baseDir, relativeVariant));
+      pushCandidate(pathMod.join(pathMod.dirname(baseDir), relativeVariant));
+
+      if (relativeParts.length > 1) {
+        const baseName = pathMod.basename(baseDir).toLowerCase();
+        const firstPart = relativeParts[0].toLowerCase();
+
+        if (baseName === firstPart) {
+          pushCandidate(pathMod.join(baseDir, ...relativeParts.slice(1)));
+        }
+
+        if (baseName === 'gravacoes' || baseName === 'recordings') {
+          pushCandidate(pathMod.join(baseDir, ...relativeParts));
+        }
+      }
     }
   }
 
@@ -1434,7 +1461,10 @@ WantedBy=multi-user.target
 
       const resolved = await resolveExistingRecordingPath(filePath);
       if (!resolved) {
-        console.warn('[recording-file] Arquivo não encontrado', { requested_path: filePath });
+        console.warn('[recording-file] Arquivo não encontrado', {
+          requested_path: filePath,
+          base_dirs: await getRecordingBaseDirs(),
+        });
         return sendJSON(res, 404, { error: 'Arquivo não encontrado', requested_path: filePath });
       }
 
