@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Settings as SettingsIcon, Building2, ShieldCheck, RefreshCw, Save, Plus, Trash2, Edit, Smartphone, Copy, QrCode, Store, Server, HardDrive, Bot, Globe, Palette, Loader2, KeyRound, Eye, EyeOff, Bell } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useRolePermissions, useUpdateRolePermission, buildPermissionMap } from '@/hooks/useRolePermissions';
 import CompanySettings from '@/components/settings/CompanySettings';
 import StorageServers from '@/components/settings/StorageServers';
@@ -730,8 +731,14 @@ const Settings = () => {
                     <p className="text-xs text-muted-foreground">Escaneie com seu celular para acessar o sistema</p>
                   </div>
                 </div>
-                <div className="w-40 h-40 bg-muted border border-border rounded-lg flex items-center justify-center">
-                  <QrCode className="w-20 h-20 text-muted-foreground/50" />
+                <div className="bg-white p-3 rounded-lg inline-block">
+                  <QRCodeSVG
+                    value={`${systemUrl}/install`}
+                    size={140}
+                    bgColor="#ffffff"
+                    fgColor="#0a0f14"
+                    level="M"
+                  />
                 </div>
               </div>
 
