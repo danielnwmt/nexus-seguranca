@@ -41,6 +41,37 @@ const minutesToTime = (mins: number) => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 };
 
+const getLocalSessionToken = () => {
+  try {
+    const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
+    return session.access_token || '';
+  } catch {
+    return '';
+  }
+};
+
+const getRecordingPathVariants = (filePath: string) => {
+  const normalized = String(filePath || '').trim();
+  if (!normalized) return [];
+
+  const normalizedSlashes = normalized.replace(/\\/g, '/');
+  const variants = new Set<string>([
+    normalizedSlashes,
+    normalizedSlashes.replace('/recordings/', '/gravacoes/'),
+    normalizedSlashes.replace('/gravacoes/', '/recordings/'),
+  ]);
+
+  const parts = normalizedSlashes.split('/').filter(Boolean);
+  if (parts.length >= 2) {
+    variants.add(`/${parts.slice(-2).join('/')}`);
+  }
+  if (parts.length >= 3) {
+    variants.add(`/${parts.slice(-3).join('/')}`);
+  }
+
+  return Array.from(variants).filter(Boolean);
+};
+
 type Segment = {
   id: string;
   startPct: number;
@@ -64,6 +95,7 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
   const [pointB, setPointB] = useState<number | null>(null);
   const [autoDateDone, setAutoDateDone] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
+  const [videoSrcIndex, setVideoSrcIndex] = useState(0);
   const timelineRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const animFrameRef = useRef<number>(0);
@@ -181,6 +213,10 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    setVideoSrcIndex(0);
+  }, [playingId]);
 
   // Handle video events
   const handleVideoPlay = () => {
@@ -355,11 +391,20 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
   const getVideoSrc = (rec: any) => {
     if (!rec?.file_path) return '';
     if (isLocalInstallation()) {
-      const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
-      const token = session.access_token || '';
+      const token = getLocalSessionToken();
       return `${getLocalApiBase()}/api/cameras/recording/file?path=${encodeURIComponent(rec.file_path)}&token=${encodeURIComponent(token)}`;
     }
     return rec.file_path;
+  };
+
+  const getVideoSrcCandidates = (rec: any) => {
+    if (!rec?.file_path) return [];
+    if (!isLocalInstallation()) return [rec.file_path];
+
+    const token = getLocalSessionToken();
+    return getRecordingPathVariants(rec.file_path).map(
+      (path) => `${getLocalApiBase()}/api/cameras/recording/file?path=${encodeURIComponent(path)}&token=${encodeURIComponent(token)}`
+    );
   };
 
   const segments = getSegments();
@@ -374,6 +419,7 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
 
   const currentRecIndex = recordings.findIndex(r => r.id === playingId);
   const currentRec = currentRecIndex >= 0 ? recordings[currentRecIndex] : null;
+  const currentVideoSources = currentRec ? getVideoSrcCandidates(currentRec) : [];
 
   if (!camera) return null;
 
@@ -404,7 +450,7 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
                 <video
                   ref={videoRef}
                   key={playingId}
-                  src={getVideoSrc(currentRec)}
+                  src={currentVideoSources[videoSrcIndex] || getVideoSrc(currentRec)}
                   className="w-full h-full object-contain"
                   autoPlay
                   muted={isMuted}
@@ -415,6 +461,18 @@ const RecordingsViewer = ({ open, onOpenChange, camera }: RecordingsViewerProps)
                     if (videoRef.current) {
                       videoRef.current.playbackRate = playbackSpeed;
                     }
+                  }}
+                  onError={() => {
+                    if (isLocalInstallation() && videoSrcIndex < currentVideoSources.length - 1) {
+                      setVideoSrcIndex((prev) => prev + 1);
+                      return;
+                    }
+
+                    toast({
+                      title: 'Arquivo não disponível para reprodução',
+                      description: currentRec?.file_path || 'Verifique o caminho da gravação no servidor local.',
+                      variant: 'destructive',
+                    });
                   }}
                 />
                 {/* DVR overlay controls */}
