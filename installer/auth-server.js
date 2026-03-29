@@ -95,6 +95,64 @@ function sendJSON(res, status, data) {
   res.end(JSON.stringify(data));
 }
 
+function resolveExistingRecordingPath(filePath) {
+  if (!filePath || typeof filePath !== 'string') return null;
+
+  const decodedPath = decodeURIComponent(filePath).trim();
+  const normalizedSlashes = decodedPath.replace(/\\/g, pathMod.sep);
+  const basename = pathMod.basename(normalizedSlashes);
+  const pathParts = normalizedSlashes.split(/[\\/]+/).filter(Boolean);
+  const candidates = new Set();
+
+  const pushCandidate = (candidate) => {
+    if (!candidate || typeof candidate !== 'string') return;
+    const trimmed = candidate.trim();
+    if (!trimmed) return;
+    candidates.add(pathMod.normalize(trimmed));
+    if (!pathMod.isAbsolute(trimmed)) {
+      candidates.add(pathMod.resolve(trimmed));
+      candidates.add(pathMod.normalize(`${pathMod.sep}${trimmed}`));
+    }
+  };
+
+  pushCandidate(decodedPath);
+  pushCandidate(normalizedSlashes);
+  pushCandidate(decodedPath.replace('/recordings/', '/gravacoes/'));
+  pushCandidate(decodedPath.replace('/gravacoes/', '/recordings/'));
+  pushCandidate(normalizedSlashes.replace(`${pathMod.sep}recordings${pathMod.sep}`, `${pathMod.sep}gravacoes${pathMod.sep}`));
+  pushCandidate(normalizedSlashes.replace(`${pathMod.sep}gravacoes${pathMod.sep}`, `${pathMod.sep}recordings${pathMod.sep}`));
+
+  const commonBases = [
+    '/opt/nexus-monitoramento/gravacoes',
+    '/opt/nexus-monitoramento/recordings',
+    'C:\\Gravacoes',
+    'D:\\Gravacoes',
+  ];
+
+  if (pathParts.length >= 3) {
+    const tail3 = pathParts.slice(-3);
+    for (const baseDir of commonBases) {
+      pushCandidate(pathMod.join(baseDir, ...tail3));
+    }
+  }
+
+  if (basename) {
+    for (const baseDir of commonBases) {
+      pushCandidate(pathMod.join(baseDir, basename));
+    }
+  }
+
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+        return candidate;
+      }
+    } catch {}
+  }
+
+  return null;
+ }
+
 function getLocalServerContext() {
   const nets = os.networkInterfaces();
   let localIp = '127.0.0.1';
@@ -1278,9 +1336,10 @@ WantedBy=multi-user.target
       const filePath = url.searchParams.get('path');
       if (!filePath) return sendJSON(res, 400, { error: 'path parameter required' });
 
-      // Validação de segurança: impedir path traversal
-      const resolved = pathMod.resolve(filePath);
-      if (!fs.existsSync(resolved)) return sendJSON(res, 404, { error: 'Arquivo não encontrado' });
+      const resolved = resolveExistingRecordingPath(filePath);
+      if (!resolved) {
+        return sendJSON(res, 404, { error: 'Arquivo não encontrado', requested_path: filePath });
+      }
 
       try {
         const stat = fs.statSync(resolved);
