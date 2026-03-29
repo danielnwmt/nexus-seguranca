@@ -95,7 +95,72 @@ function sendJSON(res, status, data) {
   res.end(JSON.stringify(data));
 }
 
-function resolveExistingRecordingPath(filePath) {
+async function getRecordingBaseDirs() {
+  const bases = new Set([
+    '/opt/nexus-monitoramento/gravacoes',
+    '/opt/nexus-monitoramento/recordings',
+    'C:\\Gravacoes',
+    'D:\\Gravacoes',
+  ]);
+
+  try {
+    const result = await pool.query(`
+      SELECT DISTINCT storage_path
+      FROM (
+        SELECT storage_path FROM cameras
+        UNION ALL
+        SELECT storage_path FROM storage_servers
+      ) paths
+      WHERE storage_path IS NOT NULL AND btrim(storage_path) != ''
+    `);
+
+    for (const row of result.rows) {
+      const value = String(row.storage_path || '').trim();
+      if (value) bases.add(pathMod.normalize(value));
+    }
+  } catch (err) {
+    console.warn('[recording-file] Não foi possível carregar storage_path do banco:', err.message);
+  }
+
+  return Array.from(bases);
+}
+
+function findFileByBasename(startDir, targetName, maxDepth, maxEntries) {
+  if (!startDir || !targetName) return null;
+
+  const queue = [{ dir: startDir, depth: 0 }];
+  let visited = 0;
+
+  while (queue.length > 0 && visited < maxEntries) {
+    const current = queue.shift();
+    if (!current) break;
+
+    let entries = [];
+    try {
+      entries = fs.readdirSync(current.dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      visited += 1;
+      if (visited >= maxEntries) break;
+
+      const fullPath = pathMod.join(current.dir, entry.name);
+      if (entry.isFile() && entry.name === targetName) {
+        return fullPath;
+      }
+
+      if (entry.isDirectory() && current.depth < maxDepth) {
+        queue.push({ dir: fullPath, depth: current.depth + 1 });
+      }
+    }
+  }
+
+  return null;
+}
+
+async function resolveExistingRecordingPath(filePath) {
   if (!filePath || typeof filePath !== 'string') return null;
 
   const decodedPath = decodeURIComponent(filePath).trim();
@@ -103,6 +168,7 @@ function resolveExistingRecordingPath(filePath) {
   const basename = pathMod.basename(normalizedSlashes);
   const pathParts = normalizedSlashes.split(/[\\/]+/).filter(Boolean);
   const candidates = new Set();
+  const commonBases = await getRecordingBaseDirs();
 
   const pushCandidate = (candidate) => {
     if (!candidate || typeof candidate !== 'string') return;
@@ -115,6 +181,26 @@ function resolveExistingRecordingPath(filePath) {
     }
   };
 
+  const buildRelativeVariants = (inputPath) => {
+    const variants = new Set();
+    if (!inputPath) return variants;
+
+    const normalized = inputPath.replace(/\\/g, '/');
+    variants.add(normalized.replace(/^([A-Za-z]:)?\//, ''));
+
+    const markers = ['/gravacoes/', '/recordings/'];
+    for (const marker of markers) {
+      const idx = normalized.toLowerCase().indexOf(marker);
+      if (idx >= 0) {
+        variants.add(normalized.slice(idx + marker.length));
+      }
+    }
+
+    return Array.from(variants)
+      .map((value) => value.split('/').filter(Boolean).join(pathMod.sep))
+      .filter(Boolean);
+  };
+
   pushCandidate(decodedPath);
   pushCandidate(normalizedSlashes);
   pushCandidate(decodedPath.replace('/recordings/', '/gravacoes/'));
@@ -122,17 +208,18 @@ function resolveExistingRecordingPath(filePath) {
   pushCandidate(normalizedSlashes.replace(`${pathMod.sep}recordings${pathMod.sep}`, `${pathMod.sep}gravacoes${pathMod.sep}`));
   pushCandidate(normalizedSlashes.replace(`${pathMod.sep}gravacoes${pathMod.sep}`, `${pathMod.sep}recordings${pathMod.sep}`));
 
-  const commonBases = [
-    '/opt/nexus-monitoramento/gravacoes',
-    '/opt/nexus-monitoramento/recordings',
-    'C:\\Gravacoes',
-    'D:\\Gravacoes',
-  ];
-
-  if (pathParts.length >= 3) {
-    const tail3 = pathParts.slice(-3);
+  for (const relativeVariant of buildRelativeVariants(normalizedSlashes)) {
     for (const baseDir of commonBases) {
-      pushCandidate(pathMod.join(baseDir, ...tail3));
+      pushCandidate(pathMod.join(baseDir, relativeVariant));
+    }
+  }
+
+  for (const tailSize of [2, 3, 4, 5]) {
+    if (pathParts.length >= tailSize) {
+      const tail = pathParts.slice(-tailSize);
+      for (const baseDir of commonBases) {
+        pushCandidate(pathMod.join(baseDir, ...tail));
+      }
     }
   }
 
@@ -150,8 +237,17 @@ function resolveExistingRecordingPath(filePath) {
     } catch {}
   }
 
+  if (basename) {
+    for (const baseDir of commonBases) {
+      const match = findFileByBasename(baseDir, basename, 5, 2500);
+      if (match) {
+        return match;
+      }
+    }
+  }
+
   return null;
- }
+}
 
 function getLocalServerContext() {
   const nets = os.networkInterfaces();
@@ -1336,8 +1432,9 @@ WantedBy=multi-user.target
       const filePath = url.searchParams.get('path');
       if (!filePath) return sendJSON(res, 400, { error: 'path parameter required' });
 
-      const resolved = resolveExistingRecordingPath(filePath);
+      const resolved = await resolveExistingRecordingPath(filePath);
       if (!resolved) {
+        console.warn('[recording-file] Arquivo não encontrado', { requested_path: filePath });
         return sendJSON(res, 404, { error: 'Arquivo não encontrado', requested_path: filePath });
       }
 
