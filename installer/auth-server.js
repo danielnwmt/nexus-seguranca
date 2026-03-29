@@ -1288,6 +1288,12 @@ WantedBy=multi-user.target
         const mimeTypes = { '.mp4': 'video/mp4', '.webm': 'video/webm', '.mkv': 'video/x-matroska' };
         const contentType = mimeTypes[ext] || 'application/octet-stream';
 
+        // Se parâmetro download=1, forçar download
+        const isDownload = url.searchParams.get('download') === '1';
+        const dispositionHeader = isDownload
+          ? { 'Content-Disposition': `attachment; filename="${pathMod.basename(resolved)}"` }
+          : {};
+
         // Suporte a Range requests para streaming de vídeo
         const range = req.headers.range;
         if (range) {
@@ -1303,6 +1309,7 @@ WantedBy=multi-user.target
             'Content-Type': contentType,
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Headers': CORS_HEADERS,
+            ...dispositionHeader,
           });
           fs.createReadStream(resolved, { start, end }).pipe(res);
         } else {
@@ -1312,6 +1319,7 @@ WantedBy=multi-user.target
             'Accept-Ranges': 'bytes',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Headers': CORS_HEADERS,
+            ...dispositionHeader,
           });
           fs.createReadStream(resolved).pipe(res);
         }
