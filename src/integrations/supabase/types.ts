@@ -986,6 +986,7 @@ export type Database = {
           referral_code: string
           status: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           address?: string | null
@@ -999,6 +1000,7 @@ export type Database = {
           referral_code?: string
           status?: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           address?: string | null
@@ -1012,6 +1014,7 @@ export type Database = {
           referral_code?: string
           status?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -1170,6 +1173,7 @@ export type Database = {
         Returns: Json
       }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
+      current_seller_id: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
