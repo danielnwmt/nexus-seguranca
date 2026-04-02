@@ -49,7 +49,7 @@ const defaultPermissions: Record<string, Record<string, boolean>> = {
 
 const AppSidebar = () => {
   const location = useLocation();
-  const { signOut, user, userRole } = useAuth();
+  const { signOut, user, userRole, isSeller } = useAuth();
   const { data: company } = useCompanySettings();
   const { data: rolePermissionsData } = useRolePermissions();
 
@@ -61,6 +61,8 @@ const AppSidebar = () => {
   const isAdmin = role === 'admin';
 
   const visibleItems = navItems.filter(item => {
+    // Sellers only see Clients
+    if (isSeller) return item.to === '/clients';
     if (isAdmin) return true;
     if (!item.permModule) return true;
     return myPerms[item.permModule] === true;
