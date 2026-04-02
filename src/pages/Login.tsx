@@ -188,14 +188,18 @@ const Login = () => {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <Label className="text-xs text-muted-foreground mb-1.5 block">Email</Label>
+              <Label className="text-xs text-muted-foreground mb-1.5 block">Email ou CPF</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                {isCpf(identifier) ? (
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                )}
                 <Input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="seu@email.com"
+                  type="text"
+                  value={identifier}
+                  onChange={e => setIdentifier(e.target.value)}
+                  placeholder="seu@email.com ou 000.000.000-00"
                   className="pl-9 bg-white/5 border-white/10 text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50"
                   required
                   disabled={isRateLimited}
