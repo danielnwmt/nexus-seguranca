@@ -24,6 +24,7 @@ interface Seller {
   referral_code: string;
   status: string;
   created_at: string;
+  user_id: string | null;
 }
 
 interface ClientWithSeller {
