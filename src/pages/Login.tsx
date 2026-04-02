@@ -6,7 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Lock, Mail, AlertCircle, ShieldAlert } from 'lucide-react';
+import { Lock, Mail, AlertCircle, ShieldAlert, User } from 'lucide-react';
+import { maskCpf } from '@/lib/masks';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 
 // Animated particle network background
@@ -99,19 +100,30 @@ const Login = () => {
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const { data: company } = useCompanySettings();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
 
+  const isCpf = (val: string) => /^\d{3}\.?\d{3}\.?\d{3}-?\d{2}$/.test(val.trim());
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    const result = await signIn(email, password);
+    // If identifier looks like CPF, convert to seller email
+    let loginEmail = identifier.trim();
+    let loginPassword = password;
+    if (isCpf(loginEmail)) {
+      const cpfDigits = loginEmail.replace(/\D/g, '');
+      loginEmail = `${cpfDigits}@vendedor.sys`;
+      loginPassword = password || cpfDigits;
+    }
+
+    const result = await signIn(loginEmail, loginPassword);
 
     if (result.error) {
       if (result.rateLimited) {
@@ -176,14 +188,18 @@ const Login = () => {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <Label className="text-xs text-muted-foreground mb-1.5 block">Email</Label>
+              <Label className="text-xs text-muted-foreground mb-1.5 block">Email ou CPF</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                {isCpf(identifier) ? (
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                )}
                 <Input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="seu@email.com"
+                  type="text"
+                  value={identifier}
+                  onChange={e => setIdentifier(e.target.value)}
+                  placeholder="seu@email.com ou 000.000.000-00"
                   className="pl-9 bg-white/5 border-white/10 text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50"
                   required
                   disabled={isRateLimited}

@@ -24,6 +24,7 @@ interface Seller {
   referral_code: string;
   status: string;
   created_at: string;
+  user_id: string | null;
 }
 
 interface ClientWithSeller {
@@ -61,21 +62,39 @@ const Sales = () => {
     },
   });
 
+  const createSellerUser = async (sellerId: string, cpf: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('create-seller-user', {
+        body: { seller_id: sellerId, cpf },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: 'Acesso do vendedor criado!', description: `Login: CPF | Senha: CPF (somente números)` });
+    } catch (err: any) {
+      toast({ title: 'Vendedor criado, mas erro ao criar acesso', description: err.message, variant: 'destructive' });
+    }
+  };
+
   const createSeller = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from('sellers').insert({
+      const { data, error } = await supabase.from('sellers').insert({
         name: form.name,
         cpf: form.cpf || null,
         phone: form.phone || null,
         email: form.email || null,
         address: form.address || null,
         commission_percent: parseFloat(form.commission_percent) || 10,
-      });
+      }).select('id').single();
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['sellers'] });
       setOpen(false);
+      // Create user access if CPF is provided
+      if (form.cpf && data?.id) {
+        createSellerUser(data.id, form.cpf);
+      }
       setForm(emptyForm);
       toast({ title: 'Vendedor cadastrado com sucesso!' });
     },
@@ -97,6 +116,10 @@ const Sales = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sellers'] });
+      // Create user if CPF was added and seller has no user_id
+      if (form.cpf && editingSeller && !editingSeller.user_id) {
+        createSellerUser(editingSeller.id, form.cpf);
+      }
       setEditOpen(false);
       setEditingSeller(null);
       setForm(emptyForm);
