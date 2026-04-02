@@ -115,6 +115,10 @@ const Sales = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sellers'] });
+      // Create user if CPF was added and seller has no user_id
+      if (form.cpf && editingSeller && !editingSeller.user_id) {
+        createSellerUser(editingSeller.id, form.cpf);
+      }
       setEditOpen(false);
       setEditingSeller(null);
       setForm(emptyForm);
