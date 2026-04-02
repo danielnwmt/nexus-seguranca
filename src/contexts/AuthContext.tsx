@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Fetch user role after user is set
   useEffect(() => {
-    if (!user?.id) { setUserRole(null); return; }
+    if (!user?.id) { setUserRole(null); setIsSeller(false); return; }
     const fetchRole = async () => {
       try {
         if (isLocalInstallation()) {
@@ -38,12 +38,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const rows = await res.json();
             setUserRole(rows?.[0]?.role || 'n1');
           }
+          // Check if seller
+          const sellerRes = await fetch(`${getLocalApiBase()}/rest/v1/sellers?user_id=eq.${user.id}&select=id&limit=1`, { headers });
+          setIsSeller(sellerRes.ok && (await sellerRes.json()).length > 0);
         } else {
           const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).maybeSingle();
           setUserRole(data?.role || 'n1');
+          // Check if seller
+          const { data: sellerData } = await supabase.from('sellers').select('id').eq('user_id', user.id).maybeSingle();
+          setIsSeller(!!sellerData);
         }
       } catch {
         setUserRole('n1');
+        setIsSeller(false);
       }
     };
     fetchRole();
