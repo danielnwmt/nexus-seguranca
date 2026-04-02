@@ -6,7 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Lock, Mail, AlertCircle, ShieldAlert } from 'lucide-react';
+import { Lock, Mail, AlertCircle, ShieldAlert, User } from 'lucide-react';
+import { maskCpf } from '@/lib/masks';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 
 // Animated particle network background
