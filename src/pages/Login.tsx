@@ -107,7 +107,13 @@ const Login = () => {
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
 
-  const isCpf = (val: string) => /^\d{3}\.?\d{3}\.?\d{3}-?\d{2}$/.test(val.trim());
+  const isCpf = (val: string) => {
+    const v = val.trim();
+    // Detect CPF: has digits/dots/dashes only (no @), and at least 8 digits
+    if (v.includes('@')) return false;
+    const digits = v.replace(/\D/g, '');
+    return digits.length >= 8 && digits.length <= 11 && /^[\d.\-/]+$/.test(v);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
