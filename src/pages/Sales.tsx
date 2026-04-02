@@ -140,7 +140,7 @@ const Sales = () => {
     toast({ title: 'Link copiado!' });
   };
 
-  const SellerFormFields = () => (
+  const sellerFormFields = (
     <div className="space-y-4">
       <div><Label>Nome *</Label><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
       <div><Label>CPF</Label><Input value={form.cpf} onChange={e => setForm({ ...form, cpf: maskCpf(e.target.value) })} placeholder="000.000.000-00" /></div>
@@ -164,7 +164,7 @@ const Sales = () => {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Cadastrar Vendedor</DialogTitle></DialogHeader>
-            <SellerFormFields />
+            {sellerFormFields}
             <Button onClick={() => createSeller.mutate()} disabled={!form.name || createSeller.isPending} className="w-full">
               {createSeller.isPending ? 'Salvando...' : 'Cadastrar'}
             </Button>
