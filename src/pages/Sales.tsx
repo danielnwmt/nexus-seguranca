@@ -210,7 +210,7 @@ const Sales = () => {
       <Dialog open={editOpen} onOpenChange={o => { setEditOpen(o); if (!o) { setEditingSeller(null); setForm(emptyForm); } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Editar Vendedor</DialogTitle></DialogHeader>
-          <SellerFormFields />
+          {sellerFormFields}
           <Button onClick={() => updateSeller.mutate()} disabled={!form.name || updateSeller.isPending} className="w-full">
             {updateSeller.isPending ? 'Salvando...' : 'Salvar Alterações'}
           </Button>
