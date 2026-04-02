@@ -107,12 +107,23 @@ const Login = () => {
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
 
+  const isCpf = (val: string) => /^\d{3}\.?\d{3}\.?\d{3}-?\d{2}$/.test(val.trim());
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    const result = await signIn(email, password);
+    // If identifier looks like CPF, convert to seller email
+    let loginEmail = identifier.trim();
+    let loginPassword = password;
+    if (isCpf(loginEmail)) {
+      const cpfDigits = loginEmail.replace(/\D/g, '');
+      loginEmail = `${cpfDigits}@vendedor.sys`;
+      loginPassword = password || cpfDigits;
+    }
+
+    const result = await signIn(loginEmail, loginPassword);
 
     if (result.error) {
       if (result.rateLimited) {
