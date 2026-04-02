@@ -100,7 +100,7 @@ const Login = () => {
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const { data: company } = useCompanySettings();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
