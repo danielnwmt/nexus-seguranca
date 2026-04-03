@@ -125,8 +125,30 @@ const Login = () => {
     let loginPassword = password;
     if (isCpf(loginEmail)) {
       const cpfDigits = loginEmail.replace(/\D/g, '');
-      loginEmail = `${cpfDigits}@vendedor.sys`;
+      // Try seller first, then client
       loginPassword = password || cpfDigits;
+
+      // Try @vendedor.sys
+      let result = await signIn(`${cpfDigits}@vendedor.sys`, loginPassword);
+      if (!result.error) {
+        setIsRateLimited(false);
+        setRemainingAttempts(null);
+        if (isLocalInstallation()) {
+          navigate('/');
+        } else {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user?.user_metadata?.force_password_change) {
+            navigate('/reset-password');
+          } else {
+            navigate('/');
+          }
+        }
+        setLoading(false);
+        return;
+      }
+
+      // Try @cliente.sys
+      loginEmail = `${cpfDigits}@cliente.sys`;
     }
 
     const result = await signIn(loginEmail, loginPassword);
