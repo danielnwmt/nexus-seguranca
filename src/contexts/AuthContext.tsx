@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Fetch user role after user is set
   useEffect(() => {
-    if (!user?.id) { setUserRole(null); setIsSeller(false); return; }
+    if (!user?.id) { setUserRole(null); setIsSeller(false); setIsClient(false); return; }
     const fetchRole = async () => {
       try {
         if (isLocalInstallation()) {
