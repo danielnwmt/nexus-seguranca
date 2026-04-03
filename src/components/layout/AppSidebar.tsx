@@ -49,7 +49,7 @@ const defaultPermissions: Record<string, Record<string, boolean>> = {
 
 const AppSidebar = () => {
   const location = useLocation();
-  const { signOut, user, userRole, isSeller } = useAuth();
+  const { signOut, user, userRole, isSeller, isClient } = useAuth();
   const { data: company } = useCompanySettings();
   const { data: rolePermissionsData } = useRolePermissions();
 
