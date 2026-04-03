@@ -59,6 +59,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch {
         setUserRole('n1');
         setIsSeller(false);
+        setIsClient(false);
       }
     };
     fetchRole();
