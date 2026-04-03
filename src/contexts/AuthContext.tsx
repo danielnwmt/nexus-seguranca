@@ -10,6 +10,7 @@ interface AuthContextType {
   loading: boolean;
   userRole: string | null;
   isSeller: boolean;
+  isClient: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null; rateLimited?: boolean; message?: string; remainingAttempts?: number; remainingSeconds?: number }>;
   signOut: () => Promise<void>;
 }
@@ -22,10 +23,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isSeller, setIsSeller] = useState(false);
+  const [isClient, setIsClient] = useState(false);
 
   // Fetch user role after user is set
   useEffect(() => {
-    if (!user?.id) { setUserRole(null); setIsSeller(false); return; }
+    if (!user?.id) { setUserRole(null); setIsSeller(false); setIsClient(false); return; }
     const fetchRole = async () => {
       try {
         if (isLocalInstallation()) {
@@ -41,16 +43,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Check if seller
           const sellerRes = await fetch(`${getLocalApiBase()}/rest/v1/sellers?user_id=eq.${user.id}&select=id&limit=1`, { headers });
           setIsSeller(sellerRes.ok && (await sellerRes.json()).length > 0);
+          // Check if client
+          const clientRes = await fetch(`${getLocalApiBase()}/rest/v1/clients?user_id=eq.${user.id}&select=id&limit=1`, { headers });
+          setIsClient(clientRes.ok && (await clientRes.json()).length > 0);
         } else {
           const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).maybeSingle();
           setUserRole(data?.role || 'n1');
           // Check if seller
           const { data: sellerData } = await supabase.from('sellers').select('id').eq('user_id', user.id).maybeSingle();
           setIsSeller(!!sellerData);
+          // Check if client
+          const { data: clientData } = await supabase.from('clients').select('id').eq('user_id', user.id).maybeSingle();
+          setIsClient(!!clientData);
         }
       } catch {
         setUserRole('n1');
         setIsSeller(false);
+        setIsClient(false);
       }
     };
     fetchRole();
@@ -224,7 +233,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, userRole, isSeller, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, userRole, isSeller, isClient, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

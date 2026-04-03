@@ -129,8 +129,19 @@ const Clients = () => {
       });
     } else {
       insertMutation.mutate(payload as any, {
-        onSuccess: (data: any) => {
+        onSuccess: async (data: any) => {
           createClientFolder(form.name, data.id);
+          // Create auth user for client if CPF has 11 digits
+          const cpfDigits = form.cpf.replace(/\D/g, '');
+          if (cpfDigits.length >= 11) {
+            try {
+              await supabase.functions.invoke('create-client-user', {
+                body: { client_id: data.id, cpf: form.cpf },
+              });
+            } catch (err) {
+              console.error('Erro ao criar usuário do cliente:', err);
+            }
+          }
           toast({ title: 'Cliente adicionado', description: 'Pasta de imagens criada automaticamente.' });
           resetForm();
         },

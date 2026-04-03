@@ -49,7 +49,7 @@ const defaultPermissions: Record<string, Record<string, boolean>> = {
 
 const AppSidebar = () => {
   const location = useLocation();
-  const { signOut, user, userRole, isSeller } = useAuth();
+  const { signOut, user, userRole, isSeller, isClient } = useAuth();
   const { data: company } = useCompanySettings();
   const { data: rolePermissionsData } = useRolePermissions();
 
@@ -60,7 +60,12 @@ const AppSidebar = () => {
   // Admin sees everything
   const isAdmin = role === 'admin';
 
+  // Client routes
+  const clientRoutes = ['/live', '/recordings', '/alarms'];
+
   const visibleItems = navItems.filter(item => {
+    // Clients see only their cameras, recordings, alarms
+    if (isClient) return clientRoutes.includes(item.to);
     // Sellers only see Clients
     if (isSeller) return item.to === '/clients';
     if (isAdmin) return true;
