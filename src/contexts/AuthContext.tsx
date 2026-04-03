@@ -23,6 +23,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isSeller, setIsSeller] = useState(false);
+  const [isClient, setIsClient] = useState(false);
 
   // Fetch user role after user is set
   useEffect(() => {
