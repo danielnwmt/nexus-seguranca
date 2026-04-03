@@ -10,6 +10,7 @@ interface AuthContextType {
   loading: boolean;
   userRole: string | null;
   isSeller: boolean;
+  isClient: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null; rateLimited?: boolean; message?: string; remainingAttempts?: number; remainingSeconds?: number }>;
   signOut: () => Promise<void>;
 }
