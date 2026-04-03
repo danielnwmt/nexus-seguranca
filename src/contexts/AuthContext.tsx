@@ -43,12 +43,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Check if seller
           const sellerRes = await fetch(`${getLocalApiBase()}/rest/v1/sellers?user_id=eq.${user.id}&select=id&limit=1`, { headers });
           setIsSeller(sellerRes.ok && (await sellerRes.json()).length > 0);
+          // Check if client
+          const clientRes = await fetch(`${getLocalApiBase()}/rest/v1/clients?user_id=eq.${user.id}&select=id&limit=1`, { headers });
+          setIsClient(clientRes.ok && (await clientRes.json()).length > 0);
         } else {
           const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).maybeSingle();
           setUserRole(data?.role || 'n1');
           // Check if seller
           const { data: sellerData } = await supabase.from('sellers').select('id').eq('user_id', user.id).maybeSingle();
           setIsSeller(!!sellerData);
+          // Check if client
+          const { data: clientData } = await supabase.from('clients').select('id').eq('user_id', user.id).maybeSingle();
+          setIsClient(!!clientData);
         }
       } catch {
         setUserRole('n1');
