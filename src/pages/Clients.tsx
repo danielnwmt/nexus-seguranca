@@ -330,14 +330,21 @@ const Clients = () => {
                   <p className="text-[10px] text-muted-foreground">{client.phone}</p>
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <button
-                    onClick={() => { setCameraViewerClient(client); setCameraViewerOpen(true); }}
-                    className="inline-flex items-center gap-1 text-xs font-mono text-foreground hover:text-primary transition-colors"
-                    title="Visualizar câmeras"
-                  >
-                    <Camera className="w-3 h-3 text-primary" />
-                    {client.cameras_count}
-                  </button>
+                  {isSeller ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-mono text-muted-foreground">
+                      <Camera className="w-3 h-3" />
+                      {client.cameras_count}
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => { setCameraViewerClient(client); setCameraViewerOpen(true); }}
+                      className="inline-flex items-center gap-1 text-xs font-mono text-foreground hover:text-primary transition-colors"
+                      title="Visualizar câmeras"
+                    >
+                      <Camera className="w-3 h-3 text-primary" />
+                      {client.cameras_count}
+                    </button>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-center">
                   <span className={`inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full ${
