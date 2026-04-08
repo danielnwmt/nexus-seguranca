@@ -356,9 +356,11 @@ const Clients = () => {
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
-                    <button onClick={() => { setCameraViewerClient(client); setCameraViewerOpen(true); }} className="w-7 h-7 rounded flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-primary" title="Ver Câmeras">
-                      <Eye className="w-3.5 h-3.5" />
-                    </button>
+                    {!isSeller && (
+                      <button onClick={() => { setCameraViewerClient(client); setCameraViewerOpen(true); }} className="w-7 h-7 rounded flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-primary" title="Ver Câmeras">
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                     <button onClick={() => handleShowBoletos(client)} className="w-7 h-7 rounded flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Boletos">
                       <Printer className="w-3.5 h-3.5" />
                     </button>
