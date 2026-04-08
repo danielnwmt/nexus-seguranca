@@ -41,6 +41,7 @@ const maskPhone = (value: string) => {
 
 const Clients = () => {
   const { toast } = useToast();
+  const { isSeller } = useAuth();
   const { data: invoices = [] } = useTableQuery('invoices');
   const insertMutation = useInsertMutation('clients');
   const updateMutation = useUpdateMutation('clients');
