@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { isValidCpfCnpj } from '@/lib/validators';
+import { useAuth } from '@/contexts/AuthContext';
 import { Plus, Search, Users, Pencil, Trash2, Camera, Printer, UserX, UserCheck, Eye, MapPin } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -41,6 +42,7 @@ const maskPhone = (value: string) => {
 
 const Clients = () => {
   const { toast } = useToast();
+  const { isSeller } = useAuth();
   const { data: invoices = [] } = useTableQuery('invoices');
   const insertMutation = useInsertMutation('clients');
   const updateMutation = useUpdateMutation('clients');
@@ -328,14 +330,21 @@ const Clients = () => {
                   <p className="text-[10px] text-muted-foreground">{client.phone}</p>
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <button
-                    onClick={() => { setCameraViewerClient(client); setCameraViewerOpen(true); }}
-                    className="inline-flex items-center gap-1 text-xs font-mono text-foreground hover:text-primary transition-colors"
-                    title="Visualizar câmeras"
-                  >
-                    <Camera className="w-3 h-3 text-primary" />
-                    {client.cameras_count}
-                  </button>
+                  {isSeller ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-mono text-muted-foreground">
+                      <Camera className="w-3 h-3" />
+                      {client.cameras_count}
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => { setCameraViewerClient(client); setCameraViewerOpen(true); }}
+                      className="inline-flex items-center gap-1 text-xs font-mono text-foreground hover:text-primary transition-colors"
+                      title="Visualizar câmeras"
+                    >
+                      <Camera className="w-3 h-3 text-primary" />
+                      {client.cameras_count}
+                    </button>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-center">
                   <span className={`inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded-full ${
@@ -347,9 +356,11 @@ const Clients = () => {
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
-                    <button onClick={() => { setCameraViewerClient(client); setCameraViewerOpen(true); }} className="w-7 h-7 rounded flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-primary" title="Ver Câmeras">
-                      <Eye className="w-3.5 h-3.5" />
-                    </button>
+                    {!isSeller && (
+                      <button onClick={() => { setCameraViewerClient(client); setCameraViewerOpen(true); }} className="w-7 h-7 rounded flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-primary" title="Ver Câmeras">
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                     <button onClick={() => handleShowBoletos(client)} className="w-7 h-7 rounded flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Boletos">
                       <Printer className="w-3.5 h-3.5" />
                     </button>
