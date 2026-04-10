@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Camera, Grid2X2, Grid3X3, LayoutGrid, Maximize2, Minimize2, Video } from 'lucide-react';
+import { Camera, Grid2X2, Grid3X3, LayoutGrid, Maximize2, Minimize2, Video, Clock, Timer } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
