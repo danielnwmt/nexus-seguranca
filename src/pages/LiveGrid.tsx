@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Camera, Grid2X2, Grid3X3, LayoutGrid, Maximize2, Minimize2, Video } from 'lucide-react';
+import { Camera, Grid2X2, Grid3X3, LayoutGrid, Maximize2, Minimize2, Video, Clock, Timer } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -26,6 +27,8 @@ const LiveGrid = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedCam, setSelectedCam] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [cycleSeconds, setCycleSeconds] = useState(30);
+  const [mosaicName, setMosaicName] = useState('');
 
   const filteredCameras = useMemo(() => {
     const list = selectedClient === 'all'
@@ -43,9 +46,9 @@ const LiveGrid = () => {
     if (totalPages <= 1) return;
     const interval = setInterval(() => {
       setPage(p => (p + 1) % totalPages);
-    }, 30000);
+    }, cycleSeconds * 1000);
     return () => clearInterval(interval);
-  }, [totalPages]);
+  }, [totalPages, cycleSeconds]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -121,7 +124,38 @@ const LiveGrid = () => {
           </Badge>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Mosaic name */}
+          <div className="flex items-center gap-1.5">
+            <Input
+              placeholder="Nome do mosaico"
+              value={mosaicName}
+              onChange={(e) => setMosaicName(e.target.value)}
+              className="h-8 w-40 text-xs bg-muted border-border"
+            />
+          </div>
+
+          {/* Cycle timer */}
+          <div className="flex items-center gap-1.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1 border border-border rounded-md px-2 h-8">
+                  <Timer className="w-3.5 h-3.5 text-muted-foreground" />
+                  <input
+                    type="number"
+                    min={5}
+                    max={300}
+                    value={cycleSeconds}
+                    onChange={(e) => setCycleSeconds(Math.max(5, Number(e.target.value)))}
+                    className="w-12 text-xs bg-transparent text-foreground outline-none text-center"
+                  />
+                  <span className="text-[10px] text-muted-foreground">seg</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>Tempo de rotação entre páginas (segundos)</TooltipContent>
+            </Tooltip>
+          </div>
+
           {/* Grid selector */}
           <div className="flex items-center border border-border rounded-md overflow-hidden">
             {(['2x2', '3x3', '4x4'] as GridLayout[]).map((g) => {
