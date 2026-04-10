@@ -46,9 +46,9 @@ const LiveGrid = () => {
     if (totalPages <= 1) return;
     const interval = setInterval(() => {
       setPage(p => (p + 1) % totalPages);
-    }, 30000);
+    }, cycleSeconds * 1000);
     return () => clearInterval(interval);
-  }, [totalPages]);
+  }, [totalPages, cycleSeconds]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
