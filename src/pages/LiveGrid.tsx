@@ -26,6 +26,8 @@ const LiveGrid = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedCam, setSelectedCam] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [cycleSeconds, setCycleSeconds] = useState(30);
+  const [mosaicName, setMosaicName] = useState('');
 
   const filteredCameras = useMemo(() => {
     const list = selectedClient === 'all'
