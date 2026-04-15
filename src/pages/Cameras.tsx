@@ -107,6 +107,7 @@ const Cameras = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [recordingsCamera, setRecordingsCamera] = useState<{ id: string; name: string; clientName?: string } | null>(null);
   const [recordingsOpen, setRecordingsOpen] = useState(false);
+  const [dvrOpen, setDvrOpen] = useState(false);
   const PAGE_SIZE = 50;
 
   const filters: Record<string, string> = {};
