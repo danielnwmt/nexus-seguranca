@@ -115,7 +115,7 @@ const DvrDiscovery = ({ open, onOpenChange, onImportCameras }: DvrDiscoveryProps
 
     // For RTMP, generate a single key for the whole DVR
     const singleRtmpKey = protocol === 'RTMP' ? generateStreamKey() : '';
-    const singleRtmpUrl = protocol === 'RTMP' ? `rtmp://${dvrIp}:1935/live/${singleRtmpKey}` : '';
+    const singleRtmpUrl = protocol === 'RTMP' ? `rtmp://${dvrIp}:1935/${singleRtmpKey}` : '';
     if (protocol === 'RTMP') setDvrStreamKey(singleRtmpKey);
 
     const discovered: DiscoveredChannel[] = Array.from({ length: count }, (_, i) => {
@@ -293,7 +293,7 @@ const DvrDiscovery = ({ open, onOpenChange, onImportCameras }: DvrDiscoveryProps
               {protocol === 'RTMP' && dvrStreamKey && (
                 <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 space-y-1">
                   <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Link RTMP único do DVR</p>
-                  <p className="text-xs font-mono text-foreground break-all">{`rtmp://${dvrIp}:1935/live/${dvrStreamKey}`}</p>
+                  <p className="text-xs font-mono text-foreground break-all">{`rtmp://${dvrIp}:1935/${dvrStreamKey}`}</p>
                   <p className="text-[10px] text-muted-foreground">Todas as câmeras usarão este mesmo link de envio.</p>
                 </div>
               )}
