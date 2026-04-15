@@ -290,6 +290,14 @@ const DvrDiscovery = ({ open, onOpenChange, onImportCameras }: DvrDiscoveryProps
           {/* Discovered channels */}
           {channels.length > 0 && (
             <div className="space-y-3">
+              {protocol === 'RTMP' && dvrStreamKey && (
+                <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 space-y-1">
+                  <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Link RTMP único do DVR</p>
+                  <p className="text-xs font-mono text-foreground break-all">{`rtmp://${dvrIp}:1935/live/${dvrStreamKey}`}</p>
+                  <p className="text-[10px] text-muted-foreground">Todas as câmeras usarão este mesmo link de envio.</p>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Wifi className="w-4 h-4 text-emerald-400" />
