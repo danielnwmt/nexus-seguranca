@@ -15,6 +15,7 @@ import { ANALYTIC_LABELS } from '@/types/monitoring';
 import { useTableQuery, usePaginatedQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
 import LineCrossingEditor, { type LineCrossingLine } from '@/components/cameras/LineCrossingEditor';
 import RecordingsViewer from '@/components/cameras/RecordingsViewer';
+import DvrDiscovery from '@/components/cameras/DvrDiscovery';
 
 // ── Options as specified ──
 const PROTOCOL_OPTIONS = ['RTSP', 'RTMP'] as const;
