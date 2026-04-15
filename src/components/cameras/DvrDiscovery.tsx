@@ -113,14 +113,17 @@ const DvrDiscovery = ({ open, onOpenChange, onImportCameras }: DvrDiscoveryProps
     const count = Number(channelCount);
     const port = Number(dvrPort) || 554;
 
+    // For RTMP, generate a single key for the whole DVR
+    const singleRtmpKey = protocol === 'RTMP' ? generateStreamKey() : '';
+    const singleRtmpUrl = protocol === 'RTMP' ? `rtmp://${dvrIp}:1935/live/${singleRtmpKey}` : '';
+    if (protocol === 'RTMP') setDvrStreamKey(singleRtmpKey);
+
     const discovered: DiscoveredChannel[] = Array.from({ length: count }, (_, i) => {
       const ch = i + 1;
       let streamUrl: string;
-      let streamKey = '';
 
       if (protocol === 'RTMP') {
-        streamKey = generateStreamKey();
-        streamUrl = `rtmp://${dvrIp}:1935/live/${streamKey}`;
+        streamUrl = singleRtmpUrl;
       } else {
         streamUrl = brandConfig.rtspPattern(dvrIp, port, dvrUser, dvrPass, ch, 0);
       }
@@ -129,7 +132,7 @@ const DvrDiscovery = ({ open, onOpenChange, onImportCameras }: DvrDiscoveryProps
         channel: ch,
         name: `Canal ${ch}`,
         rtspUrl: streamUrl,
-        streamKey,
+        streamKey: protocol === 'RTMP' ? singleRtmpKey : '',
         selected: true,
       };
     });
