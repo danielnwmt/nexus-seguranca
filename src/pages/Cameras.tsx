@@ -736,6 +736,13 @@ const Cameras = () => {
         onOpenChange={setRecordingsOpen}
         camera={recordingsCamera}
       />
+
+      {/* DVR/NVR Discovery */}
+      <DvrDiscovery
+        open={dvrOpen}
+        onOpenChange={setDvrOpen}
+        onImportCameras={handleDvrImport}
+      />
     </div>
   );
 };
