@@ -266,9 +266,9 @@ const Cameras = () => {
 
   const handleDelete = (id: string) => deleteMutation.mutate(id);
 
-  const handleDvrImport = async (cameras: Array<{ name: string; streamUrl: string; protocol: string; brand: string }>) => {
+  const handleDvrImport = async (cameras: Array<{ name: string; streamUrl: string; streamKey?: string; protocol: string; brand: string }>) => {
     for (const cam of cameras) {
-      const streamKey = (() => {
+      const streamKey = cam.streamKey || (() => {
         const length = Math.floor(Math.random() * 8) + 5;
         let key = '';
         for (let i = 0; i < length; i++) key += (i === 0 ? Math.floor(Math.random() * 9) + 1 : Math.floor(Math.random() * 10)).toString();

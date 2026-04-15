@@ -69,13 +69,14 @@ interface DiscoveredChannel {
   channel: number;
   name: string;
   rtspUrl: string;
+  streamKey: string;
   selected: boolean;
 }
 
 interface DvrDiscoveryProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImportCameras: (cameras: Array<{ name: string; streamUrl: string; protocol: string; brand: string }>) => void;
+  onImportCameras: (cameras: Array<{ name: string; streamUrl: string; streamKey?: string; protocol: string; brand: string }>) => void;
 }
 
 const DvrDiscovery = ({ open, onOpenChange, onImportCameras }: DvrDiscoveryProps) => {
@@ -92,6 +93,13 @@ const DvrDiscovery = ({ open, onOpenChange, onImportCameras }: DvrDiscoveryProps
 
   const brandConfig = DVR_BRANDS[dvrBrand];
 
+  const generateStreamKey = () => {
+    const len = Math.floor(Math.random() * 8) + 5; // 5-12 digits
+    let key = '';
+    for (let i = 0; i < len; i++) key += Math.floor(Math.random() * 10);
+    return key;
+  };
+
   const handleDiscover = () => {
     if (!dvrIp.trim()) {
       toast({ title: 'IP obrigatório', description: 'Informe o IP do DVR/NVR.', variant: 'destructive' });
@@ -102,14 +110,23 @@ const DvrDiscovery = ({ open, onOpenChange, onImportCameras }: DvrDiscoveryProps
     const count = Number(channelCount);
     const port = Number(dvrPort) || 554;
 
-    // Generate channels based on brand pattern
     const discovered: DiscoveredChannel[] = Array.from({ length: count }, (_, i) => {
       const ch = i + 1;
-      const rtspUrl = brandConfig.rtspPattern(dvrIp, port, dvrUser, dvrPass, ch, 0);
+      let streamUrl: string;
+      let streamKey = '';
+
+      if (protocol === 'RTMP') {
+        streamKey = generateStreamKey();
+        streamUrl = `rtmp://${dvrIp}:1935/live/${streamKey}`;
+      } else {
+        streamUrl = brandConfig.rtspPattern(dvrIp, port, dvrUser, dvrPass, ch, 0);
+      }
+
       return {
         channel: ch,
         name: `Canal ${ch}`,
-        rtspUrl,
+        rtspUrl: streamUrl,
+        streamKey,
         selected: true,
       };
     });
@@ -142,6 +159,7 @@ const DvrDiscovery = ({ open, onOpenChange, onImportCameras }: DvrDiscoveryProps
     const camerasToImport = selected.map(ch => ({
       name: ch.name,
       streamUrl: ch.rtspUrl,
+      streamKey: ch.streamKey,
       protocol,
       brand: brandConfig.label,
     }));
