@@ -100,6 +100,9 @@ const DvrDiscovery = ({ open, onOpenChange, onImportCameras }: DvrDiscoveryProps
     return key;
   };
 
+  // Single RTMP key for the entire DVR
+  const [dvrStreamKey, setDvrStreamKey] = useState('');
+
   const handleDiscover = () => {
     if (!dvrIp.trim()) {
       toast({ title: 'IP obrigatório', description: 'Informe o IP do DVR/NVR.', variant: 'destructive' });
