@@ -266,6 +266,32 @@ const Cameras = () => {
 
   const handleDelete = (id: string) => deleteMutation.mutate(id);
 
+  const handleDvrImport = async (cameras: Array<{ name: string; streamUrl: string; protocol: string; brand: string }>) => {
+    for (const cam of cameras) {
+      const streamKey = (() => {
+        const length = Math.floor(Math.random() * 8) + 5;
+        let key = '';
+        for (let i = 0; i < length; i++) key += (i === 0 ? Math.floor(Math.random() * 9) + 1 : Math.floor(Math.random() * 10)).toString();
+        return key;
+      })();
+      const storagePath = buildStoragePath(cam.name);
+      try {
+        await insertMutation.mutateAsync({
+          name: cam.name,
+          stream_url: cam.streamUrl,
+          protocol: cam.protocol,
+          brand: cam.brand,
+          stream_key: streamKey,
+          storage_path: storagePath,
+          retention_days: 30,
+          analytics: [...DEFAULT_ANALYTICS],
+        } as any);
+      } catch (err) {
+        console.error(`Erro ao importar ${cam.name}:`, err);
+      }
+    }
+  };
+
   const getClientName = (clientId: string | null) => {
     if (!clientId) return 'Sem Cliente';
     const client = (clients as any[]).find(c => c.id === clientId);
