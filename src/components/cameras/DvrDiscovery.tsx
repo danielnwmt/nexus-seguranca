@@ -100,6 +100,9 @@ const DvrDiscovery = ({ open, onOpenChange, onImportCameras }: DvrDiscoveryProps
     return key;
   };
 
+  // Single RTMP key for the entire DVR
+  const [dvrStreamKey, setDvrStreamKey] = useState('');
+
   const handleDiscover = () => {
     if (!dvrIp.trim()) {
       toast({ title: 'IP obrigatório', description: 'Informe o IP do DVR/NVR.', variant: 'destructive' });
@@ -110,14 +113,17 @@ const DvrDiscovery = ({ open, onOpenChange, onImportCameras }: DvrDiscoveryProps
     const count = Number(channelCount);
     const port = Number(dvrPort) || 554;
 
+    // For RTMP, generate a single key for the whole DVR
+    const singleRtmpKey = protocol === 'RTMP' ? generateStreamKey() : '';
+    const singleRtmpUrl = protocol === 'RTMP' ? `rtmp://${dvrIp}:1935/live/${singleRtmpKey}` : '';
+    if (protocol === 'RTMP') setDvrStreamKey(singleRtmpKey);
+
     const discovered: DiscoveredChannel[] = Array.from({ length: count }, (_, i) => {
       const ch = i + 1;
       let streamUrl: string;
-      let streamKey = '';
 
       if (protocol === 'RTMP') {
-        streamKey = generateStreamKey();
-        streamUrl = `rtmp://${dvrIp}:1935/live/${streamKey}`;
+        streamUrl = singleRtmpUrl;
       } else {
         streamUrl = brandConfig.rtspPattern(dvrIp, port, dvrUser, dvrPass, ch, 0);
       }
@@ -126,7 +132,7 @@ const DvrDiscovery = ({ open, onOpenChange, onImportCameras }: DvrDiscoveryProps
         channel: ch,
         name: `Canal ${ch}`,
         rtspUrl: streamUrl,
-        streamKey,
+        streamKey: protocol === 'RTMP' ? singleRtmpKey : '',
         selected: true,
       };
     });
@@ -284,6 +290,14 @@ const DvrDiscovery = ({ open, onOpenChange, onImportCameras }: DvrDiscoveryProps
           {/* Discovered channels */}
           {channels.length > 0 && (
             <div className="space-y-3">
+              {protocol === 'RTMP' && dvrStreamKey && (
+                <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 space-y-1">
+                  <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Link RTMP único do DVR</p>
+                  <p className="text-xs font-mono text-foreground break-all">{`rtmp://${dvrIp}:1935/live/${dvrStreamKey}`}</p>
+                  <p className="text-[10px] text-muted-foreground">Todas as câmeras usarão este mesmo link de envio.</p>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Wifi className="w-4 h-4 text-emerald-400" />
