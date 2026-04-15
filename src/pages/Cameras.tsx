@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Camera, Plus, Search, HardDrive, Calendar, Brain, Video, Key, Copy, MapPin, Film, Eye, Pencil, Trash2, VideoOff, Circle } from 'lucide-react';
+import { Camera, Plus, Search, HardDrive, Calendar, Brain, Video, Key, Copy, MapPin, Film, Eye, Pencil, Trash2, VideoOff, Circle, MonitorPlay } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { ANALYTIC_LABELS } from '@/types/monitoring';
 import { useTableQuery, usePaginatedQuery, useInsertMutation, useUpdateMutation, useDeleteMutation } from '@/hooks/useSupabaseQuery';
 import LineCrossingEditor, { type LineCrossingLine } from '@/components/cameras/LineCrossingEditor';
 import RecordingsViewer from '@/components/cameras/RecordingsViewer';
+import DvrDiscovery from '@/components/cameras/DvrDiscovery';
 
 // ── Options as specified ──
 const PROTOCOL_OPTIONS = ['RTSP', 'RTMP'] as const;
@@ -106,6 +107,7 @@ const Cameras = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [recordingsCamera, setRecordingsCamera] = useState<{ id: string; name: string; clientName?: string } | null>(null);
   const [recordingsOpen, setRecordingsOpen] = useState(false);
+  const [dvrOpen, setDvrOpen] = useState(false);
   const PAGE_SIZE = 50;
 
   const filters: Record<string, string> = {};
@@ -264,6 +266,32 @@ const Cameras = () => {
 
   const handleDelete = (id: string) => deleteMutation.mutate(id);
 
+  const handleDvrImport = async (cameras: Array<{ name: string; streamUrl: string; protocol: string; brand: string }>) => {
+    for (const cam of cameras) {
+      const streamKey = (() => {
+        const length = Math.floor(Math.random() * 8) + 5;
+        let key = '';
+        for (let i = 0; i < length; i++) key += (i === 0 ? Math.floor(Math.random() * 9) + 1 : Math.floor(Math.random() * 10)).toString();
+        return key;
+      })();
+      const storagePath = buildStoragePath(cam.name);
+      try {
+        await insertMutation.mutateAsync({
+          name: cam.name,
+          stream_url: cam.streamUrl,
+          protocol: cam.protocol,
+          brand: cam.brand,
+          stream_key: streamKey,
+          storage_path: storagePath,
+          retention_days: 30,
+          analytics: [...DEFAULT_ANALYTICS],
+        } as any);
+      } catch (err) {
+        console.error(`Erro ao importar ${cam.name}:`, err);
+      }
+    }
+  };
+
   const getClientName = (clientId: string | null) => {
     if (!clientId) return 'Sem Cliente';
     const client = (clients as any[]).find(c => c.id === clientId);
@@ -286,9 +314,14 @@ const Cameras = () => {
             {totalCount} dispositivo{totalCount !== 1 ? 's' : ''} cadastrado{totalCount !== 1 ? 's' : ''}
           </p>
         </div>
-        <Button className="gap-2" onClick={handleAddCameraClick}>
-          <Plus className="w-4 h-4" /> Nova Câmera
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => setDvrOpen(true)}>
+            <HardDrive className="w-4 h-4" /> Adicionar DVR/NVR
+          </Button>
+          <Button className="gap-2" onClick={handleAddCameraClick}>
+            <Plus className="w-4 h-4" /> Nova Câmera
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -702,6 +735,13 @@ const Cameras = () => {
         open={recordingsOpen}
         onOpenChange={setRecordingsOpen}
         camera={recordingsCamera}
+      />
+
+      {/* DVR/NVR Discovery */}
+      <DvrDiscovery
+        open={dvrOpen}
+        onOpenChange={setDvrOpen}
+        onImportCameras={handleDvrImport}
       />
     </div>
   );
