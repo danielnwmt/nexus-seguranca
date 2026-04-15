@@ -314,9 +314,14 @@ const Cameras = () => {
             {totalCount} dispositivo{totalCount !== 1 ? 's' : ''} cadastrado{totalCount !== 1 ? 's' : ''}
           </p>
         </div>
-        <Button className="gap-2" onClick={handleAddCameraClick}>
-          <Plus className="w-4 h-4" /> Nova Câmera
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => setDvrOpen(true)}>
+            <HardDrive className="w-4 h-4" /> Adicionar DVR/NVR
+          </Button>
+          <Button className="gap-2" onClick={handleAddCameraClick}>
+            <Plus className="w-4 h-4" /> Nova Câmera
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
