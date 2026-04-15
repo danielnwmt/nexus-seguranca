@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Camera, Plus, Search, HardDrive, Calendar, Brain, Video, Key, Copy, MapPin, Film, Eye, Pencil, Trash2, VideoOff, Circle } from 'lucide-react';
+import { Camera, Plus, Search, HardDrive, Calendar, Brain, Video, Key, Copy, MapPin, Film, Eye, Pencil, Trash2, VideoOff, Circle, MonitorPlay } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
