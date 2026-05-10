@@ -161,7 +161,7 @@ export async function generateQuotePdf(
     `R$ ${Number(item.total).toFixed(2)}`,
   ]);
 
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: y,
     head: [['#', 'Produto', 'Qtd', 'Unitário', 'Total']],
     body: tableBody,
