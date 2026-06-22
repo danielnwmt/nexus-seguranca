@@ -116,24 +116,25 @@ const ServiceOrders = () => {
   const handlePrint = (o: ServiceOrder) => {
     const w = window.open('', '_blank');
     if (!w) return;
+    const esc = (s: any) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     w.document.write(`
-      <html><head><title>OS ${o.order_number}</title>
+      <html><head><title>OS ${esc(o.order_number)}</title>
       <style>body{font-family:sans-serif;padding:40px;color:#333}h1{font-size:22px}table{width:100%;border-collapse:collapse;margin-top:20px}td{padding:8px 12px;border:1px solid #ddd}td:first-child{font-weight:bold;width:180px;background:#f5f5f5}</style></head>
-      <body><h1>Ordem de Serviço — ${o.order_number}</h1>
+      <body><h1>Ordem de Serviço — ${esc(o.order_number)}</h1>
       <table>
-        <tr><td>Cliente</td><td>${o.client_name || '—'}</td></tr>
-        <tr><td>Técnico</td><td>${o.installer_name || '—'}</td></tr>
-        <tr><td>Tipo</td><td>${typeLabels[o.type] || o.type}</td></tr>
-        <tr><td>Status</td><td>${statusConfig[o.status]?.label || o.status}</td></tr>
-        <tr><td>Data Agendada</td><td>${o.scheduled_date || '—'}</td></tr>
-        <tr><td>Descrição</td><td>${o.description || '—'}</td></tr>
-        <tr><td>Observações</td><td>${o.notes || '—'}</td></tr>
+        <tr><td>Cliente</td><td>${esc(o.client_name || '—')}</td></tr>
+        <tr><td>Técnico</td><td>${esc(o.installer_name || '—')}</td></tr>
+        <tr><td>Tipo</td><td>${esc(typeLabels[o.type] || o.type)}</td></tr>
+        <tr><td>Status</td><td>${esc(statusConfig[o.status]?.label || o.status)}</td></tr>
+        <tr><td>Data Agendada</td><td>${esc(o.scheduled_date || '—')}</td></tr>
+        <tr><td>Descrição</td><td>${esc(o.description || '—')}</td></tr>
+        <tr><td>Observações</td><td>${esc(o.notes || '—')}</td></tr>
       </table>
-      <p style="margin-top:40px;font-size:12px;color:#999">Emitido em ${new Date().toLocaleString('pt-BR')}</p>
+      <p style="margin-top:40px;font-size:12px;color:#999">Emitido em ${esc(new Date().toLocaleString('pt-BR'))}</p>
       </body></html>
     `);
     w.document.close();
-    w.print();
+    w.onload = () => w.print();
   };
 
   const selectClient = (id: string) => {
