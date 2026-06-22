@@ -162,7 +162,9 @@ const Settings = () => {
         const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
         const bankHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
         if (session.access_token) bankHeaders['Authorization'] = `Bearer ${session.access_token}`;
-        const res = await fetch(`${getLocalApiBase()}/rest/v1/bank_configs?select=id,bank,label,agencia,conta,convenio,active,api_key_encrypted,created_at,updated_at&order=label.asc`, {
+        // Local mode: do NOT request api_key_encrypted from the network — it's sensitive.
+        // Local API should be updated to proxy this through a server endpoint that returns only has_api_key.
+        const res = await fetch(`${getLocalApiBase()}/rest/v1/bank_configs?select=id,bank,label,agencia,conta,convenio,active,created_at,updated_at&order=label.asc`, {
           headers: bankHeaders,
         });
         if (!res.ok) throw new Error('Erro ao buscar bank_configs');
@@ -170,7 +172,7 @@ const Settings = () => {
         const mapped = (rows || []).map((b: any) => ({
           id: b.id, bank: b.bank, label: b.label, agencia: b.agencia || '',
           conta: b.conta || '', convenio: b.convenio || '', active: !!b.active,
-          has_api_key: !!(b.api_key_encrypted && b.api_key_encrypted.length > 0),
+          has_api_key: false,
           created_at: b.created_at, updated_at: b.updated_at,
         }));
         setBanks(mapped);

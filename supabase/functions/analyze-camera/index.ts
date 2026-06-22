@@ -52,6 +52,14 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // --- Authorization: only admin/n2/n3 may trigger AI analysis / alarms ---
+    const _serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const _roleClient = createClient(supabaseUrl, _serviceKey);
+    const { data: _roles } = await _roleClient.from("user_roles").select("role").eq("user_id", claimsData.claims.sub);
+    if (!(_roles || []).some((r: any) => ["admin", "n2", "n3"].includes(r.role))) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // --- Input validation ---
     const contentLength = parseInt(req.headers.get("content-length") || "0", 10);
     if (contentLength > MAX_BODY_SIZE) {

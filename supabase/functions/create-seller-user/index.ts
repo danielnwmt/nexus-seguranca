@@ -81,12 +81,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Create new user with CPF as password
+    // Generate cryptographically random temporary password
+    const _rand = new Uint8Array(12);
+    crypto.getRandomValues(_rand);
+    const tempPassword = btoa(String.fromCharCode(..._rand)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+    // Create new user with random temp password; force change on first login
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
-      password: cpfDigits,
+      password: tempPassword,
       email_confirm: true,
-      user_metadata: { is_seller: true, seller_name: cpf },
+      user_metadata: { is_seller: true, seller_name: cpf, force_password_change: true },
     });
 
     if (createError) {
@@ -110,7 +115,7 @@ Deno.serve(async (req) => {
       await adminClient.from("user_roles").insert({ user_id: newUser.user.id, role: "n1" });
     }
 
-    return new Response(JSON.stringify({ success: true, user_id: newUser.user.id }), {
+    return new Response(JSON.stringify({ success: true, user_id: newUser.user.id, temp_password: tempPassword, force_password_change: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

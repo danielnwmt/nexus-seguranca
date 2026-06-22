@@ -29,6 +29,12 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // --- Authorization: only admin/n2/n3 may trigger mass AI analysis ---
+    const { data: _roles } = await supabase.from("user_roles").select("role").eq("user_id", claimsData.claims.sub);
+    if (!(_roles || []).some((r: any) => ["admin", "n2", "n3"].includes(r.role))) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Buscar TODAS as cameras com analytics (não apenas as com snapshot_url)
     const { data: cameras, error: camError } = await supabase
       .from("cameras")
