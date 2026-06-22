@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
       await adminClient.from("user_roles").insert({ user_id: newUser.user.id, role: "n1" });
     }
 
-    return new Response(JSON.stringify({ success: true, user_id: newUser.user.id }), {
+    return new Response(JSON.stringify({ success: true, user_id: newUser.user.id, temp_password: tempPassword, force_password_change: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
