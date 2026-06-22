@@ -80,12 +80,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Create new user with CPF as password
+    // Generate cryptographically random temporary password (16 chars, base64url)
+    const _rand = new Uint8Array(12);
+    crypto.getRandomValues(_rand);
+    const tempPassword = btoa(String.fromCharCode(..._rand)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+    // Create new user with a random temp password; force change on first login
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
-      password: cpfDigits,
+      password: tempPassword,
       email_confirm: true,
-      user_metadata: { is_client: true, client_id },
+      user_metadata: { is_client: true, client_id, force_password_change: true },
     });
 
     if (createError) {
