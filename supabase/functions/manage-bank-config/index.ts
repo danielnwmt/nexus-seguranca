@@ -5,10 +5,27 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// AES-256-GCM helpers using BANK_ENCRYPTION_KEY (any length; SHA-256 normalized to 32 bytes)
+async function getAesKey(): Promise<CryptoKey> {
+  const raw = Deno.env.get("BANK_ENCRYPTION_KEY") || "";
+  if (!raw) throw new Error("BANK_ENCRYPTION_KEY not set");
+  const keyBytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw)));
+  return crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+async function encryptApiKey(plain: string): Promise<string> {
+  const key = await getAesKey();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(plain)));
+  const out = new Uint8Array(iv.length + cipher.length);
+  out.set(iv); out.set(cipher, iv.length);
+  return "enc:v1:" + btoa(String.fromCharCode(...out));
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
