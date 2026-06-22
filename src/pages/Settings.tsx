@@ -162,15 +162,22 @@ const Settings = () => {
         const session = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
         const bankHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
         if (session.access_token) bankHeaders['Authorization'] = `Bearer ${session.access_token}`;
-        const res = await fetch(`${getLocalApiBase()}/rest/v1/bank_configs?select=id,bank,label,agencia,conta,convenio,active,api_key_encrypted,created_at,updated_at&order=label.asc`, {
+        const res = await fetch(`${getLocalApiBase()}/rest/v1/bank_configs?select=id,bank,label,agencia,conta,convenio,active,created_at,updated_at&order=label.asc`, {
           headers: bankHeaders,
         });
         if (!res.ok) throw new Error('Erro ao buscar bank_configs');
         const rows = await res.json();
+        // Fetch has_api_key flags separately without exposing the encrypted value
+        const flagRes = await fetch(`${getLocalApiBase()}/rest/v1/bank_configs?select=id,api_key_present:api_key_encrypted&order=label.asc`, {
+          headers: { ...bankHeaders, 'Accept-Profile': 'public' },
+        }).catch(() => null);
+        const flagRows: any[] = flagRes && flagRes.ok ? await flagRes.json() : [];
+        const flagMap: Record<string, boolean> = {};
+        for (const f of flagRows) flagMap[f.id] = !!(f.api_key_present && String(f.api_key_present).length > 0);
         const mapped = (rows || []).map((b: any) => ({
           id: b.id, bank: b.bank, label: b.label, agencia: b.agencia || '',
           conta: b.conta || '', convenio: b.convenio || '', active: !!b.active,
-          has_api_key: !!(b.api_key_encrypted && b.api_key_encrypted.length > 0),
+          has_api_key: flagMap[b.id] || false,
           created_at: b.created_at, updated_at: b.updated_at,
         }));
         setBanks(mapped);
