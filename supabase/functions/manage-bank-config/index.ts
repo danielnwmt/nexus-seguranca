@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        updates.api_key_encrypted = api_key;
+        updates.api_key_encrypted = api_key.length > 0 ? await encryptApiKey(api_key) : "";
       }
 
       const { error } = await adminClient
