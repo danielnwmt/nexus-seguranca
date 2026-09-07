@@ -56,9 +56,10 @@ const Clients = () => {
   const [cameraViewerClient, setCameraViewerClient] = useState<any>(null);
   const { data: allCameras = [] } = useTableQuery('cameras');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '', latitude: '', longitude: '' });
+  const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '', cloudStorageId: '', latitude: '', longitude: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { data: storageServers = [] } = useTableQuery('storage_servers');
+  const { data: cloudStorages = [] } = useTableQuery('cloud_storages');
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
 
@@ -114,6 +115,7 @@ const Clients = () => {
       monthly_fee: form.monthlyFee ? Number(form.monthlyFee) : null,
       payment_due_day: form.paymentDueDay ? Number(form.paymentDueDay) : null,
       storage_server_id: form.storageServerId || null,
+      cloud_storage_id: form.cloudStorageId || null,
       latitude: form.latitude ? Number(form.latitude) : null,
       longitude: form.longitude ? Number(form.longitude) : null,
     };
@@ -166,6 +168,7 @@ const Clients = () => {
       monthlyFee: client.monthly_fee ? String(client.monthly_fee) : '',
       paymentDueDay: client.payment_due_day ? String(client.payment_due_day) : '',
       storageServerId: client.storage_server_id || '',
+      cloudStorageId: client.cloud_storage_id || '',
       latitude: client.latitude ? String(client.latitude) : '',
       longitude: client.longitude ? String(client.longitude) : '',
     });
@@ -176,7 +179,7 @@ const Clients = () => {
     deleteMutation.mutate(id);
   };
 
-  const defaultForm = { name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '', latitude: '', longitude: '' };
+  const defaultForm = { name: '', cpf: '', email: '', phone: '', address: '', monthlyFee: '', paymentDueDay: '', storageServerId: '', cloudStorageId: '', latitude: '', longitude: '' };
   const resetForm = () => {
     setForm(defaultForm);
     setErrors({});
@@ -281,6 +284,15 @@ const Clients = () => {
                   <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o servidor" /></SelectTrigger>
                   <SelectContent>
                     {storageServers.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name} ({s.ip_address})</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Armazenamento em Nuvem (imagens)</Label>
+                <Select value={form.cloudStorageId} onValueChange={v => setForm(p => ({ ...p, cloudStorageId: v }))}>
+                  <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione o destino na nuvem" /></SelectTrigger>
+                  <SelectContent>
+                    {(cloudStorages as any[]).map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name} ({s.provider === 'r2' ? 'Cloudflare R2' : s.provider === 'eveo' ? 'Eveo' : 'Outro servidor'})</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

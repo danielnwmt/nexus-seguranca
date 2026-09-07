@@ -4,6 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useRolePermissions, useUpdateRolePermission, buildPermissionMap } from '@/hooks/useRolePermissions';
 import CompanySettings from '@/components/settings/CompanySettings';
 import StorageServers from '@/components/settings/StorageServers';
+import CloudStorageSettings from '@/components/settings/CloudStorageSettings';
 import MediaServerSettings from '@/components/settings/MediaServerSettings';
 import SystemUpdate from '@/components/settings/SystemUpdate';
 import BackupSettings from '@/components/settings/BackupSettings';
@@ -529,6 +530,7 @@ const Settings = () => {
         <TabsContent value="storage" className="space-y-4">
           <MediaServerSettings />
           <StorageServers />
+          <CloudStorageSettings />
         </TabsContent>
 
         {/* ===== BACKUP ===== */}
