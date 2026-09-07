@@ -343,6 +343,7 @@ export type Database = {
         Row: {
           address: string | null
           cameras_count: number
+          cloud_storage_id: string | null
           cpf: string | null
           created_at: string
           deleted_at: string | null
@@ -363,6 +364,7 @@ export type Database = {
         Insert: {
           address?: string | null
           cameras_count?: number
+          cloud_storage_id?: string | null
           cpf?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -383,6 +385,7 @@ export type Database = {
         Update: {
           address?: string | null
           cameras_count?: number
+          cloud_storage_id?: string | null
           cpf?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -402,6 +405,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "clients_cloud_storage_id_fkey"
+            columns: ["cloud_storage_id"]
+            isOneToOne: false
+            referencedRelation: "cloud_storages"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "clients_seller_id_fkey"
             columns: ["seller_id"]
             isOneToOne: false
@@ -416,6 +426,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cloud_storages: {
+        Row: {
+          access_key_id: string | null
+          base_path: string | null
+          bucket: string | null
+          created_at: string
+          endpoint: string | null
+          id: string
+          name: string
+          provider: string
+          public_base_url: string | null
+          region: string | null
+          secret_access_key: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          access_key_id?: string | null
+          base_path?: string | null
+          bucket?: string | null
+          created_at?: string
+          endpoint?: string | null
+          id?: string
+          name: string
+          provider?: string
+          public_base_url?: string | null
+          region?: string | null
+          secret_access_key?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          access_key_id?: string | null
+          base_path?: string | null
+          bucket?: string | null
+          created_at?: string
+          endpoint?: string | null
+          id?: string
+          name?: string
+          provider?: string
+          public_base_url?: string | null
+          region?: string | null
+          secret_access_key?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       company_settings: {
         Row: {
