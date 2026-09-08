@@ -206,7 +206,7 @@ const Analytics = () => {
   const totalEvents = events.length;
   const criticalEvents = events.filter(e => ['weapon_detection', 'intrusion', 'fallen_person'].includes(e.event_type)).length;
   const camerasWithAnalytics = cameras.filter((c: any) => c.analytics && c.analytics.length > 0);
-  const isRunning = analysisStatus?.running || false;
+  const isRunning = isLocal ? (analysisStatus?.running || false) : cloudRunning;
 
   return (
     <div className="space-y-6">
