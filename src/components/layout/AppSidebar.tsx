@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Camera, Users, Bell, DollarSign, Shield, Settings, LogOut, Headphones, ClipboardList, Wrench, Brain, Film, Activity, MapPin, Clock, Monitor, Package, FileText, HandCoins } from 'lucide-react';
+import { LayoutDashboard, Camera, Users, Bell, DollarSign, Shield, Settings, LogOut, Headphones, ClipboardList, Wrench, Brain, Film, Activity, MapPin, Clock, Monitor, Package, FileText, HandCoins, Siren } from 'lucide-react';
 import nexusLogo from '@/assets/nexus-logo.png';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
@@ -22,6 +22,7 @@ const navItems: { to: string; icon: any; label: string; permModule?: string }[] 
   { to: '/sales', icon: HandCoins, label: 'Vendedores', permModule: 'financial' },
   { to: '/financial', icon: DollarSign, label: 'Financeiro', permModule: 'financial' },
   { to: '/alarms', icon: Bell, label: 'Alarmes', permModule: 'alarms' },
+  { to: '/alarm-panels', icon: Siren, label: 'Centrais de Alarme', permModule: 'alarms' },
   { to: '/analytics', icon: Brain, label: 'Analíticos IA', permModule: 'cameras_view' },
   { to: '/system-health', icon: Activity, label: 'Saúde do Sistema', permModule: 'settings' },
   { to: '/support', icon: Headphones, label: 'Atendimento', permModule: 'support' },

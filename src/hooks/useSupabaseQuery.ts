@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 
-type TableName = 'clients' | 'cameras' | 'guards' | 'alarms' | 'invoices' | 'storage_servers' | 'cloud_storages' | 'installers' | 'service_orders' | 'bills' | 'media_servers' | 'recordings' | 'analytics_events' | 'guard_clients';
+type TableName = 'clients' | 'cameras' | 'guards' | 'alarms' | 'invoices' | 'storage_servers' | 'cloud_storages' | 'installers' | 'service_orders' | 'bills' | 'media_servers' | 'recordings' | 'analytics_events' | 'guard_clients' | 'alarm_panels' | 'alarm_zones';
 
 /**
  * Detects JWT expired errors and attempts a session refresh.
