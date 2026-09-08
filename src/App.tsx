@@ -13,6 +13,7 @@ import Clients from "./pages/Clients";
 import Guards from "./pages/Guards";
 import Financial from "./pages/Financial";
 import Alarms from "./pages/Alarms";
+import AlarmPanels from "./pages/AlarmPanels";
 import Settings from "./pages/Settings";
 import Installers from "./pages/Installers";
 import ServiceOrders from "./pages/ServiceOrders";
@@ -53,6 +54,7 @@ const App = () => (
                 <Route path="/guards" element={<Guards />} />
                 <Route path="/financial" element={<Financial />} />
                 <Route path="/alarms" element={<Alarms />} />
+                <Route path="/alarm-panels" element={<AlarmPanels />} />
                 <Route path="/installers" element={<Installers />} />
                 <Route path="/service-orders" element={<ServiceOrders />} />
                 <Route path="/support" element={<Support />} />

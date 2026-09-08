@@ -1,16 +1,36 @@
 import { useState, useEffect } from 'react';
-import { Bell, CheckCheck, Plus } from 'lucide-react';
+import { Bell, CheckCheck, Plus, ClipboardCheck } from 'lucide-react';
 import AlarmItem from '@/components/dashboard/AlarmItem';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useTableQuery, useInsertMutation, useUpdateMutation } from '@/hooks/useSupabaseQuery';
 import { supabase } from '@/integrations/supabase/client';
 import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 import { useQueryClient } from '@tanstack/react-query';
 import { subscribeToAlarms, acknowledgeAllAlarms } from '@/services/alarmService';
+import { toast } from '@/hooks/use-toast';
+
+const HANDLING_LABELS: Record<string, string> = {
+  new: 'Novo', in_progress: 'Em atendimento', resolved: 'Resolvido', false_alarm: 'Falso alarme',
+};
+const HANDLING_STYLES: Record<string, string> = {
+  new: 'bg-muted text-muted-foreground',
+  in_progress: 'bg-alarm-warning/15 text-alarm-warning',
+  resolved: 'bg-primary/15 text-primary',
+  false_alarm: 'bg-muted text-muted-foreground line-through',
+};
+const ACTION_LABELS: Record<string, string> = {
+  verified_cameras: 'Verificado pelas câmeras',
+  client_contacted: 'Cliente contatado',
+  guard_dispatched: 'Vigilante deslocado',
+  police_called: 'Polícia acionada',
+  technical_issue: 'Problema técnico',
+  no_action: 'Sem providência',
+};
 
 const Alarms = () => {
   const { data: alarms = [], isLoading } = useTableQuery('alarms');
@@ -36,6 +56,37 @@ const Alarms = () => {
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedCameraId, setSelectedCameraId] = useState('');
   const [newAlarm, setNewAlarm] = useState({ type: 'motion', severity: 'warning', message: '' });
+  const [treatAlarm, setTreatAlarm] = useState<any>(null);
+  const [treatForm, setTreatForm] = useState({ handling_status: 'in_progress', action_taken: '', handling_notes: '' });
+
+  const openTreat = (a: any) => {
+    setTreatAlarm(a);
+    setTreatForm({
+      handling_status: a.handling_status && a.handling_status !== 'new' ? a.handling_status : 'in_progress',
+      action_taken: a.action_taken || '',
+      handling_notes: a.handling_notes || '',
+    });
+  };
+
+  const handleSaveTreatment = async () => {
+    if (!treatAlarm) return;
+    const done = treatForm.handling_status === 'resolved' || treatForm.handling_status === 'false_alarm';
+    try {
+      await updateMutation.mutateAsync({
+        id: treatAlarm.id,
+        handling_status: treatForm.handling_status,
+        action_taken: treatForm.action_taken || null,
+        handling_notes: treatForm.handling_notes || null,
+        handled_at: new Date().toISOString(),
+        acknowledged: done ? true : treatAlarm.acknowledged,
+      } as any);
+      toast({ title: 'Tratamento registrado' });
+      setTreatAlarm(null);
+    } catch (e: any) {
+      toast({ title: 'Erro ao salvar', description: e.message, variant: 'destructive' });
+    }
+  };
+
 
   const clientCameras = cameras.filter((c: any) => c.client_id === selectedClientId);
 
@@ -200,9 +251,75 @@ const Alarms = () => {
 
       <div className="space-y-2 max-w-2xl">
         {filtered.map((alarm: any) => (
-          <AlarmItem key={alarm.id} alarm={mapAlarm(alarm) as any} onAcknowledge={handleAcknowledge} />
+          <div key={alarm.id} className="space-y-1">
+            <AlarmItem alarm={mapAlarm(alarm) as any} onAcknowledge={handleAcknowledge} />
+            <div className="flex items-center gap-2 pl-3">
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${HANDLING_STYLES[alarm.handling_status as string] || HANDLING_STYLES.new}`}>
+                {HANDLING_LABELS[alarm.handling_status as string] || 'Novo'}
+              </span>
+              {alarm.action_taken && (
+                <span className="text-[10px] text-muted-foreground font-mono truncate max-w-[240px]">
+                  {ACTION_LABELS[alarm.action_taken as string] || alarm.action_taken}
+                </span>
+              )}
+              <Button size="sm" variant="outline" className="h-6 text-[10px] gap-1 ml-auto" onClick={() => openTreat(alarm)}>
+                <ClipboardCheck className="w-3 h-3" /> Tratar evento
+              </Button>
+            </div>
+          </div>
         ))}
       </div>
+
+      <Dialog open={!!treatAlarm} onOpenChange={o => !o && setTreatAlarm(null)}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Tratamento do Evento</DialogTitle>
+          </DialogHeader>
+          {treatAlarm && (
+            <div className="space-y-4">
+              <div className="bg-muted/40 rounded p-3 text-xs space-y-1">
+                <p className="text-foreground font-medium">{treatAlarm.message || 'Alarme'}</p>
+                <p className="text-muted-foreground font-mono">
+                  {treatAlarm.camera_name || treatAlarm.client_name || '—'} • {new Date(treatAlarm.created_at).toLocaleString('pt-BR')}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Situação</Label>
+                  <Select value={treatForm.handling_status} onValueChange={v => setTreatForm(p => ({ ...p, handling_status: v }))}>
+                    <SelectTrigger className="bg-muted border-border"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new">Novo</SelectItem>
+                      <SelectItem value="in_progress">Em atendimento</SelectItem>
+                      <SelectItem value="resolved">Resolvido</SelectItem>
+                      <SelectItem value="false_alarm">Falso alarme</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Providência</Label>
+                  <Select value={treatForm.action_taken} onValueChange={v => setTreatForm(p => ({ ...p, action_taken: v }))}>
+                    <SelectTrigger className="bg-muted border-border"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="verified_cameras">Verificado pelas câmeras</SelectItem>
+                      <SelectItem value="client_contacted">Cliente contatado</SelectItem>
+                      <SelectItem value="guard_dispatched">Vigilante deslocado</SelectItem>
+                      <SelectItem value="police_called">Polícia acionada</SelectItem>
+                      <SelectItem value="technical_issue">Problema técnico</SelectItem>
+                      <SelectItem value="no_action">Sem providência</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Observações do atendimento</Label>
+                <Textarea rows={3} value={treatForm.handling_notes} onChange={e => setTreatForm(p => ({ ...p, handling_notes: e.target.value }))} className="bg-muted border-border" placeholder="Descreva o que foi feito" />
+              </div>
+              <Button className="w-full" onClick={handleSaveTreatment}>Salvar tratamento</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {!isLoading && filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
