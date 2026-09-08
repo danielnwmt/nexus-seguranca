@@ -1,16 +1,36 @@
 import { useState, useEffect } from 'react';
-import { Bell, CheckCheck, Plus } from 'lucide-react';
+import { Bell, CheckCheck, Plus, ClipboardCheck } from 'lucide-react';
 import AlarmItem from '@/components/dashboard/AlarmItem';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useTableQuery, useInsertMutation, useUpdateMutation } from '@/hooks/useSupabaseQuery';
 import { supabase } from '@/integrations/supabase/client';
 import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 import { useQueryClient } from '@tanstack/react-query';
 import { subscribeToAlarms, acknowledgeAllAlarms } from '@/services/alarmService';
+import { toast } from '@/hooks/use-toast';
+
+const HANDLING_LABELS: Record<string, string> = {
+  new: 'Novo', in_progress: 'Em atendimento', resolved: 'Resolvido', false_alarm: 'Falso alarme',
+};
+const HANDLING_STYLES: Record<string, string> = {
+  new: 'bg-muted text-muted-foreground',
+  in_progress: 'bg-alarm-warning/15 text-alarm-warning',
+  resolved: 'bg-primary/15 text-primary',
+  false_alarm: 'bg-muted text-muted-foreground line-through',
+};
+const ACTION_LABELS: Record<string, string> = {
+  verified_cameras: 'Verificado pelas câmeras',
+  client_contacted: 'Cliente contatado',
+  guard_dispatched: 'Vigilante deslocado',
+  police_called: 'Polícia acionada',
+  technical_issue: 'Problema técnico',
+  no_action: 'Sem providência',
+};
 
 const Alarms = () => {
   const { data: alarms = [], isLoading } = useTableQuery('alarms');
