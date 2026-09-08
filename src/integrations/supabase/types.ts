@@ -14,42 +14,166 @@ export type Database = {
   }
   public: {
     Tables: {
+      alarm_panels: {
+        Row: {
+          account_number: string | null
+          client_id: string | null
+          client_name: string | null
+          created_at: string
+          id: string
+          ip_address: string | null
+          manufacturer: string | null
+          model: string | null
+          name: string
+          notes: string | null
+          partitions: number
+          phone: string | null
+          port: number | null
+          status: string
+          updated_at: string
+          zones_count: number
+        }
+        Insert: {
+          account_number?: string | null
+          client_id?: string | null
+          client_name?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          manufacturer?: string | null
+          model?: string | null
+          name: string
+          notes?: string | null
+          partitions?: number
+          phone?: string | null
+          port?: number | null
+          status?: string
+          updated_at?: string
+          zones_count?: number
+        }
+        Update: {
+          account_number?: string | null
+          client_id?: string | null
+          client_name?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          manufacturer?: string | null
+          model?: string | null
+          name?: string
+          notes?: string | null
+          partitions?: number
+          phone?: string | null
+          port?: number | null
+          status?: string
+          updated_at?: string
+          zones_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alarm_panels_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alarm_zones: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          panel_id: string
+          updated_at: string
+          zone_number: number
+          zone_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          panel_id: string
+          updated_at?: string
+          zone_number: number
+          zone_type?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          panel_id?: string
+          updated_at?: string
+          zone_number?: number
+          zone_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alarm_zones_panel_id_fkey"
+            columns: ["panel_id"]
+            isOneToOne: false
+            referencedRelation: "alarm_panels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alarms: {
         Row: {
           acknowledged: boolean
+          action_taken: string | null
           camera_id: string | null
           camera_name: string | null
           client_name: string | null
           created_at: string
+          handled_at: string | null
+          handled_by: string | null
+          handling_notes: string | null
+          handling_status: string
           id: string
           message: string | null
+          panel_id: string | null
           severity: string
           type: string
           updated_at: string
+          zone_number: number | null
         }
         Insert: {
           acknowledged?: boolean
+          action_taken?: string | null
           camera_id?: string | null
           camera_name?: string | null
           client_name?: string | null
           created_at?: string
+          handled_at?: string | null
+          handled_by?: string | null
+          handling_notes?: string | null
+          handling_status?: string
           id?: string
           message?: string | null
+          panel_id?: string | null
           severity?: string
           type?: string
           updated_at?: string
+          zone_number?: number | null
         }
         Update: {
           acknowledged?: boolean
+          action_taken?: string | null
           camera_id?: string | null
           camera_name?: string | null
           client_name?: string | null
           created_at?: string
+          handled_at?: string | null
+          handled_by?: string | null
+          handling_notes?: string | null
+          handling_status?: string
           id?: string
           message?: string | null
+          panel_id?: string | null
           severity?: string
           type?: string
           updated_at?: string
+          zone_number?: number | null
         }
         Relationships: [
           {
@@ -57,6 +181,13 @@ export type Database = {
             columns: ["camera_id"]
             isOneToOne: false
             referencedRelation: "cameras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alarms_panel_id_fkey"
+            columns: ["panel_id"]
+            isOneToOne: false
+            referencedRelation: "alarm_panels"
             referencedColumns: ["id"]
           },
         ]
