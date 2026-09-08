@@ -52,10 +52,59 @@ const Analytics = () => {
   const [filterClient, setFilterClient] = useState<string>('all');
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus | null>(null);
   const [toggling, setToggling] = useState(false);
+  const isLocal = isLocalInstallation();
 
-  // Fetch analysis status
+  // --- Modo nuvem (Vercel/publicado): o ciclo roda pelo navegador chamando a função da nuvem ---
+  const [cloudRunning, setCloudRunning] = useState(false);
+  const cloudStats = useRef({ cycles: 0, detections: 0, errors: 0, cameras: 0, startedAt: null as string | null, lastCycleAt: null as string | null, lastCycleDuration: 0 });
+  const cloudBusy = useRef(false);
+
+  const runCloudCycle = useCallback(async () => {
+    if (cloudBusy.current) return;
+    cloudBusy.current = true;
+    const started = Date.now();
+    try {
+      const { data, error } = await supabase.functions.invoke('auto-analyze-cameras', { body: {} });
+      const s = cloudStats.current;
+      s.cycles += 1;
+      s.lastCycleAt = new Date().toISOString();
+      s.lastCycleDuration = Date.now() - started;
+      if (error) {
+        s.errors += 1;
+      } else {
+        const results: any[] = (data as any)?.results || [];
+        s.cameras = (data as any)?.analyzed ?? results.length;
+        s.detections += results.reduce((acc, r) => acc + (r.detections || 0), 0);
+        s.errors += results.filter((r) => r.status === 'error').length;
+      }
+      setAnalysisStatus({
+        running: true,
+        interval: 30,
+        concurrency: 1,
+        startedAt: s.startedAt,
+        cyclesCompleted: s.cycles,
+        totalDetections: s.detections,
+        totalErrors: s.errors,
+        camerasAnalyzed: s.cameras,
+        lastCycleAt: s.lastCycleAt,
+        lastCycleDuration: s.lastCycleDuration,
+        rateLimited: false,
+      });
+    } finally {
+      cloudBusy.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isLocal || !cloudRunning) return;
+    runCloudCycle();
+    const id = setInterval(runCloudCycle, 30000);
+    return () => clearInterval(id);
+  }, [isLocal, cloudRunning, runCloudCycle]);
+
+  // Fetch analysis status (apenas instalação local)
   const fetchStatus = useCallback(async () => {
-    if (!mediaServerIp) return;
+    if (!isLocal || !mediaServerIp) return;
     try {
       const resp = await fetch(getServerApiUrl(mediaServerIp, '/analytics/status'));
       if (resp.ok) {
@@ -63,15 +112,30 @@ const Analytics = () => {
         setAnalysisStatus(data);
       }
     } catch {}
-  }, [mediaServerIp]);
+  }, [isLocal, mediaServerIp]);
 
   useEffect(() => {
+    if (!isLocal) return;
     fetchStatus();
     const interval = setInterval(fetchStatus, 5000);
     return () => clearInterval(interval);
-  }, [fetchStatus]);
+  }, [isLocal, fetchStatus]);
 
   const handleToggleAnalysis = async () => {
+    // Nuvem (Vercel/publicado): liga/desliga o ciclo via função da nuvem
+    if (!isLocal) {
+      if (cloudRunning) {
+        setCloudRunning(false);
+        setAnalysisStatus(null);
+        toast({ title: '🔴 Análise contínua PARADA' });
+      } else {
+        cloudStats.current = { cycles: 0, detections: 0, errors: 0, cameras: 0, startedAt: new Date().toISOString(), lastCycleAt: null, lastCycleDuration: 0 };
+        setCloudRunning(true);
+        toast({ title: '🟢 Análise contínua INICIADA', description: 'Rodando na nuvem a cada 30s' });
+      }
+      return;
+    }
+
     if (!mediaServerIp) {
       toast({ title: 'Configure o servidor de mídia primeiro', variant: 'destructive' });
       return;
