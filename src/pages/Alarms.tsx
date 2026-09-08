@@ -56,6 +56,37 @@ const Alarms = () => {
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedCameraId, setSelectedCameraId] = useState('');
   const [newAlarm, setNewAlarm] = useState({ type: 'motion', severity: 'warning', message: '' });
+  const [treatAlarm, setTreatAlarm] = useState<any>(null);
+  const [treatForm, setTreatForm] = useState({ handling_status: 'in_progress', action_taken: '', handling_notes: '' });
+
+  const openTreat = (a: any) => {
+    setTreatAlarm(a);
+    setTreatForm({
+      handling_status: a.handling_status && a.handling_status !== 'new' ? a.handling_status : 'in_progress',
+      action_taken: a.action_taken || '',
+      handling_notes: a.handling_notes || '',
+    });
+  };
+
+  const handleSaveTreatment = async () => {
+    if (!treatAlarm) return;
+    const done = treatForm.handling_status === 'resolved' || treatForm.handling_status === 'false_alarm';
+    try {
+      await updateMutation.mutateAsync({
+        id: treatAlarm.id,
+        handling_status: treatForm.handling_status,
+        action_taken: treatForm.action_taken || null,
+        handling_notes: treatForm.handling_notes || null,
+        handled_at: new Date().toISOString(),
+        acknowledged: done ? true : treatAlarm.acknowledged,
+      } as any);
+      toast({ title: 'Tratamento registrado' });
+      setTreatAlarm(null);
+    } catch (e: any) {
+      toast({ title: 'Erro ao salvar', description: e.message, variant: 'destructive' });
+    }
+  };
+
 
   const clientCameras = cameras.filter((c: any) => c.client_id === selectedClientId);
 
