@@ -1167,35 +1167,50 @@ export type Database = {
       }
       saas_companies: {
         Row: {
+          address: string | null
           created_at: string
           document: string | null
           email: string | null
           id: string
+          legal_name: string | null
+          login_bg_url: string | null
+          logo_url: string | null
           name: string
           phone: string | null
           plan_name: string
+          recording_segment_minutes: number
           status: string
           updated_at: string
         }
         Insert: {
+          address?: string | null
           created_at?: string
           document?: string | null
           email?: string | null
           id?: string
+          legal_name?: string | null
+          login_bg_url?: string | null
+          logo_url?: string | null
           name: string
           phone?: string | null
           plan_name?: string
+          recording_segment_minutes?: number
           status?: string
           updated_at?: string
         }
         Update: {
+          address?: string | null
           created_at?: string
           document?: string | null
           email?: string | null
           id?: string
+          legal_name?: string | null
+          login_bg_url?: string | null
+          logo_url?: string | null
           name?: string
           phone?: string | null
           plan_name?: string
+          recording_segment_minutes?: number
           status?: string
           updated_at?: string
         }
