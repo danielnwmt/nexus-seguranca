@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -24,10 +20,54 @@ serve(async (req) => {
     const authClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user }, error: authError } = await authClient.auth.getUser();
-    if (authError || !user) {
+    const token = authHeader.slice(7);
+    const { data: claimsData, error: authError } = await authClient.auth.getClaims(token);
+    const userId = claimsData?.claims?.sub;
+    if (authError || typeof userId !== "string") {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: roleData, error: roleError } = await authClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .in("role", ["admin", "n2", "n3"])
+      .maybeSingle();
+
+    if (roleError || !roleData) {
+      return new Response(JSON.stringify({ error: "Acesso não permitido" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!serviceRoleKey) {
+      return new Response(JSON.stringify({ error: "Serviço indisponível" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    const { data: rateLimit, error: rateLimitError } = await adminClient.rpc("check_rate_limit", {
+      _identifier: `chat-ai:${userId}`,
+      _max_attempts: 20,
+      _window_minutes: 1,
+      _lockout_minutes: 1,
+    });
+    if (rateLimitError) {
+      console.error("chat-ai rate limit error:", rateLimitError.message);
+      return new Response(JSON.stringify({ error: "Serviço indisponível" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (rateLimit?.allowed === false) {
+      return new Response(JSON.stringify({ error: "Muitas mensagens. Aguarde um minuto." }), {
+        status: 429,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -40,7 +80,20 @@ serve(async (req) => {
       });
     }
 
-    const { messages } = await req.json();
+    const payload = await req.json();
+    const messages = Array.isArray(payload?.messages) ? payload.messages : [];
+    const validMessages = messages.length > 0 && messages.length <= 30 && messages.every((message: unknown) => {
+      if (!message || typeof message !== "object") return false;
+      const candidate = message as Record<string, unknown>;
+      return (candidate.role === "user" || candidate.role === "assistant") &&
+        typeof candidate.content === "string" && candidate.content.length > 0 && candidate.content.length <= 4000;
+    });
+    if (!validMessages) {
+      return new Response(JSON.stringify({ error: "Mensagens inválidas" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -61,12 +114,6 @@ Suas responsabilidades:
 - Sugerir soluções para problemas comuns de câmeras offline, falhas de stream, alarmes falsos
 - Responder de forma clara, objetiva e profissional em português brasileiro
 - Manter respostas concisas (máximo 3 parágrafos)
-
-Contexto do sistema:
-- Usa MediaMTX como servidor de mídia (portas RTMP 1935, RTSP 8554, HLS 8888, WebRTC 8889)
-- Analíticos de IA via Gemini Vision (detecção de pessoas, veículos, cruzamento de linha, etc.)
-- Gravações em servidores locais via FFmpeg
-- Gerenciamento de clientes com mensalidades e cobranças por boleto
 
 Não invente informações que não sabe. Se não souber, oriente o usuário a procurar o suporte técnico.`,
           },

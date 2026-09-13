@@ -178,8 +178,16 @@ const Settings = () => {
         }));
         setBanks(mapped);
       } else {
+        const { data: sessionData } = await supabase.auth.getSession();
+        let accessToken = sessionData.session?.access_token;
+        if (!accessToken) {
+          const { data: refreshed } = await supabase.auth.refreshSession();
+          accessToken = refreshed.session?.access_token;
+        }
+        if (!accessToken) throw new Error('Sessão expirada');
         const { data, error } = await supabase.functions.invoke('manage-bank-config', {
           body: { action: 'list' },
+          headers: { Authorization: `Bearer ${accessToken}` },
         });
         if (error) throw error;
         setBanks(data || []);
@@ -232,9 +240,18 @@ const Settings = () => {
           });
           if (!res.ok) throw new Error('Erro ao salvar');
         } else {
-          await supabase.functions.invoke('manage-bank-config', {
+          const { data: sessionData } = await supabase.auth.getSession();
+          let accessToken = sessionData.session?.access_token;
+          if (!accessToken) {
+            const { data: refreshed } = await supabase.auth.refreshSession();
+            accessToken = refreshed.session?.access_token;
+          }
+          if (!accessToken) throw new Error('Sessão expirada');
+          const { error } = await supabase.functions.invoke('manage-bank-config', {
             body: { ...payload, action: 'update' },
+            headers: { Authorization: `Bearer ${accessToken}` },
           });
+          if (error) throw error;
         }
       }
       setBankApiKeys({});
