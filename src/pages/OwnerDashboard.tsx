@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, Bell, Camera, Cloud, Database, DollarSign, Pencil, Plus, Settings2, ShieldCheck, Users, Video } from 'lucide-react';
+import { Activity, Bell, Camera, Check, Cloud, Copy, Database, DollarSign, Pencil, Plus, Settings2, ShieldCheck, Users, Video } from 'lucide-react';
 import StatsCard from '@/components/dashboard/StatsCard';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -56,7 +56,7 @@ const modules = [
 ] as const;
 
 const blankForm = { name: '', legal_name: '', document: '', address: '', email: '', phone: '', logo_url: '', recording_segment_minutes: 30, plan_name: 'Personalizado', status: 'active' };
-const blankAccessForm = { name: '', email: '', password: '' };
+const blankAccessForm = { name: '', email: '' };
 
 const OwnerDashboard = () => {
   const queryClient = useQueryClient();
@@ -68,6 +68,8 @@ const OwnerDashboard = () => {
   const [form, setForm] = useState(blankForm);
   const [accessForm, setAccessForm] = useState(blankAccessForm);
   const [accessLoading, setAccessLoading] = useState(false);
+  const [temporaryAccess, setTemporaryAccess] = useState<{ email: string; password: string } | null>(null);
+  const [passwordCopied, setPasswordCopied] = useState(false);
   const [enabledModules, setEnabledModules] = useState<string[]>([]);
   const { data = emptyStats, isLoading, error } = useQuery({
     queryKey: ['owner-dashboard-stats'],
@@ -123,6 +125,9 @@ const OwnerDashboard = () => {
         body: { action: 'save_company_access', company_id: companyId, ...accessForm },
       });
       if (accessError || accessResult?.error) throw new Error(accessResult?.error || 'Não foi possível criar o usuário da empresa.');
+      if (accessResult?.temporary_password) {
+        setTemporaryAccess({ email: accessForm.email, password: accessResult.temporary_password });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['saas-companies'] });
@@ -162,7 +167,7 @@ const OwnerDashboard = () => {
       headers: { Authorization: `Bearer ${accessToken}` },
       body: { action: 'get_company_access', company_id: company.id },
     });
-    if (accessResult?.user) setAccessForm({ name: accessResult.user.name || '', email: accessResult.user.email || '', password: '' });
+    if (accessResult?.user) setAccessForm({ name: accessResult.user.name || '', email: accessResult.user.email || '' });
     setAccessLoading(false);
   };
   const openFeatures = async (company: Company) => {
@@ -298,10 +303,21 @@ const OwnerDashboard = () => {
               <div className="sm:col-span-2 border-t border-border pt-4"><h3 className="font-semibold text-foreground">Usuário de acesso</h3><p className="text-xs text-muted-foreground">Dados usados para entrar no sistema desta empresa.</p></div>
               <div><Label htmlFor="access-name">Nome do usuário</Label><Input id="access-name" value={accessForm.name} onChange={(event) => setAccessForm({ ...accessForm, name: event.target.value })} disabled={accessLoading} required /></div>
               <div><Label htmlFor="access-email">E-mail de acesso</Label><Input id="access-email" type="email" value={accessForm.email} onChange={(event) => setAccessForm({ ...accessForm, email: event.target.value })} disabled={accessLoading} required /></div>
-              <div className="sm:col-span-2"><Label htmlFor="access-password">{editingCompany ? 'Nova senha (opcional)' : 'Senha temporária'}</Label><Input id="access-password" type="password" minLength={8} value={accessForm.password} onChange={(event) => setAccessForm({ ...accessForm, password: event.target.value })} disabled={accessLoading} required={!editingCompany} placeholder={editingCompany ? 'Deixe vazio para manter a senha atual' : 'Mínimo de 8 caracteres'} /></div>
+               {!editingCompany && <div className="sm:col-span-2 rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">A senha temporária será gerada automaticamente. No primeiro acesso, o usuário deverá criar uma nova senha.</div>}
             </div>
             <DialogFooter><Button type="button" variant="outline" onClick={() => setCompanyDialog(false)}>Cancelar</Button><Button type="submit" disabled={saveCompany.isPending || accessLoading}>{saveCompany.isPending ? 'Salvando...' : 'Salvar empresa'}</Button></DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(temporaryAccess)} onOpenChange={(open) => { if (!open) { setTemporaryAccess(null); setPasswordCopied(false); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Empresa criada</DialogTitle><DialogDescription>Envie estes dados ao administrador. A senha deverá ser alterada no primeiro acesso.</DialogDescription></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>E-mail</Label><Input readOnly value={temporaryAccess?.email || ''} /></div>
+            <div><Label>Senha temporária</Label><div className="flex gap-2"><Input readOnly value={temporaryAccess?.password || ''} className="font-mono" /><Button type="button" size="icon" variant="outline" title="Copiar senha" onClick={async () => { if (!temporaryAccess) return; await navigator.clipboard.writeText(temporaryAccess.password); setPasswordCopied(true); }}>{passwordCopied ? <Check /> : <Copy />}</Button></div></div>
+          </div>
+          <DialogFooter><Button onClick={() => { setTemporaryAccess(null); setPasswordCopied(false); }}>Concluir</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 

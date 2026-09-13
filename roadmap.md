@@ -10,3 +10,4 @@
 - [x] Adicionar recuperação de senha por e-mail na tela de acesso
 - [x] Liberar todas as funcionalidades para o administrador de cada empresa
 - [x] Vincular as informações de Configurações ao cadastro de cada organização
+- [x] Gerar senha temporária automática e exigir troca no primeiro acesso
