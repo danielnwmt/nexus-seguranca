@@ -1367,6 +1367,7 @@ export type Database = {
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       current_client_user_id: { Args: never; Returns: string }
       current_seller_id: { Args: never; Returns: string }
+      get_owner_dashboard_stats: { Args: never; Returns: Json }
       is_authenticated: { Args: never; Returns: boolean }
       reset_rate_limit: { Args: { _identifier: string }; Returns: undefined }
     }
