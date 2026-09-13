@@ -44,6 +44,34 @@ serve(async (req) => {
       });
     }
 
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!serviceRoleKey) {
+      return new Response(JSON.stringify({ error: "Serviço indisponível" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    const { data: rateLimit, error: rateLimitError } = await adminClient.rpc("check_rate_limit", {
+      _identifier: `chat-ai:${userId}`,
+      _max_attempts: 20,
+      _window_minutes: 1,
+      _lockout_minutes: 1,
+    });
+    if (rateLimitError) {
+      console.error("chat-ai rate limit error:", rateLimitError.message);
+      return new Response(JSON.stringify({ error: "Serviço indisponível" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (rateLimit?.allowed === false) {
+      return new Response(JSON.stringify({ error: "Muitas mensagens. Aguarde um minuto." }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       return new Response(JSON.stringify({ error: "AI not configured" }), {
