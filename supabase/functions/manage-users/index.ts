@@ -178,6 +178,11 @@ Deno.serve(async (req) => {
               headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
           }
+          const { error: roleError } = await adminClient
+            .from("user_roles")
+            .update({ role: "admin" })
+            .eq("user_id", membership.user_id);
+          if (roleError) throw roleError;
           return new Response(JSON.stringify({ success: true, user_id: membership.user_id }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
@@ -210,6 +215,16 @@ Deno.serve(async (req) => {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
+        }
+
+        const { error: roleError } = await adminClient
+          .from("user_roles")
+          .update({ role: "admin" })
+          .eq("user_id", newUser.user.id);
+        if (roleError) {
+          await adminClient.from("saas_company_users").delete().eq("user_id", newUser.user.id);
+          await adminClient.auth.admin.deleteUser(newUser.user.id);
+          throw roleError;
         }
 
         return new Response(JSON.stringify({ success: true, user_id: newUser.user.id }), {
