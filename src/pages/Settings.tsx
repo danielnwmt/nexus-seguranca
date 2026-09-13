@@ -222,14 +222,14 @@ const Settings = () => {
         }
 
         if (isLocalInstallation()) {
+          if (newKey !== undefined && newKey !== '') {
+            throw new Error('Chaves bancárias só podem ser salvas pelo serviço seguro na nuvem.');
+          }
           // Local: PATCH direto no PostgREST
           const updates: Record<string, any> = {
             agencia: bank.agencia, conta: bank.conta,
             convenio: bank.convenio, active: bank.active,
           };
-          if (newKey !== undefined && newKey !== '') {
-            updates.api_key_encrypted = newKey;
-          }
           const bankSession = JSON.parse(sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session') || '{}');
           const patchHeaders: Record<string, string> = { 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
           if (bankSession.access_token) patchHeaders['Authorization'] = `Bearer ${bankSession.access_token}`;
