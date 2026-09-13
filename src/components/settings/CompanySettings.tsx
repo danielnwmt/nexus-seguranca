@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { Building2, Upload, Save, ImageIcon, HardDrive } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -66,11 +66,7 @@ const CompanySettings = () => {
     recording_segment_minutes: 30,
   });
 
-  useEffect(() => {
-    loadCompanySettings();
-  }, []);
-
-  const loadCompanySettings = async () => {
+  const loadCompanySettings = useCallback(async () => {
     let data: any = null;
     if (isLocal) {
       try {
@@ -103,7 +99,11 @@ const CompanySettings = () => {
       if (data.logo_url) setLogoPreview(data.logo_url);
       if (data.login_bg_url) setLoginBgPreview(data.login_bg_url);
     }
-  };
+  }, [companyId, isLocal]);
+
+  useEffect(() => {
+    loadCompanySettings();
+  }, [loadCompanySettings]);
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
