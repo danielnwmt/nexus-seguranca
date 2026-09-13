@@ -9,3 +9,4 @@
 - [ ] Aplicar a correção de permissões no banco da nuvem — bloqueado porque o banco está temporariamente indisponível.
 - [ ] Executar IA com a aba e o navegador fechados — requer agendador permanente no servidor de mídia ou banco disponível.
 - [ ] Atualizar o deploy da Vercel — correção pronta e validada; aguarda a Vercel gerar uma nova publicação.
+- [ ] Transformar em SaaS com empresas separadas e dados isolados — sem cobrança nesta fase.
