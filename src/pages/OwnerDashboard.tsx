@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Activity, Bell, Camera, Cloud, Database, DollarSign, ShieldCheck, Users, Video } from 'lucide-react';
 import StatsCard from '@/components/dashboard/StatsCard';
+import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 
 interface OwnerStats {
@@ -73,11 +74,11 @@ const OwnerDashboard = () => {
               <div className="grid gap-5 sm:grid-cols-2">
                 <div>
                   <div className="mb-2 flex justify-between text-xs"><span className="text-muted-foreground">Clientes ativos</span><span className="font-mono text-foreground">{clientRate}%</span></div>
-                  <div className="h-2 overflow-hidden rounded bg-muted"><div className="h-full bg-primary" style={{ width: `${clientRate}%` }} /></div>
+                  <Progress value={clientRate} className="h-2" />
                 </div>
                 <div>
                   <div className="mb-2 flex justify-between text-xs"><span className="text-muted-foreground">Câmeras online</span><span className="font-mono text-foreground">{onlineRate}%</span></div>
-                  <div className="h-2 overflow-hidden rounded bg-muted"><div className="h-full bg-success" style={{ width: `${onlineRate}%` }} /></div>
+                  <Progress value={onlineRate} className="h-2 [&>div]:bg-success" />
                 </div>
               </div>
             </div>

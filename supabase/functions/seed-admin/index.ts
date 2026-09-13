@@ -61,10 +61,12 @@ Deno.serve(async (req) => {
     if (exists) {
       const existingUser = existingUsers?.users?.find((u) => u.email === email);
       if (existingUser) {
-        await supabaseAdmin.from("user_roles").upsert(
-          { user_id: existingUser.id, role: "owner" },
-          { onConflict: "user_id,role" },
-        );
+        const { data: currentRoles } = await supabaseAdmin.from("user_roles").select("id").eq("user_id", existingUser.id).limit(1);
+        if (currentRoles?.[0]?.id) {
+          await supabaseAdmin.from("user_roles").update({ role: "owner" }).eq("id", currentRoles[0].id);
+        } else {
+          await supabaseAdmin.from("user_roles").insert({ user_id: existingUser.id, role: "owner" });
+        }
       }
       return new Response(
         JSON.stringify({ message: "Proprietário configurado com sucesso." }),
@@ -85,10 +87,7 @@ Deno.serve(async (req) => {
     if (error) throw error;
 
     if (data.user) {
-      await supabaseAdmin.from("user_roles").upsert(
-        { user_id: data.user.id, role: "owner" },
-        { onConflict: "user_id,role" },
-      );
+      await supabaseAdmin.from("user_roles").update({ role: "owner" }).eq("user_id", data.user.id);
     }
 
     // Send password reset so admin sets their own password
