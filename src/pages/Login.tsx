@@ -149,7 +149,11 @@ const Login = () => {
     if (isCpf(loginEmail)) {
       const cpfDigits = loginEmail.replace(/\D/g, '');
       // Try seller first, then client
-      loginPassword = password || cpfDigits;
+      if (!password) {
+        setError('Informe sua senha. O CPF não é usado automaticamente como senha.');
+        setLoading(false);
+        return;
+      }
 
       // Try @vendedor.sys
       let result = await signIn(`${cpfDigits}@vendedor.sys`, loginPassword);

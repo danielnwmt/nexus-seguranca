@@ -86,9 +86,24 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Invalid client_id" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (!camera_id) {
+      return new Response(JSON.stringify({ error: "camera_id is required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const { data: cameraRecord, error: cameraError } = await _roleClient
+      .from("cameras")
+      .select("id, name, client_id, clients(name)")
+      .eq("id", camera_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (cameraError || !cameraRecord) {
+      return new Response(JSON.stringify({ error: "Camera not found or access denied" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Validate strings
-    const safeCameraName = typeof camera_name === "string" ? camera_name.slice(0, 200) : null;
-    const safeClientName = typeof client_name === "string" ? client_name.slice(0, 200) : null;
+    const safeCameraName = cameraRecord.name;
+    const safeClientName = cameraRecord.clients?.name || null;
+    const safeClientId = cameraRecord.client_id || null;
 
     // Validate image
     if (image_url && (typeof image_url !== "string" || image_url.length > 2048 || !/^https?:\/\/.+/.test(image_url))) {
@@ -164,7 +179,7 @@ serve(async (req) => {
 
     if (detections.length > 0) {
       const eventRows = detections.map((d: any) => ({
-        camera_id: camera_id || null, camera_name: safeCameraName, client_id: client_id || null, client_name: safeClientName,
+        camera_id, camera_name: safeCameraName, client_id: safeClientId, client_name: safeClientName,
         event_type: d.event_type, confidence: d.confidence, details: d.details || {},
       }));
       const { error: evtError } = await supabase.from("analytics_events").insert(eventRows);

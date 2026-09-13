@@ -56,13 +56,30 @@ serve(async (req) => {
     const analyticsRows = [];
     const alarmRows = [];
 
+    const requestedCameraIds = [...new Set(rawEvents
+      .map((evt) => typeof evt?.camera_id === "string" && UUID_RE.test(evt.camera_id) ? evt.camera_id : null)
+      .filter((id): id is string => Boolean(id)))];
+    if (requestedCameraIds.length !== rawEvents.length) {
+      return new Response(JSON.stringify({ error: "A valid camera_id is required for every event" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const { data: authorizedCameras, error: cameraError } = await _roleClient
+      .from("cameras")
+      .select("id, name, client_id, clients(name)")
+      .in("id", requestedCameraIds)
+      .is("deleted_at", null);
+    if (cameraError || authorizedCameras?.length !== requestedCameraIds.length) {
+      return new Response(JSON.stringify({ error: "Camera not found or access denied" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const cameraMap = new Map((authorizedCameras || []).map((camera: any) => [camera.id, camera]));
+
     for (const evt of rawEvents) {
-      const camera_id = typeof evt.camera_id === "string" && UUID_RE.test(evt.camera_id) ? evt.camera_id : null;
-      const client_id = typeof evt.client_id === "string" && UUID_RE.test(evt.client_id) ? evt.client_id : null;
+      const camera_id = evt.camera_id as string;
+      const camera = cameraMap.get(camera_id);
+      const client_id = camera.client_id || null;
       const event_type = typeof evt.event_type === "string" && VALID_EVENT_TYPES.has(evt.event_type) ? evt.event_type : "motion";
       const confidence = typeof evt.confidence === "number" && evt.confidence >= 0 && evt.confidence <= 1 ? evt.confidence : 0;
-      const camera_name = typeof evt.camera_name === "string" ? evt.camera_name.slice(0, 200) : null;
-      const client_name = typeof evt.client_name === "string" ? evt.client_name.slice(0, 200) : null;
+      const camera_name = camera.name || null;
+      const client_name = camera.clients?.name || null;
       const details = typeof evt.details === "object" && evt.details !== null && !Array.isArray(evt.details) ? evt.details : {};
       const thumbnail_url = typeof evt.thumbnail_url === "string" && evt.thumbnail_url.length < 2048 ? evt.thumbnail_url : null;
 
