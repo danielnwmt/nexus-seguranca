@@ -72,7 +72,7 @@ const CompanySettings = () => {
 
   const loadCompanySettings = async () => {
     let data: any = null;
-    if (isLocal || companyId) {
+    if (isLocal) {
       try {
         const res = await fetch(
           `${getLocalApiBase()}/rest/v1/company_settings?select=*&limit=1`,
@@ -123,7 +123,7 @@ const CompanySettings = () => {
       return;
     }
 
-    if (isLocal || companyId) {
+    if (isLocal) {
       try {
         const base64 = await fileToBase64(file);
         setLogoPreview(base64);
