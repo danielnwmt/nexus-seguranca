@@ -66,10 +66,6 @@ const CompanySettings = () => {
     recording_segment_minutes: 30,
   });
 
-  useEffect(() => {
-    loadCompanySettings();
-  }, []);
-
   const loadCompanySettings = async () => {
     let data: any = null;
     if (isLocal) {
@@ -104,6 +100,10 @@ const CompanySettings = () => {
       if (data.login_bg_url) setLoginBgPreview(data.login_bg_url);
     }
   };
+
+  useEffect(() => {
+    loadCompanySettings();
+  }, [companyId, isLocal]);
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
