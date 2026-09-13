@@ -5,6 +5,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const generateTemporaryPassword = () => {
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const randomPart = Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+  return `Nx!${randomPart}7a`;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -139,7 +146,7 @@ Deno.serve(async (req) => {
         const companyId = typeof body.company_id === "string" ? body.company_id : "";
         const email = typeof body.email === "string" ? body.email.trim().toLowerCase().slice(0, 255) : "";
         const name = typeof body.name === "string" ? body.name.trim().slice(0, 100) : "";
-        const password = typeof body.password === "string" ? body.password : "";
+        const requestedPassword = typeof body.password === "string" ? body.password : "";
         if (!companyId || !email || !name) {
           return new Response(JSON.stringify({ error: "Empresa, nome e e-mail são obrigatórios" }), {
             status: 400,
@@ -163,14 +170,17 @@ Deno.serve(async (req) => {
         if (membershipError) throw membershipError;
 
         if (membership) {
-          if (password && password.length < 8) {
+          if (requestedPassword && requestedPassword.length < 8) {
             return new Response(JSON.stringify({ error: "A senha deve ter pelo menos 8 caracteres" }), {
               status: 400,
               headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
           }
           const attributes: Record<string, unknown> = { email, email_confirm: true, user_metadata: { name } };
-          if (password) attributes.password = password;
+          if (requestedPassword) {
+            attributes.password = requestedPassword;
+            attributes.user_metadata = { name, company_id: companyId, force_password_change: true };
+          }
           const { error: updateError } = await adminClient.auth.admin.updateUserById(membership.user_id, attributes);
           if (updateError) {
             return new Response(JSON.stringify({ error: updateError.message }), {
@@ -188,12 +198,7 @@ Deno.serve(async (req) => {
           });
         }
 
-        if (password.length < 8) {
-          return new Response(JSON.stringify({ error: "A senha deve ter pelo menos 8 caracteres" }), {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+        const password = requestedPassword || generateTemporaryPassword();
 
         const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
           email,
@@ -227,7 +232,7 @@ Deno.serve(async (req) => {
           throw roleError;
         }
 
-        return new Response(JSON.stringify({ success: true, user_id: newUser.user.id }), {
+        return new Response(JSON.stringify({ success: true, user_id: newUser.user.id, temporary_password: password }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
