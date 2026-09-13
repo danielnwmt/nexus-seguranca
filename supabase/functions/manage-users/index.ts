@@ -11,9 +11,12 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!supabaseUrl || !serviceRoleKey || !anonKey) {
+      throw new Error("Missing authentication configuration");
+    }
 
     // Verify authentication
     const authHeader = req.headers.get("Authorization");
@@ -89,6 +92,127 @@ Deno.serve(async (req) => {
       if (!body.action) {
         return new Response(JSON.stringify({ error: "Action required" }), {
           status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (body.action === "get_company_access") {
+        if (roleData.role !== "owner") {
+          return new Response(JSON.stringify({ error: "Owner access required" }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const companyId = typeof body.company_id === "string" ? body.company_id : "";
+        const { data: membership, error: membershipError } = await adminClient
+          .from("saas_company_users")
+          .select("user_id")
+          .eq("company_id", companyId)
+          .maybeSingle();
+        if (membershipError) throw membershipError;
+        if (!membership) {
+          return new Response(JSON.stringify({ user: null }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const { data: authUser, error: userError } = await adminClient.auth.admin.getUserById(membership.user_id);
+        if (userError) throw userError;
+        return new Response(JSON.stringify({
+          user: {
+            id: authUser.user.id,
+            email: authUser.user.email || "",
+            name: authUser.user.user_metadata?.name || "",
+          },
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (body.action === "save_company_access") {
+        if (roleData.role !== "owner") {
+          return new Response(JSON.stringify({ error: "Owner access required" }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const companyId = typeof body.company_id === "string" ? body.company_id : "";
+        const email = typeof body.email === "string" ? body.email.trim().toLowerCase().slice(0, 255) : "";
+        const name = typeof body.name === "string" ? body.name.trim().slice(0, 100) : "";
+        const password = typeof body.password === "string" ? body.password : "";
+        if (!companyId || !email || !name) {
+          return new Response(JSON.stringify({ error: "Empresa, nome e e-mail são obrigatórios" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const { data: company } = await adminClient.from("saas_companies").select("id").eq("id", companyId).maybeSingle();
+        if (!company) {
+          return new Response(JSON.stringify({ error: "Empresa não encontrada" }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const { data: membership, error: membershipError } = await adminClient
+          .from("saas_company_users")
+          .select("user_id")
+          .eq("company_id", companyId)
+          .maybeSingle();
+        if (membershipError) throw membershipError;
+
+        if (membership) {
+          if (password && password.length < 8) {
+            return new Response(JSON.stringify({ error: "A senha deve ter pelo menos 8 caracteres" }), {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          const attributes: Record<string, unknown> = { email, email_confirm: true, user_metadata: { name } };
+          if (password) attributes.password = password;
+          const { error: updateError } = await adminClient.auth.admin.updateUserById(membership.user_id, attributes);
+          if (updateError) {
+            return new Response(JSON.stringify({ error: updateError.message }), {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          return new Response(JSON.stringify({ success: true, user_id: membership.user_id }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        if (password.length < 8) {
+          return new Response(JSON.stringify({ error: "A senha deve ter pelo menos 8 caracteres" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { name, company_id: companyId, force_password_change: true },
+        });
+        if (createError || !newUser.user) {
+          return new Response(JSON.stringify({ error: createError?.message || "Não foi possível criar o usuário" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const { error: linkError } = await adminClient.from("saas_company_users").insert({ company_id: companyId, user_id: newUser.user.id });
+        if (linkError) {
+          await adminClient.auth.admin.deleteUser(newUser.user.id);
+          return new Response(JSON.stringify({ error: linkError.message }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ success: true, user_id: newUser.user.id }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
