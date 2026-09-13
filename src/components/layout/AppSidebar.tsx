@@ -24,7 +24,7 @@ const navItems: { to: string; icon: any; label: string; permModule?: string }[] 
   { to: '/financial', icon: DollarSign, label: 'Financeiro', permModule: 'financial' },
   { to: '/alarms', icon: Bell, label: 'Alarmes', permModule: 'alarms' },
   { to: '/alarm-panels', icon: Siren, label: 'Centrais de Alarme', permModule: 'alarms' },
-  { to: '/analytics', icon: Brain, label: 'Analíticos IA', permModule: 'cameras_view' },
+  { to: '/analytics', icon: Brain, label: 'Analíticos IA', permModule: 'analytics' },
   { to: '/system-health', icon: Activity, label: 'Saúde do Sistema', permModule: 'settings' },
   { to: '/support', icon: Headphones, label: 'Atendimento', permModule: 'support' },
   { to: '/settings', icon: Settings, label: 'Configurações', permModule: 'settings' },

@@ -8,7 +8,11 @@ const CompanyFeatureRoute = ({ module, children }: { module: string; children: R
     return <div className="py-16 text-center text-sm font-mono text-muted-foreground">Verificando recursos...</div>;
   }
 
-  if (userRole !== 'owner' && companyId && !companyFeatures.includes(module)) {
+  if (userRole === 'owner') {
+    return <Navigate to="/owner" replace />;
+  }
+
+  if (companyId && !companyFeatures.includes(module)) {
     return <Navigate to="/" replace />;
   }
 
