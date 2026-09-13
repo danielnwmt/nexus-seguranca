@@ -1,7 +1,17 @@
-import { useQuery } from '@tanstack/react-query';
-import { Activity, Bell, Camera, Cloud, Database, DollarSign, ShieldCheck, Users, Video } from 'lucide-react';
+import { FormEvent, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Activity, Bell, Camera, Cloud, Database, DollarSign, Pencil, Plus, Settings2, ShieldCheck, Users, Video } from 'lucide-react';
 import StatsCard from '@/components/dashboard/StatsCard';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 interface OwnerStats {
@@ -23,7 +33,35 @@ const emptyStats: OwnerStats = {
   storage_servers_total: 0, cloud_storages_total: 0, monthly_revenue: 0,
 };
 
+type Company = {
+  id: string;
+  name: string;
+  document: string | null;
+  email: string | null;
+  phone: string | null;
+  plan_name: string;
+  status: string;
+};
+
+const modules = [
+  ['dashboard', 'Dashboard'], ['cameras_view', 'Câmeras, ao vivo e gravações'],
+  ['clients_view', 'Clientes'], ['guards', 'Vigilantes'], ['installers', 'Técnicos'],
+  ['service_orders', 'Ordens de serviço'], ['financial', 'Financeiro, estoque e orçamentos'],
+  ['alarms', 'Alarmes e centrais'], ['analytics', 'Analíticos IA'],
+  ['settings', 'Saúde e configurações'], ['support', 'Atendimento'],
+] as const;
+
+const blankForm = { name: '', document: '', email: '', phone: '', plan_name: 'Personalizado', status: 'active' };
+
 const OwnerDashboard = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [companyDialog, setCompanyDialog] = useState(false);
+  const [featuresDialog, setFeaturesDialog] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [form, setForm] = useState(blankForm);
+  const [enabledModules, setEnabledModules] = useState<string[]>([]);
   const { data = emptyStats, isLoading, error } = useQuery({
     queryKey: ['owner-dashboard-stats'],
     queryFn: async () => {
@@ -33,6 +71,71 @@ const OwnerDashboard = () => {
     },
     refetchInterval: 60_000,
   });
+
+  const { data: companies = [], isLoading: companiesLoading } = useQuery({
+    queryKey: ['saas-companies'],
+    queryFn: async () => {
+      const { data: result, error: queryError } = await supabase.from('saas_companies').select('*').order('name');
+      if (queryError) throw queryError;
+      return result as Company[];
+    },
+  });
+
+  const activeCompanies = useMemo(() => companies.filter((company) => company.status === 'active').length, [companies]);
+
+  const saveCompany = useMutation({
+    mutationFn: async () => {
+      const payload = { ...form, name: form.name.trim(), document: form.document.trim() || null, email: form.email.trim() || null, phone: form.phone.trim() || null };
+      if (!payload.name) throw new Error('Informe o nome da empresa.');
+      if (editingCompany) {
+        const { error: updateError } = await supabase.from('saas_companies').update(payload).eq('id', editingCompany.id);
+        if (updateError) throw updateError;
+      } else {
+        const { data: created, error: insertError } = await supabase.from('saas_companies').insert(payload).select('id').single();
+        if (insertError) throw insertError;
+        const { error: featureError } = await supabase.from('saas_company_features').insert(modules.map(([module]) => ({ company_id: created.id, module, enabled: true })));
+        if (featureError) throw featureError;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['saas-companies'] });
+      setCompanyDialog(false);
+      toast({ title: editingCompany ? 'Empresa atualizada' : 'Empresa adicionada' });
+    },
+    onError: (mutationError: Error) => toast({ title: 'Não foi possível salvar', description: mutationError.message, variant: 'destructive' }),
+  });
+
+  const saveFeatures = useMutation({
+    mutationFn: async () => {
+      if (!selectedCompany) throw new Error('Empresa não selecionada.');
+      const { error: upsertError } = await supabase.from('saas_company_features').upsert(
+        modules.map(([module]) => ({ company_id: selectedCompany.id, module, enabled: enabledModules.includes(module) })),
+        { onConflict: 'company_id,module' },
+      );
+      if (upsertError) throw upsertError;
+    },
+    onSuccess: () => {
+      setFeaturesDialog(false);
+      toast({ title: 'Recursos atualizados' });
+    },
+    onError: (mutationError: Error) => toast({ title: 'Não foi possível liberar os recursos', description: mutationError.message, variant: 'destructive' }),
+  });
+
+  const openNewCompany = () => { setEditingCompany(null); setForm(blankForm); setCompanyDialog(true); };
+  const openEditCompany = (company: Company) => {
+    setEditingCompany(company);
+    setForm({ name: company.name, document: company.document || '', email: company.email || '', phone: company.phone || '', plan_name: company.plan_name, status: company.status });
+    setCompanyDialog(true);
+  };
+  const openFeatures = async (company: Company) => {
+    const { data: features, error: featureError } = await supabase.from('saas_company_features').select('module, enabled').eq('company_id', company.id);
+    if (featureError) { toast({ title: 'Não foi possível carregar os recursos', variant: 'destructive' }); return; }
+    setSelectedCompany(company);
+    setEnabledModules(features?.filter((feature) => feature.enabled).map((feature) => feature.module) || []);
+    setFeaturesDialog(true);
+  };
+
+  const handleCompanySubmit = (event: FormEvent) => { event.preventDefault(); saveCompany.mutate(); };
 
   const onlineRate = data.cameras_total > 0 ? Math.round((data.cameras_online / data.cameras_total) * 100) : 0;
   const clientRate = data.clients_total > 0 ? Math.round((data.clients_active / data.clients_total) * 100) : 0;
@@ -45,7 +148,7 @@ const OwnerDashboard = () => {
             <ShieldCheck className="h-4 w-4" /> Acesso proprietário
           </div>
           <h1 className="text-2xl font-bold text-foreground">Gestão do SaaS</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Visão consolidada da operação Nexus Segurança.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Empresas, planos e recursos liberados na plataforma.</p>
         </div>
         <div className="flex items-center gap-2 text-xs font-mono text-success">
           <span className="status-dot status-online" /> Plataforma operacional
@@ -94,8 +197,66 @@ const OwnerDashboard = () => {
               </div>
             </div>
           </section>
+
+          <section className="space-y-4 border-t border-border pt-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Empresas do SaaS</h2>
+                <p className="text-sm text-muted-foreground">{companies.length} cadastradas · {activeCompanies} ativas</p>
+              </div>
+              <Button onClick={openNewCompany}><Plus /> Adicionar empresa</Button>
+            </div>
+
+            <div className="overflow-hidden rounded-md border border-border">
+              <Table>
+                <TableHeader><TableRow><TableHead>Empresa</TableHead><TableHead>Contato</TableHead><TableHead>Plano</TableHead><TableHead>Situação</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {companiesLoading ? (
+                    <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">Carregando empresas...</TableCell></TableRow>
+                  ) : companies.length === 0 ? (
+                    <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">Nenhuma empresa cadastrada.</TableCell></TableRow>
+                  ) : companies.map((company) => (
+                    <TableRow key={company.id}>
+                      <TableCell><strong>{company.name}</strong><div className="text-xs text-muted-foreground">{company.document || 'Documento não informado'}</div></TableCell>
+                      <TableCell><div>{company.email || '—'}</div><div className="text-xs text-muted-foreground">{company.phone || '—'}</div></TableCell>
+                      <TableCell>{company.plan_name}</TableCell>
+                      <TableCell><Badge variant={company.status === 'active' ? 'default' : 'secondary'}>{company.status === 'active' ? 'Ativa' : 'Inativa'}</Badge></TableCell>
+                      <TableCell><div className="flex justify-end gap-2"><Button variant="outline" size="sm" onClick={() => openFeatures(company)}><Settings2 /> Recursos</Button><Button variant="ghost" size="icon" title="Editar empresa" onClick={() => openEditCompany(company)}><Pencil /></Button></div></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </section>
         </>
       )}
+
+      <Dialog open={companyDialog} onOpenChange={setCompanyDialog}>
+        <DialogContent>
+          <form onSubmit={handleCompanySubmit} className="space-y-4">
+            <DialogHeader><DialogTitle>{editingCompany ? 'Editar empresa' : 'Adicionar empresa'}</DialogTitle><DialogDescription>Cadastre a empresa assinante da plataforma.</DialogDescription></DialogHeader>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2"><Label htmlFor="company-name">Nome da empresa</Label><Input id="company-name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></div>
+              <div><Label htmlFor="company-document">CNPJ/CPF</Label><Input id="company-document" value={form.document} onChange={(event) => setForm({ ...form, document: event.target.value })} /></div>
+              <div><Label htmlFor="company-phone">Telefone</Label><Input id="company-phone" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></div>
+              <div className="sm:col-span-2"><Label htmlFor="company-email">E-mail</Label><Input id="company-email" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></div>
+              <div><Label>Plano</Label><Input value={form.plan_name} onChange={(event) => setForm({ ...form, plan_name: event.target.value })} /></div>
+              <div><Label>Situação</Label><Select value={form.status} onValueChange={(status) => setForm({ ...form, status })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Ativa</SelectItem><SelectItem value="inactive">Inativa</SelectItem></SelectContent></Select></div>
+            </div>
+            <DialogFooter><Button type="button" variant="outline" onClick={() => setCompanyDialog(false)}>Cancelar</Button><Button type="submit" disabled={saveCompany.isPending}>{saveCompany.isPending ? 'Salvando...' : 'Salvar empresa'}</Button></DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={featuresDialog} onOpenChange={setFeaturesDialog}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader><DialogTitle>Liberar recursos</DialogTitle><DialogDescription>Escolha o que {selectedCompany?.name} poderá usar.</DialogDescription></DialogHeader>
+          <div className="max-h-[55vh] space-y-1 overflow-y-auto pr-1">
+            {modules.map(([module, label]) => <div key={module} className="flex items-center justify-between border-b border-border py-3"><Label htmlFor={`module-${module}`}>{label}</Label><Switch id={`module-${module}`} checked={enabledModules.includes(module)} onCheckedChange={(checked) => setEnabledModules((current) => checked ? [...current, module] : current.filter((item) => item !== module))} /></div>)}
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setFeaturesDialog(false)}>Cancelar</Button><Button onClick={() => saveFeatures.mutate()} disabled={saveFeatures.isPending}>{saveFeatures.isPending ? 'Salvando...' : 'Salvar liberações'}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
