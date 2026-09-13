@@ -6,9 +6,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Lock, Mail, AlertCircle, ShieldAlert, User } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Lock, Mail, AlertCircle, ShieldAlert, User, CheckCircle, Loader2 } from 'lucide-react';
 import { maskCpf } from '@/lib/masks';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { z } from 'zod';
+
+const recoveryEmailSchema = z.string().trim().email('Digite um e-mail válido').max(255, 'E-mail muito longo');
 
 // Animated particle network background
 const ParticleBackground = () => {
@@ -106,6 +110,11 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [recoveryError, setRecoveryError] = useState('');
+  const [recoverySent, setRecoverySent] = useState(false);
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
 
   const isCpf = (val: string) => {
     const v = val.trim();
@@ -193,6 +202,43 @@ const Login = () => {
     setLoading(false);
   };
 
+  const openRecovery = () => {
+    const currentEmail = identifier.trim();
+    setRecoveryEmail(currentEmail.includes('@') ? currentEmail : '');
+    setRecoveryError('');
+    setRecoverySent(false);
+    setRecoveryOpen(true);
+  };
+
+  const handleRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRecoveryError('');
+
+    const parsedEmail = recoveryEmailSchema.safeParse(recoveryEmail);
+    if (!parsedEmail.success) {
+      setRecoveryError(parsedEmail.error.issues[0]?.message || 'Digite um e-mail válido');
+      return;
+    }
+
+    if (isLocalInstallation()) {
+      setRecoveryError('Na instalação local, solicite a redefinição ao administrador.');
+      return;
+    }
+
+    setRecoveryLoading(true);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(parsedEmail.data, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setRecoveryLoading(false);
+
+    if (resetError) {
+      setRecoveryError('Não foi possível enviar o link. Tente novamente.');
+      return;
+    }
+
+    setRecoverySent(true);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden"
       style={{ background: 'linear-gradient(135deg, hsl(200, 30%, 12%) 0%, hsl(190, 40%, 18%) 50%, hsl(180, 35%, 14%) 100%)' }}
@@ -238,7 +284,17 @@ const Login = () => {
               </div>
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground mb-1.5 block">Senha</Label>
+              <div className="mb-1.5 flex items-center justify-between gap-3">
+                <Label className="text-xs text-muted-foreground">Senha</Label>
+                <Button
+                  type="button"
+                  variant="link"
+                  className="h-auto p-0 text-xs text-primary"
+                  onClick={openRecovery}
+                >
+                  Esqueci minha senha
+                </Button>
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -284,6 +340,60 @@ const Login = () => {
 
         </div>
       </div>
+
+      <Dialog open={recoveryOpen} onOpenChange={setRecoveryOpen}>
+        <DialogContent className="max-w-sm border-border bg-card">
+          <DialogHeader>
+            <DialogTitle>Recuperar senha</DialogTitle>
+            <DialogDescription>
+              Informe seu e-mail para receber o link de redefinição.
+            </DialogDescription>
+          </DialogHeader>
+
+          {recoverySent ? (
+            <div className="space-y-4 py-2 text-center">
+              <CheckCircle className="mx-auto h-10 w-10 text-primary" />
+              <p className="text-sm text-foreground">Link enviado. Verifique sua caixa de entrada e o spam.</p>
+              <Button type="button" className="w-full" onClick={() => setRecoveryOpen(false)}>
+                Fechar
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={handleRecovery} className="space-y-4">
+              <div>
+                <Label htmlFor="recovery-email" className="mb-1.5 block text-xs text-muted-foreground">E-mail</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="recovery-email"
+                    type="email"
+                    value={recoveryEmail}
+                    onChange={(event) => setRecoveryEmail(event.target.value)}
+                    placeholder="seu@email.com"
+                    className="pl-9"
+                    maxLength={255}
+                    autoComplete="email"
+                    required
+                  />
+                </div>
+              </div>
+
+              {recoveryError && (
+                <div className="flex items-start gap-2 text-xs text-destructive">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>{recoveryError}</span>
+                </div>
+              )}
+
+              <Button type="submit" className="w-full" disabled={recoveryLoading}>
+                {recoveryLoading ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enviando...</>
+                ) : 'Enviar link'}
+              </Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
