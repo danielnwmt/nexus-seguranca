@@ -99,8 +99,6 @@ apiAddress: ${API_ADDRESS}
 metrics: no
 
 rtspAddress: :8554
-rtspServerKey: ""
-rtspServerCert: ""
 
 rtmpAddress: :1935
 rtmpEncryption: "no"
@@ -117,7 +115,7 @@ hlsAllowOrigin: '*'
 webrtcAddress: :8889
 webrtcEncryption: no
 webrtcAllowOrigin: '*'
-webrtcICEUDPServerIPs: [${WEBRTC_HOST}]
+webrtcAdditionalHosts: [${WEBRTC_HOST}]
 
 paths:
   all_others:
