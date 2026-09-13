@@ -6,4 +6,4 @@
 - [x] Validar painel do proprietário
 - [x] Criar instalador independente do MediaMTX para Ubuntu
 - [x] Documentar instalação e comandos de gerenciamento
-- [ ] Definir e vincular o usuário de acesso de cada empresa SaaS
+- [x] Definir e vincular o usuário de acesso de cada empresa SaaS
