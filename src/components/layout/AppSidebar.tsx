@@ -24,7 +24,7 @@ const navItems: { to: string; icon: any; label: string; permModule?: string }[] 
   { to: '/financial', icon: DollarSign, label: 'Financeiro', permModule: 'financial' },
   { to: '/alarms', icon: Bell, label: 'Alarmes', permModule: 'alarms' },
   { to: '/alarm-panels', icon: Siren, label: 'Centrais de Alarme', permModule: 'alarms' },
-  { to: '/analytics', icon: Brain, label: 'Analíticos IA', permModule: 'cameras_view' },
+  { to: '/analytics', icon: Brain, label: 'Analíticos IA', permModule: 'analytics' },
   { to: '/system-health', icon: Activity, label: 'Saúde do Sistema', permModule: 'settings' },
   { to: '/support', icon: Headphones, label: 'Atendimento', permModule: 'support' },
   { to: '/settings', icon: Settings, label: 'Configurações', permModule: 'settings' },
@@ -55,7 +55,7 @@ const defaultPermissions: Record<string, Record<string, boolean>> = {
 
 const AppSidebar = () => {
   const location = useLocation();
-  const { signOut, user, userRole, isSeller, isClient } = useAuth();
+  const { signOut, user, userRole, isSeller, isClient, companyId, companyFeatures } = useAuth();
   const { data: company } = useCompanySettings();
   const { data: rolePermissionsData } = useRolePermissions();
 
@@ -70,12 +70,14 @@ const AppSidebar = () => {
   const clientRoutes = ['/live', '/recordings', '/alarms'];
 
   const visibleItems = navItems.filter(item => {
+    if (role === 'owner') return item.permModule === 'owner_master';
     if (item.permModule === 'owner_master') return role === 'owner';
     // Clients see only their cameras, recordings, alarms
     if (isClient) return clientRoutes.includes(item.to);
     // Sellers only see Clients
     if (isSeller) return item.to === '/clients';
     if (isAdmin) return true;
+    if (companyId && item.permModule && !companyFeatures.includes(item.permModule)) return false;
     if (!item.permModule) return true;
     return myPerms[item.permModule] === true;
   });

@@ -12,6 +12,9 @@ interface AuthContextType {
   userRole: string | null;
   isSeller: boolean;
   isClient: boolean;
+  companyId: string | null;
+  companyFeatures: string[];
+  companyAccessLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null; rateLimited?: boolean; message?: string; remainingAttempts?: number; remainingSeconds?: number }>;
   signOut: () => Promise<void>;
 }
@@ -26,12 +29,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [roleLoading, setRoleLoading] = useState(true);
   const [isSeller, setIsSeller] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [companyFeatures, setCompanyFeatures] = useState<string[]>([]);
+  const [companyAccessLoading, setCompanyAccessLoading] = useState(true);
 
   // Fetch user role after user is set
   useEffect(() => {
-    if (!user?.id) { setUserRole(null); setRoleLoading(false); setIsSeller(false); setIsClient(false); return; }
+    if (!user?.id) { setUserRole(null); setRoleLoading(false); setIsSeller(false); setIsClient(false); setCompanyId(null); setCompanyFeatures([]); setCompanyAccessLoading(false); return; }
     const fetchRole = async () => {
       setRoleLoading(true);
+      setCompanyAccessLoading(true);
       try {
         if (isLocalInstallation()) {
           const stored = sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session');
@@ -59,13 +66,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Check if client
           const { data: clientData } = await supabase.from('clients').select('id').eq('user_id', user.id).maybeSingle();
           setIsClient(!!clientData);
+          const { data: membership } = await supabase.from('saas_company_users').select('company_id').eq('user_id', user.id).maybeSingle();
+          const currentCompanyId = membership?.company_id || null;
+          setCompanyId(currentCompanyId);
+          if (currentCompanyId) {
+            const { data: features } = await supabase.from('saas_company_features').select('module').eq('company_id', currentCompanyId).eq('enabled', true);
+            setCompanyFeatures(features?.map((feature) => feature.module) || []);
+          } else {
+            setCompanyFeatures([]);
+          }
         }
       } catch {
         setUserRole('n1');
         setIsSeller(false);
         setIsClient(false);
+        setCompanyId(null);
+        setCompanyFeatures([]);
       } finally {
         setRoleLoading(false);
+        setCompanyAccessLoading(false);
       }
     };
     fetchRole();
@@ -250,7 +269,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, roleLoading, userRole, isSeller, isClient, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, roleLoading, userRole, isSeller, isClient, companyId, companyFeatures, companyAccessLoading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

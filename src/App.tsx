@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "./components/layout/ProtectedRoute";
 import OwnerRoute from "./components/layout/OwnerRoute";
+import CompanyFeatureRoute from "./components/layout/CompanyFeatureRoute";
 import AppLayout from "./components/layout/AppLayout";
 import ErrorBoundary from "./components/layout/ErrorBoundary";
 import Index from "./pages/Index";
@@ -51,26 +52,26 @@ const App = () => (
               <Route path="/install" element={<Install />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-                <Route path="/" element={<Index />} />
-                <Route path="/cameras" element={<Cameras />} />
-                <Route path="/recordings" element={<Recordings />} />
-                <Route path="/clients" element={<Clients />} />
-                <Route path="/guards" element={<Guards />} />
-                <Route path="/financial" element={<Financial />} />
-                <Route path="/alarms" element={<Alarms />} />
-                <Route path="/alarm-panels" element={<AlarmPanels />} />
-                <Route path="/installers" element={<Installers />} />
-                <Route path="/service-orders" element={<ServiceOrders />} />
-                <Route path="/support" element={<Support />} />
-                <Route path="/analytics" element={<Analytics />} />
-                <Route path="/system-health" element={<SystemHealth />} />
-                <Route path="/camera-map" element={<CameraMap />} />
-                <Route path="/timeline" element={<Timeline />} />
-                <Route path="/live" element={<LiveGrid />} />
-                <Route path="/stock" element={<Stock />} />
-                <Route path="/quotes" element={<Quotes />} />
-                <Route path="/sales" element={<Sales />} />
-                <Route path="/settings" element={<Settings />} />
+                <Route path="/" element={<CompanyFeatureRoute module="dashboard"><Index /></CompanyFeatureRoute>} />
+                <Route path="/cameras" element={<CompanyFeatureRoute module="cameras_view"><Cameras /></CompanyFeatureRoute>} />
+                <Route path="/recordings" element={<CompanyFeatureRoute module="cameras_view"><Recordings /></CompanyFeatureRoute>} />
+                <Route path="/clients" element={<CompanyFeatureRoute module="clients_view"><Clients /></CompanyFeatureRoute>} />
+                <Route path="/guards" element={<CompanyFeatureRoute module="guards"><Guards /></CompanyFeatureRoute>} />
+                <Route path="/financial" element={<CompanyFeatureRoute module="financial"><Financial /></CompanyFeatureRoute>} />
+                <Route path="/alarms" element={<CompanyFeatureRoute module="alarms"><Alarms /></CompanyFeatureRoute>} />
+                <Route path="/alarm-panels" element={<CompanyFeatureRoute module="alarms"><AlarmPanels /></CompanyFeatureRoute>} />
+                <Route path="/installers" element={<CompanyFeatureRoute module="installers"><Installers /></CompanyFeatureRoute>} />
+                <Route path="/service-orders" element={<CompanyFeatureRoute module="service_orders"><ServiceOrders /></CompanyFeatureRoute>} />
+                <Route path="/support" element={<CompanyFeatureRoute module="support"><Support /></CompanyFeatureRoute>} />
+                <Route path="/analytics" element={<CompanyFeatureRoute module="analytics"><Analytics /></CompanyFeatureRoute>} />
+                <Route path="/system-health" element={<CompanyFeatureRoute module="settings"><SystemHealth /></CompanyFeatureRoute>} />
+                <Route path="/camera-map" element={<CompanyFeatureRoute module="cameras_view"><CameraMap /></CompanyFeatureRoute>} />
+                <Route path="/timeline" element={<CompanyFeatureRoute module="cameras_view"><Timeline /></CompanyFeatureRoute>} />
+                <Route path="/live" element={<CompanyFeatureRoute module="cameras_view"><LiveGrid /></CompanyFeatureRoute>} />
+                <Route path="/stock" element={<CompanyFeatureRoute module="financial"><Stock /></CompanyFeatureRoute>} />
+                <Route path="/quotes" element={<CompanyFeatureRoute module="financial"><Quotes /></CompanyFeatureRoute>} />
+                <Route path="/sales" element={<CompanyFeatureRoute module="financial"><Sales /></CompanyFeatureRoute>} />
+                <Route path="/settings" element={<CompanyFeatureRoute module="settings"><Settings /></CompanyFeatureRoute>} />
                 <Route path="/owner" element={<OwnerRoute><OwnerDashboard /></OwnerRoute>} />
               </Route>
               <Route path="*" element={<NotFound />} />
