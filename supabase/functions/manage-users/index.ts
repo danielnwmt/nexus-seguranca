@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
         });
 
         // Update role
-        const validLevels = ["admin", "n1", "n2", "n3"];
+        const validLevels = ["admin", "n1", "n2", "n3", "owner"];
         if (level && validLevels.includes(level)) {
           await adminClient
             .from("user_roles")
