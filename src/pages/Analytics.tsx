@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Brain, ShieldAlert, Users, Car, Crosshair, Footprints, PersonStanding, ScanEye, AlertTriangle, Camera, Play, Square, Loader2, Zap } from 'lucide-react';
 import ManualAnalysis from '@/components/analytics/ManualAnalysis';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { isLocalInstallation, getServerApiUrl } from '@/hooks/useLocalApi';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { CLOUD_ANALYTICS_EVENT, CLOUD_ANALYTICS_KEY } from '@/components/analytics/CloudAnalyticsRunner';
 
 const eventLabels: Record<string, { label: string; icon: any; color: string }> = {
   lpr: { label: 'Leitura de Placa', icon: Car, color: 'text-blue-400' },
@@ -54,53 +55,10 @@ const Analytics = () => {
   const [toggling, setToggling] = useState(false);
   const isLocal = isLocalInstallation();
 
-  // --- Modo nuvem (Vercel/publicado): o ciclo roda pelo navegador chamando a função da nuvem ---
-  const [cloudRunning, setCloudRunning] = useState(false);
-  const cloudStats = useRef({ cycles: 0, detections: 0, errors: 0, cameras: 0, startedAt: null as string | null, lastCycleAt: null as string | null, lastCycleDuration: 0 });
-  const cloudBusy = useRef(false);
-
-  const runCloudCycle = useCallback(async () => {
-    if (cloudBusy.current) return;
-    cloudBusy.current = true;
-    const started = Date.now();
-    try {
-      const { data, error } = await supabase.functions.invoke('auto-analyze-cameras', { body: {} });
-      const s = cloudStats.current;
-      s.cycles += 1;
-      s.lastCycleAt = new Date().toISOString();
-      s.lastCycleDuration = Date.now() - started;
-      if (error) {
-        s.errors += 1;
-      } else {
-        const results: any[] = (data as any)?.results || [];
-        s.cameras = (data as any)?.analyzed ?? results.length;
-        s.detections += results.reduce((acc, r) => acc + (r.detections || 0), 0);
-        s.errors += results.filter((r) => r.status === 'error').length;
-      }
-      setAnalysisStatus({
-        running: true,
-        interval: 30,
-        concurrency: 1,
-        startedAt: s.startedAt,
-        cyclesCompleted: s.cycles,
-        totalDetections: s.detections,
-        totalErrors: s.errors,
-        camerasAnalyzed: s.cameras,
-        lastCycleAt: s.lastCycleAt,
-        lastCycleDuration: s.lastCycleDuration,
-        rateLimited: false,
-      });
-    } finally {
-      cloudBusy.current = false;
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isLocal || !cloudRunning) return;
-    runCloudCycle();
-    const id = setInterval(runCloudCycle, 30000);
-    return () => clearInterval(id);
-  }, [isLocal, cloudRunning, runCloudCycle]);
+  // Na nuvem, a preferência fica ativa durante toda a navegação do sistema.
+  const [cloudRunning, setCloudRunning] = useState(
+    () => localStorage.getItem(CLOUD_ANALYTICS_KEY) === 'true',
+  );
 
   // Fetch analysis status (apenas instalação local)
   const fetchStatus = useCallback(async () => {
@@ -125,14 +83,16 @@ const Analytics = () => {
     // Nuvem (Vercel/publicado): liga/desliga o ciclo via função da nuvem
     if (!isLocal) {
       if (cloudRunning) {
+        localStorage.setItem(CLOUD_ANALYTICS_KEY, 'false');
         setCloudRunning(false);
         setAnalysisStatus(null);
         toast({ title: '🔴 Análise contínua PARADA' });
       } else {
-        cloudStats.current = { cycles: 0, detections: 0, errors: 0, cameras: 0, startedAt: new Date().toISOString(), lastCycleAt: null, lastCycleDuration: 0 };
+        localStorage.setItem(CLOUD_ANALYTICS_KEY, 'true');
         setCloudRunning(true);
         toast({ title: '🟢 Análise contínua INICIADA', description: 'Rodando na nuvem a cada 30s' });
       }
+      window.dispatchEvent(new Event(CLOUD_ANALYTICS_EVENT));
       return;
     }
 
