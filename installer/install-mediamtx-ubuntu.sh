@@ -56,27 +56,19 @@ echo
 info "Instalando dependências..."
 export DEBIAN_FRONTEND=noninteractive
 
-wait_for_apt() {
-  local waited=0
-  local max_wait=300
+MISSING_PACKAGES=()
+command -v curl >/dev/null 2>&1 || MISSING_PACKAGES+=(curl)
+command -v tar >/dev/null 2>&1 || MISSING_PACKAGES+=(tar)
+command -v ufw >/dev/null 2>&1 || MISSING_PACKAGES+=(ufw)
 
-  while fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1; do
-    if (( waited >= max_wait )); then
-      fail "O gerenciador de pacotes continua ocupado após 5 minutos. Aguarde as atualizações do Ubuntu terminarem e execute novamente."
-    fi
-    if (( waited == 0 )); then
-      warn "O Ubuntu está instalando atualizações. Aguardando a liberação automática..."
-    fi
-    sleep 5
-    waited=$((waited + 5))
-  done
-}
-
-wait_for_apt
-dpkg --configure -a >/dev/null
-apt-get -o DPkg::Lock::Timeout=300 update -qq
-apt-get -o DPkg::Lock::Timeout=300 install -y -qq ca-certificates curl tar ufw >/dev/null
-ok "Dependências instaladas"
+if (( ${#MISSING_PACKAGES[@]} > 0 )); then
+  if fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1; then
+    fail "O apt está ocupado. Encerre a atualização do Ubuntu e execute novamente."
+  fi
+  apt-get -o DPkg::Lock::Timeout=0 update -qq
+  apt-get -o DPkg::Lock::Timeout=0 install -y -qq ca-certificates "${MISSING_PACKAGES[@]}" >/dev/null
+fi
+ok "Dependências verificadas"
 
 LOCAL_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 LOCAL_IP="${LOCAL_IP:-127.0.0.1}"
