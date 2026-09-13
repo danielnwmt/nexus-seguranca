@@ -44,11 +44,12 @@ Deno.serve(async (req) => {
       .from("user_roles")
       .select("role")
       .eq("user_id", userId)
-      .eq("role", "admin")
+      .in("role", ["admin", "owner"])
+      .limit(1)
       .maybeSingle();
 
     if (!roleData) {
-      return new Response(JSON.stringify({ error: "Admin access required" }), {
+      return new Response(JSON.stringify({ error: "Administrator access required" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -152,6 +153,11 @@ Deno.serve(async (req) => {
           });
         }
 
+        const { data: targetRole } = await adminClient.from("user_roles").select("role").eq("user_id", user_id).eq("role", "owner").maybeSingle();
+        if (targetRole && user_id !== userId) {
+          return new Response(JSON.stringify({ error: "Owner account is protected" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
         // Prevent self-demotion from admin
         if (user_id === userId && level !== "admin") {
           return new Response(JSON.stringify({ error: "Cannot demote yourself" }), {
@@ -231,6 +237,12 @@ Deno.serve(async (req) => {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
+        }
+
+
+        const { data: targetRole } = await adminClient.from("user_roles").select("role").eq("user_id", user_id).eq("role", "owner").maybeSingle();
+        if (targetRole) {
+          return new Response(JSON.stringify({ error: "Owner account is protected" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
         await adminClient.from("user_roles").delete().eq("user_id", user_id);

@@ -8,6 +8,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  roleLoading: boolean;
   userRole: string | null;
   isSeller: boolean;
   isClient: boolean;
@@ -22,13 +23,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [roleLoading, setRoleLoading] = useState(false);
   const [isSeller, setIsSeller] = useState(false);
   const [isClient, setIsClient] = useState(false);
 
   // Fetch user role after user is set
   useEffect(() => {
-    if (!user?.id) { setUserRole(null); setIsSeller(false); setIsClient(false); return; }
+    if (!user?.id) { setUserRole(null); setRoleLoading(false); setIsSeller(false); setIsClient(false); return; }
     const fetchRole = async () => {
+      setRoleLoading(true);
       try {
         if (isLocalInstallation()) {
           const stored = sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session');
@@ -47,8 +50,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const clientRes = await fetch(`${getLocalApiBase()}/rest/v1/clients?user_id=eq.${user.id}&select=id&limit=1`, { headers });
           setIsClient(clientRes.ok && (await clientRes.json()).length > 0);
         } else {
-          const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id).maybeSingle();
-          setUserRole(data?.role || 'n1');
+          const { data } = await supabase.from('user_roles').select('role').eq('user_id', user.id);
+          const roles = data?.map((entry) => entry.role) || [];
+          setUserRole(roles.includes('owner') ? 'owner' : (roles[0] || 'n1'));
           // Check if seller
           const { data: sellerData } = await supabase.from('sellers').select('id').eq('user_id', user.id).maybeSingle();
           setIsSeller(!!sellerData);
@@ -60,6 +64,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUserRole('n1');
         setIsSeller(false);
         setIsClient(false);
+      } finally {
+        setRoleLoading(false);
       }
     };
     fetchRole();
@@ -244,7 +250,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, userRole, isSeller, isClient, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, roleLoading, userRole, isSeller, isClient, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
