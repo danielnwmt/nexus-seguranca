@@ -299,6 +299,29 @@ sudo systemctl restart nginx
 
 O **MediaMTX** é o servidor responsável por receber os streams RTMP das câmeras e convertê-los para HLS/WebRTC para visualização no navegador.
 
+### Instalar somente o MediaMTX no Ubuntu
+
+No servidor Ubuntu, execute:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/danielnwmt/nexus-seguranca/main/installer/install-mediamtx-ubuntu.sh | sudo bash
+```
+
+O instalador detecta o IP público, configura o WebRTC, libera as portas necessárias e mantém o MediaMTX ativo como serviço.
+
+Para verificar:
+
+```bash
+sudo systemctl status mediamtx
+sudo journalctl -u mediamtx -f
+```
+
+Para instalar outra versão compatível:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/danielnwmt/nexus-seguranca/main/installer/install-mediamtx-ubuntu.sh | sudo MEDIAMTX_VERSION=v1.9.3 bash
+```
+
 ### Instalação Automática (Ubuntu)
 
 No Ubuntu, o instalador já configura o MediaMTX automaticamente. Além disso, ao acessar **Configurações → Servidores de Mídia**, o sistema **detecta e cadastra** o servidor local automaticamente.
