@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const OwnerRoute = ({ children }: { children: React.ReactNode }) => {
   const { userRole, roleLoading } = useAuth();
 
-  if (roleLoading) {
+  if (roleLoading || userRole === null) {
     return <div className="py-16 text-center text-sm font-mono text-muted-foreground">Verificando acesso...</div>;
   }
 
