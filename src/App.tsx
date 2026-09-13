@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "./components/layout/ProtectedRoute";
+import OwnerRoute from "./components/layout/OwnerRoute";
 import AppLayout from "./components/layout/AppLayout";
 import ErrorBoundary from "./components/layout/ErrorBoundary";
 import Index from "./pages/Index";
@@ -31,6 +32,7 @@ import Quotes from "./pages/Quotes";
 import Sales from "./pages/Sales";
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
+import OwnerDashboard from "./pages/OwnerDashboard";
 import CloudAnalyticsRunner from "./components/analytics/CloudAnalyticsRunner";
 
 const queryClient = new QueryClient();
@@ -69,6 +71,7 @@ const App = () => (
                 <Route path="/quotes" element={<Quotes />} />
                 <Route path="/sales" element={<Sales />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/owner" element={<OwnerRoute><OwnerDashboard /></OwnerRoute>} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

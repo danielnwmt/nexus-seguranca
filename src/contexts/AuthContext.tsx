@@ -8,6 +8,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  roleLoading: boolean;
   userRole: string | null;
   isSeller: boolean;
   isClient: boolean;
@@ -22,13 +23,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [roleLoading, setRoleLoading] = useState(false);
   const [isSeller, setIsSeller] = useState(false);
   const [isClient, setIsClient] = useState(false);
 
   // Fetch user role after user is set
   useEffect(() => {
-    if (!user?.id) { setUserRole(null); setIsSeller(false); setIsClient(false); return; }
+    if (!user?.id) { setUserRole(null); setRoleLoading(false); setIsSeller(false); setIsClient(false); return; }
     const fetchRole = async () => {
+      setRoleLoading(true);
       try {
         if (isLocalInstallation()) {
           const stored = sessionStorage.getItem('nexus-local-session') || localStorage.getItem('nexus-local-session');
@@ -60,6 +63,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUserRole('n1');
         setIsSeller(false);
         setIsClient(false);
+      } finally {
+        setRoleLoading(false);
       }
     };
     fetchRole();
@@ -244,7 +249,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, userRole, isSeller, isClient, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, roleLoading, userRole, isSeller, isClient, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

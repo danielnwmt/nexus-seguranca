@@ -53,14 +53,21 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    const email = "admin@protenexus.com";
+    const email = "suporte@protenexus.com";
 
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const exists = existingUsers?.users?.some((u) => u.email === email);
 
     if (exists) {
+      const existingUser = existingUsers?.users?.find((u) => u.email === email);
+      if (existingUser) {
+        await supabaseAdmin.from("user_roles").upsert(
+          { user_id: existingUser.id, role: "owner" },
+          { onConflict: "user_id,role" },
+        );
+      }
       return new Response(
-        JSON.stringify({ message: "Usuário admin@protenexus.com já existe." }),
+        JSON.stringify({ message: "Proprietário configurado com sucesso." }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
       );
     }
@@ -72,17 +79,24 @@ Deno.serve(async (req) => {
       email,
       password: tempPassword,
       email_confirm: true,
-      user_metadata: { email_verified: true, force_password_change: true },
+      user_metadata: { email_verified: true, force_password_change: true, name: "Proprietário Nexus" },
     });
 
     if (error) throw error;
+
+    if (data.user) {
+      await supabaseAdmin.from("user_roles").upsert(
+        { user_id: data.user.id, role: "owner" },
+        { onConflict: "user_id,role" },
+      );
+    }
 
     // Send password reset so admin sets their own password
     await supabaseAdmin.auth.resetPasswordForEmail(email);
 
     return new Response(
       JSON.stringify({ 
-        message: "Usuário admin@protenexus.com criado. Um e-mail de redefinição de senha foi enviado.", 
+        message: "Proprietário criado. Um e-mail de redefinição de senha foi enviado.", 
         user_id: data.user.id 
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }

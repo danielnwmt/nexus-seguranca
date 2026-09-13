@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Camera, Users, Bell, DollarSign, Shield, Settings, LogOut, Headphones, ClipboardList, Wrench, Brain, Film, Activity, MapPin, Clock, Monitor, Package, FileText, HandCoins, Siren } from 'lucide-react';
+import { LayoutDashboard, Camera, Users, Bell, DollarSign, Shield, Settings, LogOut, Headphones, ClipboardList, Wrench, Brain, Film, Activity, MapPin, Clock, Monitor, Package, FileText, HandCoins, Siren, Crown } from 'lucide-react';
 import nexusLogo from '@/assets/nexus-logo.png';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
@@ -7,6 +7,7 @@ import { useRolePermissions, buildPermissionMap } from '@/hooks/useRolePermissio
 
 // Map route to permission module key
 const navItems: { to: string; icon: any; label: string; permModule?: string }[] = [
+  { to: '/owner', icon: Crown, label: 'Gestão SaaS', permModule: 'owner_master' },
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', permModule: 'dashboard' },
   { to: '/cameras', icon: Camera, label: 'Câmeras', permModule: 'cameras_view' },
   { to: '/live', icon: Monitor, label: 'Ao Vivo', permModule: 'cameras_view' },
@@ -46,6 +47,10 @@ const defaultPermissions: Record<string, Record<string, boolean>> = {
     dashboard: true, cameras_view: true, cameras_edit: true, clients_view: true, clients_edit: true,
     guards: true, installers: true, service_orders: true, financial: true, alarms: true, support: true, settings: true, users: true,
   },
+  owner: {
+    dashboard: true, cameras_view: true, cameras_edit: true, clients_view: true, clients_edit: true,
+    guards: true, installers: true, service_orders: true, financial: true, alarms: true, support: true, settings: true, users: true, owner_master: true,
+  },
 };
 
 const AppSidebar = () => {
@@ -59,12 +64,13 @@ const AppSidebar = () => {
   const myPerms = permissionMap[role] || defaultPermissions[role] || {};
 
   // Admin sees everything
-  const isAdmin = role === 'admin';
+  const isAdmin = role === 'admin' || role === 'owner';
 
   // Client routes
   const clientRoutes = ['/live', '/recordings', '/alarms'];
 
   const visibleItems = navItems.filter(item => {
+    if (item.permModule === 'owner_master') return role === 'owner';
     // Clients see only their cameras, recordings, alarms
     if (isClient) return clientRoutes.includes(item.to);
     // Sellers only see Clients
