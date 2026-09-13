@@ -199,24 +199,33 @@ const Clients = () => {
   const handlePrintBoleto = (inv: any) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
-    const esc = (s: any) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-    printWindow.document.write(`
-      <html><head><title>Boleto - ${esc(selectedClient?.name)}</title>
-      <style>body{font-family:monospace;padding:40px}h1{font-size:18px}table{width:100%;border-collapse:collapse;margin-top:20px}td,th{border:1px solid #333;padding:8px;text-align:left}th{background:#f0f0f0}</style>
-      </head><body>
-      <h1>Boleto de Cobrança</h1>
-      <table>
-        <tr><th>Cliente</th><td>${esc(inv.client_name)}</td></tr>
-        <tr><th>Valor</th><td>R$ ${esc(Number(inv.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))}</td></tr>
-        <tr><th>Vencimento</th><td>${esc(inv.due_date ? new Date(inv.due_date).toLocaleDateString('pt-BR') : '-')}</td></tr>
-        <tr><th>Banco</th><td>${esc(inv.bank || '-')}</td></tr>
-        <tr><th>Status</th><td>${esc(inv.status === 'paid' ? 'Pago' : 'Pendente')}</td></tr>
-        <tr><th>Registro</th><td>${esc(inv.boleto_url)}</td></tr>
-      </table>
-      </body></html>
-    `);
-    printWindow.document.close();
-    printWindow.onload = () => printWindow.print();
+    const doc = printWindow.document;
+    doc.title = `Boleto - ${String(selectedClient?.name || '')}`;
+    const style = doc.createElement('style');
+    style.textContent = 'body{font-family:monospace;padding:40px}h1{font-size:18px}table{width:100%;border-collapse:collapse;margin-top:20px}td,th{border:1px solid #333;padding:8px;text-align:left}th{background:#f0f0f0}';
+    doc.head.appendChild(style);
+    const heading = doc.createElement('h1');
+    heading.textContent = 'Boleto de Cobrança';
+    doc.body.appendChild(heading);
+    const table = doc.createElement('table');
+    const rows = [
+      ['Cliente', inv.client_name],
+      ['Valor', `R$ ${Number(inv.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+      ['Vencimento', inv.due_date ? new Date(inv.due_date).toLocaleDateString('pt-BR') : '-'],
+      ['Banco', inv.bank || '-'],
+      ['Status', inv.status === 'paid' ? 'Pago' : 'Pendente'],
+      ['Registro', inv.boleto_url || '-'],
+    ];
+    rows.forEach(([label, value]) => {
+      const row = table.insertRow();
+      const header = doc.createElement('th');
+      header.textContent = String(label);
+      const cell = row.insertCell();
+      cell.textContent = String(value ?? '');
+      row.prepend(header);
+    });
+    doc.body.appendChild(table);
+    printWindow.setTimeout(() => printWindow.print(), 0);
   };
 
   return (
