@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 import { companySettingsQueryKey } from '@/hooks/useCompanySettings';
+import { useAuth } from '@/contexts/AuthContext';
 
 const maskCNPJ = (value: string) => {
   return value
@@ -47,6 +48,7 @@ const getLocalHeaders = () => {
 const CompanySettings = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { companyId } = useAuth();
   const [loading, setLoading] = useState(false);
   const isLocal = isLocalInstallation();
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -79,19 +81,18 @@ const CompanySettings = () => {
         if (res.ok) data = await res.json();
       } catch {}
     } else {
-      const { data: d } = await supabase
-        .from('company_settings')
-        .select('*')
-        .limit(1)
-        .maybeSingle();
+      const query = companyId
+        ? supabase.from('saas_companies').select('*').eq('id', companyId).maybeSingle()
+        : supabase.from('company_settings').select('*').limit(1).maybeSingle();
+      const { data: d } = await query;
       data = d;
     }
     if (data) {
       setForm({
         id: data.id,
         name: data.name || '',
-        razao_social: data.razao_social || '',
-        cnpj: data.cnpj || '',
+        razao_social: data.legal_name || data.razao_social || '',
+        cnpj: data.document || data.cnpj || '',
         address: data.address || '',
         phone: data.phone || '',
         email: data.email || '',
@@ -135,7 +136,7 @@ const CompanySettings = () => {
     }
 
     const fileExt = file.name.split('.').pop();
-    const filePath = `company/logo.${fileExt}`;
+    const filePath = companyId ? `${companyId}/branding/logo.${fileExt}` : `company/logo.${fileExt}`;
 
     const { error } = await supabase.storage
       .from('client-cameras')
@@ -180,7 +181,7 @@ const CompanySettings = () => {
     }
 
     const fileExt = file.name.split('.').pop();
-    const filePath = `company/login-bg.${fileExt}`;
+    const filePath = companyId ? `${companyId}/branding/login-bg.${fileExt}` : `company/login-bg.${fileExt}`;
 
     const { error } = await supabase.storage
       .from('client-cameras')
@@ -237,10 +238,19 @@ const CompanySettings = () => {
         error = { message: e.message || 'Erro de conexão' };
       }
     } else {
-      const result = await supabase
-        .from('company_settings')
-        .update(payload)
-        .eq('id', form.id);
+      const result = companyId
+        ? await supabase.from('saas_companies').update({
+            name: payload.name,
+            legal_name: payload.razao_social,
+            document: payload.cnpj,
+            address: payload.address,
+            phone: payload.phone,
+            email: payload.email,
+            logo_url: payload.logo_url,
+            login_bg_url: payload.login_bg_url,
+            recording_segment_minutes: payload.recording_segment_minutes,
+          }).eq('id', companyId)
+        : await supabase.from('company_settings').update(payload).eq('id', form.id);
       error = result.error;
       if (!result.error && result.data === null && result.count === 0) {
         error = { message: 'Nenhum registro atualizado. Verifique permissões.' };
