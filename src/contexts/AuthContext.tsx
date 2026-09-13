@@ -80,21 +80,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // Cloud: clear persisted session on page load so user must login again
-    supabase.auth.signOut().then(() => {
-      setUser(null);
+    let active = true;
+
+    // Cloud: restore the existing session instead of signing the user out on every refresh.
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setSession(data.session);
+      setUser(data.session?.user ?? null);
+      setLoading(false);
+    }).catch(() => {
+      if (!active) return;
       setSession(null);
+      setUser(null);
       setLoading(false);
     });
 
-    // Still listen for new sign-ins during this page session
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return;
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const isLocal = isLocalInstallation();

@@ -115,6 +115,20 @@ const Login = () => {
     return digits.length >= 8 && digits.length <= 11 && /^[\d.\-/]+$/.test(v);
   };
 
+  const navigateAfterLocalLogin = () => {
+    const stored = sessionStorage.getItem('nexus-local-session');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.user?.user_metadata?.force_password_change) {
+          navigate('/reset-password');
+          return;
+        }
+      } catch {}
+    }
+    navigate('/');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -134,7 +148,7 @@ const Login = () => {
         setIsRateLimited(false);
         setRemainingAttempts(null);
         if (isLocalInstallation()) {
-          navigate('/');
+          navigateAfterLocalLogin();
         } else {
           const { data: { user } } = await supabase.auth.getUser();
           if (user?.user_metadata?.force_password_change) {
@@ -166,18 +180,7 @@ const Login = () => {
       setIsRateLimited(false);
       setRemainingAttempts(null);
       if (isLocalInstallation()) {
-        const stored = localStorage.getItem('nexus-local-session');
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            if (parsed.user?.user_metadata?.force_password_change) {
-              navigate('/reset-password');
-              setLoading(false);
-              return;
-            }
-          } catch {}
-        }
-        navigate('/');
+        navigateAfterLocalLogin();
       } else {
         const { data: { user } } = await supabase.auth.getUser();
         if (user?.user_metadata?.force_password_change) {

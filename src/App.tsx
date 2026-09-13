@@ -31,6 +31,7 @@ import Quotes from "./pages/Quotes";
 import Sales from "./pages/Sales";
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
+import CloudAnalyticsRunner from "./components/analytics/CloudAnalyticsRunner";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <CloudAnalyticsRunner />
         <TooltipProvider>
           <Toaster />
           <Sonner />
