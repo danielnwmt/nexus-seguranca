@@ -55,8 +55,27 @@ echo
 
 info "Instalando dependências..."
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get install -y -qq ca-certificates curl tar ufw >/dev/null
+
+wait_for_apt() {
+  local waited=0
+  local max_wait=300
+
+  while fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1; do
+    if (( waited >= max_wait )); then
+      fail "O gerenciador de pacotes continua ocupado após 5 minutos. Aguarde as atualizações do Ubuntu terminarem e execute novamente."
+    fi
+    if (( waited == 0 )); then
+      warn "O Ubuntu está instalando atualizações. Aguardando a liberação automática..."
+    fi
+    sleep 5
+    waited=$((waited + 5))
+  done
+}
+
+wait_for_apt
+dpkg --configure -a >/dev/null
+apt-get -o DPkg::Lock::Timeout=300 update -qq
+apt-get -o DPkg::Lock::Timeout=300 install -y -qq ca-certificates curl tar ufw >/dev/null
 ok "Dependências instaladas"
 
 LOCAL_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
