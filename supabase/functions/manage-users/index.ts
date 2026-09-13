@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
           });
         }
 
-        const validLevels = ["admin", "n1", "n2", "n3"];
+    const validLevels = ["admin", "n1", "n2", "n3", "owner"];
         const userLevel = validLevels.includes(level) ? level : "n1";
 
         const { data: newUser, error: createErr } = await adminClient.auth.admin.createUser({

@@ -4,4 +4,4 @@
 - [x] Criar papel seguro de dono SaaS e vinculá-lo ao usuário informado
 - [x] Criar painel de gestão exclusivo
 - [x] Integrar rota e menu com controle de acesso
-- [ ] Validar funcionamento e segurança
+- [x] Validar funcionamento e segurança
