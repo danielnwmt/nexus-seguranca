@@ -331,7 +331,7 @@ Deno.serve(async (req) => {
       }
 
       if (body.action === "reset_password") {
-        const { user_id } = body;
+        const { user_id, password } = body;
 
         if (!user_id || typeof user_id !== "string") {
           return new Response(JSON.stringify({ error: "User ID required" }), {
@@ -340,18 +340,33 @@ Deno.serve(async (req) => {
           });
         }
 
-        // Generate a random temporary password
-        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
-        let tempPassword = "";
-        for (let i = 0; i < 12; i++) {
-          tempPassword += chars[Math.floor(Math.random() * chars.length)];
+        const requestedPassword = typeof password === "string" ? password : "";
+        if (requestedPassword && (roleData.role !== "owner" || user_id !== userId)) {
+          return new Response(JSON.stringify({ error: "Only the owner can define their own temporary password" }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
-        // Ensure it meets policy: uppercase, number, special
-        tempPassword = "A1!" + tempPassword;
+        if (requestedPassword && requestedPassword.length < 8) {
+          return new Response(JSON.stringify({ error: "Password must be at least 8 characters" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const tempPassword = requestedPassword || generateTemporaryPassword();
+
+        const { data: targetUser, error: targetUserError } = await adminClient.auth.admin.getUserById(user_id);
+        if (targetUserError || !targetUser.user) {
+          return new Response(JSON.stringify({ error: "User not found" }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
 
         const { error: resetErr } = await adminClient.auth.admin.updateUserById(user_id, {
           password: tempPassword,
-          user_metadata: { force_password_change: true },
+          user_metadata: { ...targetUser.user.user_metadata, force_password_change: true },
         });
 
         if (resetErr) {
