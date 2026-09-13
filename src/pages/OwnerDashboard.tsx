@@ -52,6 +52,7 @@ const modules = [
 ] as const;
 
 const blankForm = { name: '', document: '', email: '', phone: '', plan_name: 'Personalizado', status: 'active' };
+const blankAccessForm = { name: '', email: '', password: '' };
 
 const OwnerDashboard = () => {
   const queryClient = useQueryClient();
@@ -61,6 +62,8 @@ const OwnerDashboard = () => {
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [form, setForm] = useState(blankForm);
+  const [accessForm, setAccessForm] = useState(blankAccessForm);
+  const [accessLoading, setAccessLoading] = useState(false);
   const [enabledModules, setEnabledModules] = useState<string[]>([]);
   const { data = emptyStats, isLoading, error } = useQuery({
     queryKey: ['owner-dashboard-stats'],
@@ -87,15 +90,26 @@ const OwnerDashboard = () => {
     mutationFn: async () => {
       const payload = { ...form, name: form.name.trim(), document: form.document.trim() || null, email: form.email.trim() || null, phone: form.phone.trim() || null };
       if (!payload.name) throw new Error('Informe o nome da empresa.');
+      let companyId = editingCompany?.id || '';
       if (editingCompany) {
         const { error: updateError } = await supabase.from('saas_companies').update(payload).eq('id', editingCompany.id);
         if (updateError) throw updateError;
       } else {
         const { data: created, error: insertError } = await supabase.from('saas_companies').insert(payload).select('id').single();
         if (insertError) throw insertError;
+        companyId = created.id;
         const { error: featureError } = await supabase.from('saas_company_features').insert(modules.map(([module]) => ({ company_id: created.id, module, enabled: true })));
         if (featureError) throw featureError;
       }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) throw new Error('Sessão expirada. Entre novamente.');
+      const { data: accessResult, error: accessError } = await supabase.functions.invoke('manage-users', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: { action: 'save_company_access', company_id: companyId, ...accessForm },
+      });
+      if (accessError || accessResult?.error) throw new Error(accessResult?.error || 'Não foi possível criar o usuário da empresa.');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['saas-companies'] });
@@ -121,11 +135,22 @@ const OwnerDashboard = () => {
     onError: (mutationError: Error) => toast({ title: 'Não foi possível liberar os recursos', description: mutationError.message, variant: 'destructive' }),
   });
 
-  const openNewCompany = () => { setEditingCompany(null); setForm(blankForm); setCompanyDialog(true); };
-  const openEditCompany = (company: Company) => {
+  const openNewCompany = () => { setEditingCompany(null); setForm(blankForm); setAccessForm(blankAccessForm); setCompanyDialog(true); };
+  const openEditCompany = async (company: Company) => {
     setEditingCompany(company);
     setForm({ name: company.name, document: company.document || '', email: company.email || '', phone: company.phone || '', plan_name: company.plan_name, status: company.status });
+    setAccessForm(blankAccessForm);
     setCompanyDialog(true);
+    setAccessLoading(true);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) { setAccessLoading(false); return; }
+    const { data: accessResult } = await supabase.functions.invoke('manage-users', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: { action: 'get_company_access', company_id: company.id },
+    });
+    if (accessResult?.user) setAccessForm({ name: accessResult.user.name || '', email: accessResult.user.email || '', password: '' });
+    setAccessLoading(false);
   };
   const openFeatures = async (company: Company) => {
     const { data: features, error: featureError } = await supabase.from('saas_company_features').select('module, enabled').eq('company_id', company.id);
@@ -232,7 +257,7 @@ const OwnerDashboard = () => {
       )}
 
       <Dialog open={companyDialog} onOpenChange={setCompanyDialog}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <form onSubmit={handleCompanySubmit} className="space-y-4">
             <DialogHeader><DialogTitle>{editingCompany ? 'Editar empresa' : 'Adicionar empresa'}</DialogTitle><DialogDescription>Cadastre a empresa assinante da plataforma.</DialogDescription></DialogHeader>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -242,8 +267,12 @@ const OwnerDashboard = () => {
               <div className="sm:col-span-2"><Label htmlFor="company-email">E-mail</Label><Input id="company-email" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></div>
               <div><Label>Plano</Label><Input value={form.plan_name} onChange={(event) => setForm({ ...form, plan_name: event.target.value })} /></div>
               <div><Label>Situação</Label><Select value={form.status} onValueChange={(status) => setForm({ ...form, status })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Ativa</SelectItem><SelectItem value="inactive">Inativa</SelectItem></SelectContent></Select></div>
+              <div className="sm:col-span-2 border-t border-border pt-4"><h3 className="font-semibold text-foreground">Usuário de acesso</h3><p className="text-xs text-muted-foreground">Dados usados para entrar no sistema desta empresa.</p></div>
+              <div><Label htmlFor="access-name">Nome do usuário</Label><Input id="access-name" value={accessForm.name} onChange={(event) => setAccessForm({ ...accessForm, name: event.target.value })} disabled={accessLoading} required /></div>
+              <div><Label htmlFor="access-email">E-mail de acesso</Label><Input id="access-email" type="email" value={accessForm.email} onChange={(event) => setAccessForm({ ...accessForm, email: event.target.value })} disabled={accessLoading} required /></div>
+              <div className="sm:col-span-2"><Label htmlFor="access-password">{editingCompany ? 'Nova senha (opcional)' : 'Senha temporária'}</Label><Input id="access-password" type="password" minLength={8} value={accessForm.password} onChange={(event) => setAccessForm({ ...accessForm, password: event.target.value })} disabled={accessLoading} required={!editingCompany} placeholder={editingCompany ? 'Deixe vazio para manter a senha atual' : 'Mínimo de 8 caracteres'} /></div>
             </div>
-            <DialogFooter><Button type="button" variant="outline" onClick={() => setCompanyDialog(false)}>Cancelar</Button><Button type="submit" disabled={saveCompany.isPending}>{saveCompany.isPending ? 'Salvando...' : 'Salvar empresa'}</Button></DialogFooter>
+            <DialogFooter><Button type="button" variant="outline" onClick={() => setCompanyDialog(false)}>Cancelar</Button><Button type="submit" disabled={saveCompany.isPending || accessLoading}>{saveCompany.isPending ? 'Salvando...' : 'Salvar empresa'}</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
