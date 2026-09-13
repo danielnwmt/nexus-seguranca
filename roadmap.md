@@ -8,3 +8,4 @@
 - [x] Documentar instalação e comandos de gerenciamento
 - [x] Definir e vincular o usuário de acesso de cada empresa SaaS
 - [x] Adicionar recuperação de senha por e-mail na tela de acesso
+- [x] Liberar todas as funcionalidades para o administrador de cada empresa
