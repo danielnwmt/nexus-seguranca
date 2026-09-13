@@ -36,9 +36,13 @@ const emptyStats: OwnerStats = {
 type Company = {
   id: string;
   name: string;
+  legal_name: string | null;
   document: string | null;
+  address: string | null;
   email: string | null;
   phone: string | null;
+  logo_url: string | null;
+  recording_segment_minutes: number;
   plan_name: string;
   status: string;
 };
@@ -51,7 +55,7 @@ const modules = [
   ['settings', 'Saúde e configurações'], ['support', 'Atendimento'],
 ] as const;
 
-const blankForm = { name: '', document: '', email: '', phone: '', plan_name: 'Personalizado', status: 'active' };
+const blankForm = { name: '', legal_name: '', document: '', address: '', email: '', phone: '', logo_url: '', recording_segment_minutes: 30, plan_name: 'Personalizado', status: 'active' };
 const blankAccessForm = { name: '', email: '', password: '' };
 
 const OwnerDashboard = () => {
@@ -88,7 +92,16 @@ const OwnerDashboard = () => {
 
   const saveCompany = useMutation({
     mutationFn: async () => {
-      const payload = { ...form, name: form.name.trim(), document: form.document.trim() || null, email: form.email.trim() || null, phone: form.phone.trim() || null };
+      const payload = {
+        ...form,
+        name: form.name.trim(),
+        legal_name: form.legal_name.trim() || null,
+        document: form.document.trim() || null,
+        address: form.address.trim() || null,
+        email: form.email.trim() || null,
+        phone: form.phone.trim() || null,
+        logo_url: form.logo_url || null,
+      };
       if (!payload.name) throw new Error('Informe o nome da empresa.');
       let companyId = editingCompany?.id || '';
       if (editingCompany) {
@@ -138,7 +151,7 @@ const OwnerDashboard = () => {
   const openNewCompany = () => { setEditingCompany(null); setForm(blankForm); setAccessForm(blankAccessForm); setCompanyDialog(true); };
   const openEditCompany = async (company: Company) => {
     setEditingCompany(company);
-    setForm({ name: company.name, document: company.document || '', email: company.email || '', phone: company.phone || '', plan_name: company.plan_name, status: company.status });
+    setForm({ name: company.name, legal_name: company.legal_name || '', document: company.document || '', address: company.address || '', email: company.email || '', phone: company.phone || '', logo_url: company.logo_url || '', recording_segment_minutes: company.recording_segment_minutes || 30, plan_name: company.plan_name, status: company.status });
     setAccessForm(blankAccessForm);
     setCompanyDialog(true);
     setAccessLoading(true);
@@ -161,6 +174,17 @@ const OwnerDashboard = () => {
   };
 
   const handleCompanySubmit = (event: FormEvent) => { event.preventDefault(); saveCompany.mutate(); };
+  const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: 'Logo muito grande', description: 'O tamanho máximo é 2 MB.', variant: 'destructive' });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setForm((current) => ({ ...current, logo_url: String(reader.result || '') }));
+    reader.readAsDataURL(file);
+  };
 
   const onlineRate = data.cameras_total > 0 ? Math.round((data.cameras_online / data.cameras_total) * 100) : 0;
   const clientRate = data.clients_total > 0 ? Math.round((data.clients_active / data.clients_total) * 100) : 0;
@@ -261,10 +285,14 @@ const OwnerDashboard = () => {
           <form onSubmit={handleCompanySubmit} className="space-y-4">
             <DialogHeader><DialogTitle>{editingCompany ? 'Editar empresa' : 'Adicionar empresa'}</DialogTitle><DialogDescription>Cadastre a empresa assinante da plataforma.</DialogDescription></DialogHeader>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2"><Label htmlFor="company-name">Nome da empresa</Label><Input id="company-name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></div>
+              <div className="sm:col-span-2"><Label htmlFor="company-name">Nome fantasia</Label><Input id="company-name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></div>
+              <div className="sm:col-span-2"><Label htmlFor="company-legal-name">Razão social</Label><Input id="company-legal-name" value={form.legal_name} onChange={(event) => setForm({ ...form, legal_name: event.target.value })} /></div>
               <div><Label htmlFor="company-document">CNPJ/CPF</Label><Input id="company-document" value={form.document} onChange={(event) => setForm({ ...form, document: event.target.value })} /></div>
               <div><Label htmlFor="company-phone">Telefone</Label><Input id="company-phone" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></div>
               <div className="sm:col-span-2"><Label htmlFor="company-email">E-mail</Label><Input id="company-email" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></div>
+              <div className="sm:col-span-2"><Label htmlFor="company-address">Endereço</Label><Input id="company-address" value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} /></div>
+              <div className="sm:col-span-2"><Label htmlFor="company-logo">Logotipo da empresa</Label><Input id="company-logo" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoChange} /><p className="mt-1 text-xs text-muted-foreground">PNG, JPG ou WebP. Máximo 2 MB.</p></div>
+              <div><Label>Tempo de gravação</Label><Select value={String(form.recording_segment_minutes)} onValueChange={(value) => setForm({ ...form, recording_segment_minutes: Number(value) })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{[5, 10, 15, 30, 60, 120].map((minutes) => <SelectItem key={minutes} value={String(minutes)}>{minutes < 60 ? `${minutes} minutos` : `${minutes / 60} hora${minutes > 60 ? 's' : ''}`}</SelectItem>)}</SelectContent></Select></div>
               <div><Label>Plano</Label><Input value={form.plan_name} onChange={(event) => setForm({ ...form, plan_name: event.target.value })} /></div>
               <div><Label>Situação</Label><Select value={form.status} onValueChange={(status) => setForm({ ...form, status })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Ativa</SelectItem><SelectItem value="inactive">Inativa</SelectItem></SelectContent></Select></div>
               <div className="sm:col-span-2 border-t border-border pt-4"><h3 className="font-semibold text-foreground">Usuário de acesso</h3><p className="text-xs text-muted-foreground">Dados usados para entrar no sistema desta empresa.</p></div>

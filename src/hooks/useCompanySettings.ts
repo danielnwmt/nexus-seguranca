@@ -14,6 +14,7 @@ export interface CompanySettings {
   logo_url: string | null;
   media_server_ip: string | null;
   login_bg_url: string | null;
+  recording_segment_minutes?: number;
 }
 
 export const companySettingsQueryKey = ['company_settings'] as const;
@@ -82,16 +83,37 @@ const fetchPrivateCompanySettings = async () => {
 };
 
 export function useCompanySettings() {
-  const { user, loading } = useAuth();
+  const { user, loading, companyId } = useAuth();
   const isLocal = isLocalInstallation();
 
   return useQuery({
-    queryKey: [...companySettingsQueryKey, isLocal ? 'local' : user ? 'private' : 'public'],
+    queryKey: [...companySettingsQueryKey, isLocal ? 'local' : user ? 'private' : 'public', companyId],
     queryFn: async () => {
       if (isLocal) {
         return fetchLocalCompanySettings();
       }
 
+      if (user && companyId) {
+        const { data, error } = await supabase
+          .from('saas_companies')
+          .select('id, name, legal_name, document, address, phone, email, logo_url, login_bg_url, recording_segment_minutes')
+          .eq('id', companyId)
+          .single();
+        if (error) throw error;
+        return {
+          id: data.id,
+          name: data.name,
+          cnpj: data.document,
+          razao_social: data.legal_name,
+          address: data.address,
+          phone: data.phone,
+          email: data.email,
+          logo_url: data.logo_url,
+          media_server_ip: null,
+          login_bg_url: data.login_bg_url,
+          recording_segment_minutes: data.recording_segment_minutes,
+        } as CompanySettings;
+      }
       return user ? fetchPrivateCompanySettings() : fetchPublicCompanyBranding();
     },
     enabled: isLocal || !loading,
