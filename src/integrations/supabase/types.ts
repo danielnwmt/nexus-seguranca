@@ -1371,7 +1371,7 @@ export type Database = {
       reset_rate_limit: { Args: { _identifier: string }; Returns: undefined }
     }
     Enums: {
-      app_role: "admin" | "n1" | "n2" | "n3"
+      app_role: "admin" | "n1" | "n2" | "n3" | "owner"
       camera_protocol: "RTSP" | "RTMP" | "HLS" | "WebRTC" | "ONVIF"
       entity_status:
         | "active"
@@ -1509,7 +1509,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "n1", "n2", "n3"],
+      app_role: ["admin", "n1", "n2", "n3", "owner"],
       camera_protocol: ["RTSP", "RTMP", "HLS", "WebRTC", "ONVIF"],
       entity_status: [
         "active",
