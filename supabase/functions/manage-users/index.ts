@@ -237,6 +237,60 @@ Deno.serve(async (req) => {
         });
       }
 
+      if (body.action === "reset_company_password") {
+        if (roleData.role !== "owner") {
+          return new Response(JSON.stringify({ error: "Owner access required" }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const companyId = typeof body.company_id === "string" ? body.company_id : "";
+        if (!companyId) {
+          return new Response(JSON.stringify({ error: "Empresa obrigatória" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const { data: membership, error: membershipError } = await adminClient
+          .from("saas_company_users")
+          .select("user_id")
+          .eq("company_id", companyId)
+          .maybeSingle();
+        if (membershipError) throw membershipError;
+        if (!membership) {
+          return new Response(JSON.stringify({ error: "Usuário da empresa não encontrado" }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const { data: targetUser, error: targetUserError } = await adminClient.auth.admin.getUserById(membership.user_id);
+        if (targetUserError || !targetUser.user) {
+          return new Response(JSON.stringify({ error: "Usuário da empresa não encontrado" }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const temporaryPassword = generateTemporaryPassword();
+        const { error: resetError } = await adminClient.auth.admin.updateUserById(membership.user_id, {
+          password: temporaryPassword,
+          user_metadata: { ...targetUser.user.user_metadata, force_password_change: true },
+        });
+        if (resetError) {
+          return new Response(JSON.stringify({ error: resetError.message }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ success: true, temporary_password: temporaryPassword }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       if (body.action === "create") {
         const { email, password, name, level } = body;
 

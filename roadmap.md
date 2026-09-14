@@ -14,3 +14,4 @@
 - [x] Gerar subdomínio exclusivo para cada empresa SaaS
 - [x] Permitir domínio próprio por empresa SaaS
 - [x] Permitir editar o nome exibido na aba do navegador
+- [x] Permitir redefinir a senha do administrador de cada empresa

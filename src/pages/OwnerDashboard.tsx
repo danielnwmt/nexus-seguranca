@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, Bell, Camera, Check, Cloud, Copy, Database, DollarSign, ExternalLink, Pencil, Plus, Settings2, ShieldCheck, Users, Video } from 'lucide-react';
+import { Activity, Bell, Camera, Check, Cloud, Copy, Database, DollarSign, ExternalLink, KeyRound, Pencil, Plus, Settings2, ShieldCheck, Users, Video } from 'lucide-react';
 import StatsCard from '@/components/dashboard/StatsCard';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -75,6 +75,8 @@ const OwnerDashboard = () => {
   const [form, setForm] = useState(blankForm);
   const [accessForm, setAccessForm] = useState(blankAccessForm);
   const [accessLoading, setAccessLoading] = useState(false);
+  const [resetPasswordDialog, setResetPasswordDialog] = useState(false);
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [temporaryAccess, setTemporaryAccess] = useState<{ email: string; password: string } | null>(null);
   const [passwordCopied, setPasswordCopied] = useState(false);
   const [enabledModules, setEnabledModules] = useState<string[]>([]);
@@ -191,6 +193,27 @@ const OwnerDashboard = () => {
   };
 
   const handleCompanySubmit = (event: FormEvent) => { event.preventDefault(); saveCompany.mutate(); };
+  const handleResetCompanyPassword = async () => {
+    if (!editingCompany) return;
+    setResetPasswordLoading(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) throw new Error('Sessão expirada. Entre novamente.');
+      const { data: result, error: resetError } = await supabase.functions.invoke('manage-users', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: { action: 'reset_company_password', company_id: editingCompany.id },
+      });
+      if (resetError || result?.error) throw new Error(result?.error || 'Não foi possível redefinir a senha.');
+      setResetPasswordDialog(false);
+      setCompanyDialog(false);
+      setTemporaryAccess({ email: accessForm.email, password: result.temporary_password });
+    } catch (resetError) {
+      toast({ title: 'Não foi possível redefinir', description: resetError instanceof Error ? resetError.message : 'Tente novamente.', variant: 'destructive' });
+    } finally {
+      setResetPasswordLoading(false);
+    }
+  };
   const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -319,15 +342,23 @@ const OwnerDashboard = () => {
               <div><Label htmlFor="access-name">Nome do usuário</Label><Input id="access-name" value={accessForm.name} onChange={(event) => setAccessForm({ ...accessForm, name: event.target.value })} disabled={accessLoading} required /></div>
               <div><Label htmlFor="access-email">E-mail de acesso</Label><Input id="access-email" type="email" value={accessForm.email} onChange={(event) => setAccessForm({ ...accessForm, email: event.target.value })} disabled={accessLoading} required /></div>
                {!editingCompany && <div className="sm:col-span-2 rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">A senha temporária será gerada automaticamente. No primeiro acesso, o usuário deverá criar uma nova senha.</div>}
+                {editingCompany && <div className="sm:col-span-2"><Button type="button" variant="outline" onClick={() => setResetPasswordDialog(true)} disabled={accessLoading || !accessForm.email}><KeyRound /> Redefinir senha</Button><p className="mt-1 text-xs text-muted-foreground">Gera uma nova senha temporária e exige a troca no próximo acesso.</p></div>}
             </div>
             <DialogFooter><Button type="button" variant="outline" onClick={() => setCompanyDialog(false)}>Cancelar</Button><Button type="submit" disabled={saveCompany.isPending || accessLoading}>{saveCompany.isPending ? 'Salvando...' : 'Salvar empresa'}</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
+      <Dialog open={resetPasswordDialog} onOpenChange={setResetPasswordDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Redefinir senha</DialogTitle><DialogDescription>Uma nova senha temporária será criada para {accessForm.email}. A senha atual deixará de funcionar.</DialogDescription></DialogHeader>
+          <DialogFooter><Button type="button" variant="outline" onClick={() => setResetPasswordDialog(false)}>Cancelar</Button><Button type="button" onClick={handleResetCompanyPassword} disabled={resetPasswordLoading}>{resetPasswordLoading ? 'Redefinindo...' : 'Gerar nova senha'}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={Boolean(temporaryAccess)} onOpenChange={(open) => { if (!open) { setTemporaryAccess(null); setPasswordCopied(false); } }}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Empresa criada</DialogTitle><DialogDescription>Envie estes dados ao administrador. A senha deverá ser alterada no primeiro acesso.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Senha temporária criada</DialogTitle><DialogDescription>Envie estes dados ao administrador. A senha deverá ser alterada no próximo acesso.</DialogDescription></DialogHeader>
           <div className="space-y-3">
             <div><Label>E-mail</Label><Input readOnly value={temporaryAccess?.email || ''} /></div>
             <div><Label>Senha temporária</Label><div className="flex gap-2"><Input readOnly value={temporaryAccess?.password || ''} className="font-mono" /><Button type="button" size="icon" variant="outline" title="Copiar senha" onClick={async () => { if (!temporaryAccess) return; await navigator.clipboard.writeText(temporaryAccess.password); setPasswordCopied(true); }}>{passwordCopied ? <Check /> : <Copy />}</Button></div></div>
