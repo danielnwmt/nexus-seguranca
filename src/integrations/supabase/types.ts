@@ -1484,16 +1484,6 @@ export type Database = {
       }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       get_owner_dashboard_stats: { Args: never; Returns: Json }
-      get_saas_company_by_subdomain: {
-        Args: { _subdomain: string }
-        Returns: {
-          id: string
-          login_bg_url: string
-          logo_url: string
-          name: string
-          status: string
-        }[]
-      }
       reset_rate_limit: { Args: { _identifier: string }; Returns: undefined }
     }
     Enums: {
