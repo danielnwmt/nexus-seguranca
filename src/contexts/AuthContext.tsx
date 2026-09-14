@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { supabase } from '@/integrations/supabase/client';
 import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 import type { User, Session } from '@supabase/supabase-js';
-import { getTenantSubdomain } from '@/lib/tenantDomain';
+import { getTenantAddress } from '@/lib/tenantDomain';
 
 interface AuthContextType {
   user: User | null;
@@ -67,10 +67,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Check if client
           const { data: clientData } = await supabase.from('clients').select('id').eq('user_id', user.id).maybeSingle();
           setIsClient(!!clientData);
-           const { data: membership } = await supabase.from('saas_company_users').select('company_id, saas_companies(subdomain, status)').eq('user_id', user.id).maybeSingle();
-           const tenantSubdomain = getTenantSubdomain();
-           const tenantCompany = membership?.saas_companies as unknown as { subdomain?: string; status?: string } | null;
-           if (tenantSubdomain && !roles.includes('owner') && (!tenantCompany || tenantCompany.subdomain !== tenantSubdomain || tenantCompany.status !== 'active')) {
+           const { data: membership } = await supabase.from('saas_company_users').select('company_id, saas_companies(subdomain, custom_domain, domain_type, status)').eq('user_id', user.id).maybeSingle();
+           const tenantAddress = getTenantAddress();
+           const tenantCompany = membership?.saas_companies as unknown as { subdomain?: string; custom_domain?: string; domain_type?: string; status?: string } | null;
+           const addressMismatch = tenantAddress.subdomain
+             ? tenantCompany?.domain_type !== 'subdomain' || tenantCompany?.subdomain !== tenantAddress.subdomain
+             : tenantAddress.customDomain
+               ? tenantCompany?.domain_type !== 'custom' || tenantCompany?.custom_domain !== tenantAddress.customDomain
+               : false;
+           if (!roles.includes('owner') && (!tenantCompany || tenantCompany.status !== 'active' || addressMismatch)) {
              await supabase.auth.signOut();
              setUser(null);
              setSession(null);
@@ -227,7 +232,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Cloud: use server-side rate-limited auth endpoint
       const { data, error } = await supabase.functions.invoke('auth-login', {
-        body: { email, password, subdomain: getTenantSubdomain() },
+        body: { email, password, ...getTenantAddress() },
       });
 
       if (error) {

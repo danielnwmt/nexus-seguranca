@@ -12,3 +12,4 @@
 - [x] Vincular as informações de Configurações ao cadastro de cada organização
 - [x] Gerar senha temporária automática e exigir troca no primeiro acesso
 - [x] Gerar subdomínio exclusivo para cada empresa SaaS
+- [x] Permitir domínio próprio por empresa SaaS
