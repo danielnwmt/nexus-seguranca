@@ -67,7 +67,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Check if client
           const { data: clientData } = await supabase.from('clients').select('id').eq('user_id', user.id).maybeSingle();
           setIsClient(!!clientData);
-          const { data: membership } = await supabase.from('saas_company_users').select('company_id').eq('user_id', user.id).maybeSingle();
+           const { data: membership } = await supabase.from('saas_company_users').select('company_id, saas_companies(subdomain, status)').eq('user_id', user.id).maybeSingle();
+           const tenantSubdomain = getTenantSubdomain();
+           const tenantCompany = membership?.saas_companies as unknown as { subdomain?: string; status?: string } | null;
+           if (tenantSubdomain && userRole !== 'owner' && (!tenantCompany || tenantCompany.subdomain !== tenantSubdomain || tenantCompany.status !== 'active')) {
+             await supabase.auth.signOut();
+             setUser(null);
+             setSession(null);
+             setCompanyId(null);
+             setCompanyFeatures([]);
+             return;
+           }
           const currentCompanyId = membership?.company_id || null;
           setCompanyId(currentCompanyId);
           if (currentCompanyId) {

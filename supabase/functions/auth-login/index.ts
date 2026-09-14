@@ -29,6 +29,37 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
+    if (body.action === "resolve_tenant") {
+      const tenantSubdomain = typeof body.subdomain === "string" ? body.subdomain.trim().toLowerCase() : "";
+      if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(tenantSubdomain)) {
+        return new Response(JSON.stringify({ error: "Empresa não encontrada" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const adminClient = createClient(supabaseUrl, serviceRoleKey);
+      const { data: company } = await adminClient
+        .from("saas_companies")
+        .select("id, name, logo_url, login_bg_url, status")
+        .eq("subdomain", tenantSubdomain)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (!company) {
+        return new Response(JSON.stringify({ error: "Empresa não encontrada" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ company }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const { email, password, subdomain } = body;
 
     // Validate inputs
