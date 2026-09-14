@@ -38,8 +38,17 @@ export const getTenantAddress = () => {
   if (subdomain) return { subdomain, customDomain: null };
 
   const hostname = normalizeDomain(window.location.hostname);
+  const configuredDomain = normalizeDomain(String(import.meta.env.VITE_SAAS_BASE_DOMAIN || ''));
   const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
-  return { subdomain: null, customDomain: isLocal ? null : hostname };
+  const isPlatformAddress = hostname.endsWith('.lovable.app')
+    || hostname.endsWith('.lovableproject.com')
+    || hostname.endsWith('.vercel.app');
+  const isMainAddress = configuredDomain !== '' && hostname === configuredDomain;
+
+  return {
+    subdomain: null,
+    customDomain: isLocal || isPlatformAddress || isMainAddress ? null : hostname,
+  };
 };
 
 export const getCompanyUrl = (subdomain: string) => {
