@@ -35,6 +35,7 @@ import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
 import OwnerDashboard from "./pages/OwnerDashboard";
 import CloudAnalyticsRunner from "./components/analytics/CloudAnalyticsRunner";
+import BrowserTitle from "./components/layout/BrowserTitle";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <BrowserTitle />
         <CloudAnalyticsRunner />
         <TooltipProvider>
           <Toaster />

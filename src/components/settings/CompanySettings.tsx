@@ -56,6 +56,7 @@ const CompanySettings = () => {
   const [form, setForm] = useState({
     id: '',
     name: 'Nexus Monitoramento',
+    browser_title: 'Nexus Segurança | Monitoramento',
     razao_social: '',
     cnpj: '',
     address: '',
@@ -87,6 +88,7 @@ const CompanySettings = () => {
       setForm({
         id: data.id,
         name: data.name || '',
+        browser_title: data.browser_title || `${data.name || 'Nexus Segurança'} | Monitoramento`,
         razao_social: data.legal_name || data.razao_social || '',
         cnpj: data.document || data.cnpj || '',
         address: data.address || '',
@@ -207,6 +209,7 @@ const CompanySettings = () => {
     setLoading(true);
     const payload = {
       name: form.name,
+      browser_title: form.browser_title.trim(),
       razao_social: form.razao_social,
       cnpj: form.cnpj,
       address: form.address,
@@ -241,6 +244,7 @@ const CompanySettings = () => {
       const result = companyId
         ? await supabase.from('saas_companies').update({
             name: payload.name,
+            browser_title: payload.browser_title,
             legal_name: payload.razao_social,
             document: payload.cnpj,
             address: payload.address,
@@ -322,6 +326,17 @@ const CompanySettings = () => {
               placeholder="Razão social da empresa"
             />
           </div>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Nome na aba do navegador</Label>
+          <Input
+            value={form.browser_title}
+            onChange={e => setForm(p => ({ ...p, browser_title: e.target.value }))}
+            className="bg-muted border-border"
+            placeholder="Nexus Segurança | Monitoramento"
+            maxLength={60}
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

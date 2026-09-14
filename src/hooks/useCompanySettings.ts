@@ -7,6 +7,7 @@ import { getTenantAddress } from '@/lib/tenantDomain';
 export interface CompanySettings {
   id: string;
   name: string;
+  browser_title: string | null;
   cnpj: string | null;
   razao_social: string | null;
   address: string | null;
@@ -59,6 +60,7 @@ const fetchPublicCompanyBranding = async () => {
     return {
       id: data.company.id,
       name: data.company.name,
+      browser_title: data.company.browser_title || null,
       cnpj: null,
       razao_social: null,
       address: null,
@@ -72,7 +74,7 @@ const fetchPublicCompanyBranding = async () => {
 
   const { data, error } = await supabase
     .from('company_branding_public')
-    .select('id, name, logo_url, login_bg_url')
+    .select('id, name, browser_title, logo_url, login_bg_url')
     .limit(1)
     .maybeSingle();
 
@@ -81,6 +83,7 @@ const fetchPublicCompanyBranding = async () => {
   return {
     id: data?.id || '',
     name: data?.name || 'Nexus Monitoramento',
+    browser_title: data?.browser_title || null,
     cnpj: null,
     razao_social: null,
     address: null,
@@ -117,13 +120,14 @@ export function useCompanySettings() {
       if (user && companyId) {
         const { data, error } = await supabase
           .from('saas_companies')
-          .select('id, name, legal_name, document, address, phone, email, logo_url, login_bg_url, recording_segment_minutes')
+          .select('id, name, browser_title, legal_name, document, address, phone, email, logo_url, login_bg_url, recording_segment_minutes')
           .eq('id', companyId)
           .single();
         if (error) throw error;
         return {
           id: data.id,
           name: data.name,
+          browser_title: data.browser_title,
           cnpj: data.document,
           razao_social: data.legal_name,
           address: data.address,
