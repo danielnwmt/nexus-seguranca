@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { email, password } = body;
+    const { email, password, subdomain } = body;
 
     // Validate inputs
     if (!email || !password || typeof email !== "string" || typeof password !== "string") {
@@ -41,6 +41,13 @@ Deno.serve(async (req) => {
 
     if (email.length > 255 || password.length > 128) {
       return new Response(JSON.stringify({ error: "Invalid input" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (subdomain !== null && subdomain !== undefined && (typeof subdomain !== "string" || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(subdomain))) {
+      return new Response(JSON.stringify({ error: "Invalid company address" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -105,6 +112,33 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
+    }
+
+    if (subdomain && data.user) {
+      const { data: ownerRole } = await adminClient
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.user.id)
+        .eq("role", "owner")
+        .maybeSingle();
+
+      if (!ownerRole) {
+        const { data: membership } = await adminClient
+          .from("saas_company_users")
+          .select("saas_companies!inner(subdomain, status)")
+          .eq("user_id", data.user.id)
+          .maybeSingle();
+        const company = membership?.saas_companies as unknown as { subdomain?: string; status?: string } | null;
+        if (!company || company.subdomain !== subdomain || company.status !== "active") {
+          return new Response(JSON.stringify({
+            error: "invalid_company",
+            message: "Esta conta não pertence a este endereço.",
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
     }
 
     // Login successful - reset rate limit

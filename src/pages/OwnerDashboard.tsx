@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, Bell, Camera, Check, Cloud, Copy, Database, DollarSign, Pencil, Plus, Settings2, ShieldCheck, Users, Video } from 'lucide-react';
+import { Activity, Bell, Camera, Check, Cloud, Copy, Database, DollarSign, ExternalLink, Pencil, Plus, Settings2, ShieldCheck, Users, Video } from 'lucide-react';
 import StatsCard from '@/components/dashboard/StatsCard';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getCompanyUrl, normalizeSubdomain } from '@/lib/tenantDomain';
 
 interface OwnerStats {
   clients_total: number;
@@ -45,6 +46,7 @@ type Company = {
   recording_segment_minutes: number;
   plan_name: string;
   status: string;
+  subdomain: string;
 };
 
 const modules = [
@@ -55,7 +57,7 @@ const modules = [
   ['settings', 'Saúde e configurações'], ['support', 'Atendimento'],
 ] as const;
 
-const blankForm = { name: '', legal_name: '', document: '', address: '', email: '', phone: '', logo_url: '', recording_segment_minutes: 30, plan_name: 'Personalizado', status: 'active' };
+const blankForm = { name: '', legal_name: '', document: '', address: '', email: '', phone: '', logo_url: '', recording_segment_minutes: 30, plan_name: 'Personalizado', status: 'active', subdomain: '' };
 const blankAccessForm = { name: '', email: '' };
 
 const OwnerDashboard = () => {
@@ -103,6 +105,7 @@ const OwnerDashboard = () => {
         email: form.email.trim() || null,
         phone: form.phone.trim() || null,
         logo_url: form.logo_url || null,
+        subdomain: normalizeSubdomain(form.subdomain || form.name),
       };
       if (!payload.name) throw new Error('Informe o nome da empresa.');
       let companyId = editingCompany?.id || '';
@@ -156,7 +159,7 @@ const OwnerDashboard = () => {
   const openNewCompany = () => { setEditingCompany(null); setForm(blankForm); setAccessForm(blankAccessForm); setCompanyDialog(true); };
   const openEditCompany = async (company: Company) => {
     setEditingCompany(company);
-    setForm({ name: company.name, legal_name: company.legal_name || '', document: company.document || '', address: company.address || '', email: company.email || '', phone: company.phone || '', logo_url: company.logo_url || '', recording_segment_minutes: company.recording_segment_minutes || 30, plan_name: company.plan_name, status: company.status });
+    setForm({ name: company.name, legal_name: company.legal_name || '', document: company.document || '', address: company.address || '', email: company.email || '', phone: company.phone || '', logo_url: company.logo_url || '', recording_segment_minutes: company.recording_segment_minutes || 30, plan_name: company.plan_name, status: company.status, subdomain: company.subdomain });
     setAccessForm(blankAccessForm);
     setCompanyDialog(true);
     setAccessLoading(true);
@@ -271,7 +274,7 @@ const OwnerDashboard = () => {
                     <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">Nenhuma empresa cadastrada.</TableCell></TableRow>
                   ) : companies.map((company) => (
                     <TableRow key={company.id}>
-                      <TableCell><strong>{company.name}</strong><div className="text-xs text-muted-foreground">{company.document || 'Documento não informado'}</div></TableCell>
+                      <TableCell><strong>{company.name}</strong><div className="text-xs text-muted-foreground">{company.document || 'Documento não informado'}</div><div className="mt-1 flex items-center gap-1 font-mono text-xs text-primary"><ExternalLink className="h-3 w-3" />{getCompanyUrl(company.subdomain)}</div></TableCell>
                       <TableCell><div>{company.email || '—'}</div><div className="text-xs text-muted-foreground">{company.phone || '—'}</div></TableCell>
                       <TableCell>{company.plan_name}</TableCell>
                       <TableCell><Badge variant={company.status === 'active' ? 'default' : 'secondary'}>{company.status === 'active' ? 'Ativa' : 'Inativa'}</Badge></TableCell>
@@ -290,7 +293,8 @@ const OwnerDashboard = () => {
           <form onSubmit={handleCompanySubmit} className="space-y-4">
             <DialogHeader><DialogTitle>{editingCompany ? 'Editar empresa' : 'Adicionar empresa'}</DialogTitle><DialogDescription>Cadastre a empresa assinante da plataforma.</DialogDescription></DialogHeader>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2"><Label htmlFor="company-name">Nome fantasia</Label><Input id="company-name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required /></div>
+               <div className="sm:col-span-2"><Label htmlFor="company-name">Nome fantasia</Label><Input id="company-name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value, subdomain: editingCompany ? form.subdomain : normalizeSubdomain(event.target.value) })} required /></div>
+               <div className="sm:col-span-2"><Label htmlFor="company-subdomain">Subdomínio</Label><Input id="company-subdomain" value={form.subdomain} onChange={(event) => setForm({ ...form, subdomain: normalizeSubdomain(event.target.value) })} placeholder="nome-da-empresa" required /><p className="mt-1 text-xs font-mono text-primary">{form.subdomain ? getCompanyUrl(form.subdomain) : 'O endereço será gerado pelo nome da empresa.'}</p></div>
               <div className="sm:col-span-2"><Label htmlFor="company-legal-name">Razão social</Label><Input id="company-legal-name" value={form.legal_name} onChange={(event) => setForm({ ...form, legal_name: event.target.value })} /></div>
               <div><Label htmlFor="company-document">CNPJ/CPF</Label><Input id="company-document" value={form.document} onChange={(event) => setForm({ ...form, document: event.target.value })} /></div>
               <div><Label htmlFor="company-phone">Telefone</Label><Input id="company-phone" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></div>

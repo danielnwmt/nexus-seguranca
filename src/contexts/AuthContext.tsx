@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { supabase } from '@/integrations/supabase/client';
 import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 import type { User, Session } from '@supabase/supabase-js';
+import { getTenantSubdomain } from '@/lib/tenantDomain';
 
 interface AuthContextType {
   user: User | null;
@@ -216,7 +217,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Cloud: use server-side rate-limited auth endpoint
       const { data, error } = await supabase.functions.invoke('auth-login', {
-        body: { email, password },
+        body: { email, password, subdomain: getTenantSubdomain() },
       });
 
       if (error) {
