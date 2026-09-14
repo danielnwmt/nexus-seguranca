@@ -31,7 +31,10 @@ Deno.serve(async (req) => {
     const body = await req.json();
     if (body.action === "resolve_tenant") {
       const tenantSubdomain = typeof body.subdomain === "string" ? body.subdomain.trim().toLowerCase() : "";
-      if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(tenantSubdomain)) {
+      const customDomain = typeof body.customDomain === "string" ? body.customDomain.trim().toLowerCase() : "";
+      const validSubdomain = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(tenantSubdomain);
+      const validCustomDomain = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(customDomain);
+      if (!validSubdomain && !validCustomDomain) {
         return new Response(JSON.stringify({ error: "Empresa não encontrada" }), {
           status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -41,12 +44,14 @@ Deno.serve(async (req) => {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
       const adminClient = createClient(supabaseUrl, serviceRoleKey);
-      const { data: company } = await adminClient
+      let companyQuery = adminClient
         .from("saas_companies")
         .select("id, name, logo_url, login_bg_url, status")
-        .eq("subdomain", tenantSubdomain)
-        .eq("status", "active")
-        .maybeSingle();
+        .eq("status", "active");
+      companyQuery = validCustomDomain
+        ? companyQuery.eq("domain_type", "custom").eq("custom_domain", customDomain)
+        : companyQuery.eq("domain_type", "subdomain").eq("subdomain", tenantSubdomain);
+      const { data: company } = await companyQuery.maybeSingle();
 
       if (!company) {
         return new Response(JSON.stringify({ error: "Empresa não encontrada" }), {
@@ -60,7 +65,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const { email, password, subdomain } = body;
+    const { email, password, subdomain, customDomain } = body;
 
     // Validate inputs
     if (!email || !password || typeof email !== "string" || typeof password !== "string") {
@@ -78,6 +83,13 @@ Deno.serve(async (req) => {
     }
 
     if (subdomain !== null && subdomain !== undefined && (typeof subdomain !== "string" || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(subdomain))) {
+      return new Response(JSON.stringify({ error: "Invalid company address" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (customDomain !== null && customDomain !== undefined && (typeof customDomain !== "string" || !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(customDomain))) {
       return new Response(JSON.stringify({ error: "Invalid company address" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -145,7 +157,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (subdomain && data.user) {
+    if ((subdomain || customDomain) && data.user) {
       const { data: ownerRole } = await adminClient
         .from("user_roles")
         .select("role")
@@ -156,11 +168,14 @@ Deno.serve(async (req) => {
       if (!ownerRole) {
         const { data: membership } = await adminClient
           .from("saas_company_users")
-          .select("saas_companies!inner(subdomain, status)")
+          .select("saas_companies!inner(subdomain, custom_domain, domain_type, status)")
           .eq("user_id", data.user.id)
           .maybeSingle();
-        const company = membership?.saas_companies as unknown as { subdomain?: string; status?: string } | null;
-        if (!company || company.subdomain !== subdomain || company.status !== "active") {
+        const company = membership?.saas_companies as unknown as { subdomain?: string; custom_domain?: string; domain_type?: string; status?: string } | null;
+        const addressMatches = subdomain
+          ? company?.domain_type === "subdomain" && company.subdomain === subdomain
+          : company?.domain_type === "custom" && company.custom_domain === customDomain;
+        if (!company || !addressMatches || company.status !== "active") {
           return new Response(JSON.stringify({
             error: "invalid_company",
             message: "Esta conta não pertence a este endereço.",

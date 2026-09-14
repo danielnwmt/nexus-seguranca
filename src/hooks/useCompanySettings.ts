@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
 import { useAuth } from '@/contexts/AuthContext';
-import { getTenantSubdomain } from '@/lib/tenantDomain';
+import { getTenantAddress } from '@/lib/tenantDomain';
 
 export interface CompanySettings {
   id: string;
@@ -50,10 +50,10 @@ const fetchLocalCompanySettings = async () => {
 };
 
 const fetchPublicCompanyBranding = async () => {
-  const subdomain = getTenantSubdomain();
-  if (subdomain) {
+  const tenantAddress = getTenantAddress();
+  if (tenantAddress.subdomain || tenantAddress.customDomain) {
     const { data, error } = await supabase.functions.invoke('auth-login', {
-      body: { action: 'resolve_tenant', subdomain },
+      body: { action: 'resolve_tenant', ...tenantAddress },
     });
     if (error || !data?.company) throw new Error('Empresa não encontrada');
     return {
