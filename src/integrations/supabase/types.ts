@@ -1180,6 +1180,7 @@ export type Database = {
           plan_name: string
           recording_segment_minutes: number
           status: string
+          subdomain: string
           updated_at: string
         }
         Insert: {
@@ -1196,6 +1197,7 @@ export type Database = {
           plan_name?: string
           recording_segment_minutes?: number
           status?: string
+          subdomain: string
           updated_at?: string
         }
         Update: {
@@ -1212,6 +1214,7 @@ export type Database = {
           plan_name?: string
           recording_segment_minutes?: number
           status?: string
+          subdomain?: string
           updated_at?: string
         }
         Relationships: []
