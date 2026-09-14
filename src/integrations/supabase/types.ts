@@ -609,6 +609,7 @@ export type Database = {
       company_settings: {
         Row: {
           address: string | null
+          browser_title: string | null
           cnpj: string | null
           created_at: string
           email: string | null
@@ -624,6 +625,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          browser_title?: string | null
           cnpj?: string | null
           created_at?: string
           email?: string | null
@@ -639,6 +641,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          browser_title?: string | null
           cnpj?: string | null
           created_at?: string
           email?: string | null
@@ -1168,6 +1171,7 @@ export type Database = {
       saas_companies: {
         Row: {
           address: string | null
+          browser_title: string | null
           created_at: string
           custom_domain: string | null
           document: string | null
@@ -1187,6 +1191,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          browser_title?: string | null
           created_at?: string
           custom_domain?: string | null
           document?: string | null
@@ -1206,6 +1211,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          browser_title?: string | null
           created_at?: string
           custom_domain?: string | null
           document?: string | null
