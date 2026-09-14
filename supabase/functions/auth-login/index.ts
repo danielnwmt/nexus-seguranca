@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
       const adminClient = createClient(supabaseUrl, serviceRoleKey);
       let companyQuery = adminClient
         .from("saas_companies")
-        .select("id, name, logo_url, login_bg_url, status")
+        .select("id, name, browser_title, logo_url, login_bg_url, status")
         .eq("status", "active");
       companyQuery = validCustomDomain
         ? companyQuery.eq("domain_type", "custom").eq("custom_domain", customDomain)

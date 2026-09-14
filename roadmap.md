@@ -13,3 +13,4 @@
 - [x] Gerar senha temporária automática e exigir troca no primeiro acesso
 - [x] Gerar subdomínio exclusivo para cada empresa SaaS
 - [x] Permitir domínio próprio por empresa SaaS
+- [x] Permitir editar o nome exibido na aba do navegador

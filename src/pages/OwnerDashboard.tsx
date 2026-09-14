@@ -37,6 +37,7 @@ const emptyStats: OwnerStats = {
 type Company = {
   id: string;
   name: string;
+  browser_title: string | null;
   legal_name: string | null;
   document: string | null;
   address: string | null;
@@ -51,7 +52,7 @@ type Company = {
   custom_domain: string | null;
 };
 
-type CompanyForm = Omit<Company, 'id' | 'custom_domain'> & { custom_domain: string };
+type CompanyForm = Omit<Company, 'id' | 'custom_domain' | 'browser_title'> & { custom_domain: string; browser_title: string };
 
 const modules = [
   ['dashboard', 'Dashboard'], ['cameras_view', 'Câmeras, ao vivo e gravações'],
@@ -61,7 +62,7 @@ const modules = [
   ['settings', 'Saúde e configurações'], ['support', 'Atendimento'],
 ] as const;
 
-const blankForm: CompanyForm = { name: '', legal_name: '', document: '', address: '', email: '', phone: '', logo_url: '', recording_segment_minutes: 30, plan_name: 'Personalizado', status: 'active', subdomain: '', domain_type: 'subdomain', custom_domain: '' };
+const blankForm: CompanyForm = { name: '', browser_title: '', legal_name: '', document: '', address: '', email: '', phone: '', logo_url: '', recording_segment_minutes: 30, plan_name: 'Personalizado', status: 'active', subdomain: '', domain_type: 'subdomain', custom_domain: '' };
 const blankAccessForm = { name: '', email: '' };
 
 const OwnerDashboard = () => {
@@ -103,6 +104,7 @@ const OwnerDashboard = () => {
       const payload = {
         ...form,
         name: form.name.trim(),
+        browser_title: form.browser_title.trim() || `${form.name.trim()} | Monitoramento`,
         legal_name: form.legal_name.trim() || null,
         document: form.document.trim() || null,
         address: form.address.trim() || null,
@@ -166,7 +168,7 @@ const OwnerDashboard = () => {
   const openNewCompany = () => { setEditingCompany(null); setForm(blankForm); setAccessForm(blankAccessForm); setCompanyDialog(true); };
   const openEditCompany = async (company: Company) => {
     setEditingCompany(company);
-    setForm({ name: company.name, legal_name: company.legal_name || '', document: company.document || '', address: company.address || '', email: company.email || '', phone: company.phone || '', logo_url: company.logo_url || '', recording_segment_minutes: company.recording_segment_minutes || 30, plan_name: company.plan_name, status: company.status, subdomain: company.subdomain, domain_type: company.domain_type || 'subdomain', custom_domain: company.custom_domain || '' });
+    setForm({ name: company.name, browser_title: company.browser_title || `${company.name} | Monitoramento`, legal_name: company.legal_name || '', document: company.document || '', address: company.address || '', email: company.email || '', phone: company.phone || '', logo_url: company.logo_url || '', recording_segment_minutes: company.recording_segment_minutes || 30, plan_name: company.plan_name, status: company.status, subdomain: company.subdomain, domain_type: company.domain_type || 'subdomain', custom_domain: company.custom_domain || '' });
     setAccessForm(blankAccessForm);
     setCompanyDialog(true);
     setAccessLoading(true);
@@ -301,6 +303,7 @@ const OwnerDashboard = () => {
             <DialogHeader><DialogTitle>{editingCompany ? 'Editar empresa' : 'Adicionar empresa'}</DialogTitle><DialogDescription>Cadastre a empresa assinante da plataforma.</DialogDescription></DialogHeader>
             <div className="grid gap-4 sm:grid-cols-2">
                <div className="sm:col-span-2"><Label htmlFor="company-name">Nome fantasia</Label><Input id="company-name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value, subdomain: editingCompany ? form.subdomain : normalizeSubdomain(event.target.value) })} required /></div>
+               <div className="sm:col-span-2"><Label htmlFor="company-browser-title">Nome na aba do navegador</Label><Input id="company-browser-title" value={form.browser_title} onChange={(event) => setForm({ ...form, browser_title: event.target.value })} placeholder={`${form.name || 'Empresa'} | Monitoramento`} maxLength={60} /></div>
                <div className="sm:col-span-2"><Label>Tipo de endereço</Label><Select value={form.domain_type} onValueChange={(value: 'subdomain' | 'custom') => setForm({ ...form, domain_type: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="subdomain">Subdomínio automático</SelectItem><SelectItem value="custom">Domínio próprio do cliente</SelectItem></SelectContent></Select></div>
                {form.domain_type === 'subdomain' ? <div className="sm:col-span-2"><Label htmlFor="company-subdomain">Subdomínio</Label><Input id="company-subdomain" value={form.subdomain} onChange={(event) => setForm({ ...form, subdomain: normalizeSubdomain(event.target.value) })} placeholder="nome-da-empresa" required /><p className="mt-1 text-xs font-mono text-primary">{form.subdomain ? getCompanyUrl(form.subdomain) : 'O endereço será gerado pelo nome da empresa.'}</p></div> : <div className="sm:col-span-2"><Label htmlFor="company-custom-domain">Domínio do cliente</Label><Input id="company-custom-domain" value={form.custom_domain} onChange={(event) => setForm({ ...form, custom_domain: event.target.value.toLowerCase().replace(/^https?:\/\//, '').replace(/[^a-z0-9.-]/g, '') })} placeholder="monitoramento.cliente.com.br" inputMode="url" autoCapitalize="none" spellCheck={false} required /><p className="mt-1 text-xs font-mono text-primary">{form.custom_domain ? `https://${normalizeDomain(form.custom_domain)}` : 'Informe o domínio completo do cliente.'}</p></div>}
               <div className="sm:col-span-2"><Label htmlFor="company-legal-name">Razão social</Label><Input id="company-legal-name" value={form.legal_name} onChange={(event) => setForm({ ...form, legal_name: event.target.value })} /></div>

@@ -178,6 +178,7 @@ CREATE TABLE IF NOT EXISTS public.bills (
 CREATE TABLE IF NOT EXISTS public.company_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT DEFAULT 'Nexus Segurança',
+  browser_title TEXT DEFAULT 'Nexus Segurança | Monitoramento',
   razao_social TEXT,
   cnpj TEXT,
   email TEXT,
@@ -192,6 +193,7 @@ CREATE TABLE IF NOT EXISTS public.company_settings (
 );
 
 ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS recording_segment_minutes INTEGER DEFAULT 30;
+ALTER TABLE public.company_settings ADD COLUMN IF NOT EXISTS browser_title TEXT DEFAULT 'Nexus Segurança | Monitoramento';
 
 CREATE TABLE IF NOT EXISTS public.storage_servers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
