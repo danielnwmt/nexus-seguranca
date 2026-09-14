@@ -1464,18 +1464,21 @@ export type Database = {
     Views: {
       company_branding_public: {
         Row: {
+          browser_title: string | null
           id: string | null
           login_bg_url: string | null
           logo_url: string | null
           name: string | null
         }
         Insert: {
+          browser_title?: string | null
           id?: string | null
           login_bg_url?: string | null
           logo_url?: string | null
           name?: string | null
         }
         Update: {
+          browser_title?: string | null
           id?: string | null
           login_bg_url?: string | null
           logo_url?: string | null
