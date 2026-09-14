@@ -51,6 +51,8 @@ type Company = {
   custom_domain: string | null;
 };
 
+type CompanyForm = Omit<Company, 'id' | 'custom_domain'> & { custom_domain: string };
+
 const modules = [
   ['dashboard', 'Dashboard'], ['cameras_view', 'Câmeras, ao vivo e gravações'],
   ['clients_view', 'Clientes'], ['guards', 'Vigilantes'], ['installers', 'Técnicos'],
@@ -59,7 +61,7 @@ const modules = [
   ['settings', 'Saúde e configurações'], ['support', 'Atendimento'],
 ] as const;
 
-const blankForm = { name: '', legal_name: '', document: '', address: '', email: '', phone: '', logo_url: '', recording_segment_minutes: 30, plan_name: 'Personalizado', status: 'active', subdomain: '', domain_type: 'subdomain' as const, custom_domain: '' };
+const blankForm: CompanyForm = { name: '', legal_name: '', document: '', address: '', email: '', phone: '', logo_url: '', recording_segment_minutes: 30, plan_name: 'Personalizado', status: 'active', subdomain: '', domain_type: 'subdomain', custom_domain: '' };
 const blankAccessForm = { name: '', email: '' };
 
 const OwnerDashboard = () => {
