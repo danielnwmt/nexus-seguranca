@@ -1169,7 +1169,9 @@ export type Database = {
         Row: {
           address: string | null
           created_at: string
+          custom_domain: string | null
           document: string | null
+          domain_type: string
           email: string | null
           id: string
           legal_name: string | null
@@ -1186,7 +1188,9 @@ export type Database = {
         Insert: {
           address?: string | null
           created_at?: string
+          custom_domain?: string | null
           document?: string | null
+          domain_type?: string
           email?: string | null
           id?: string
           legal_name?: string | null
@@ -1203,7 +1207,9 @@ export type Database = {
         Update: {
           address?: string | null
           created_at?: string
+          custom_domain?: string | null
           document?: string | null
+          domain_type?: string
           email?: string | null
           id?: string
           legal_name?: string | null
