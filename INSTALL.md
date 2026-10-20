@@ -307,7 +307,17 @@ No servidor Ubuntu, execute:
 curl -fsSL https://raw.githubusercontent.com/danielnwmt/nexus-seguranca/main/installer/install-mediamtx-ubuntu.sh | sudo bash
 ```
 
-O instalador detecta o IP público, configura o WebRTC, libera as portas necessárias e mantém o MediaMTX ativo como serviço.
+O instalador pergunta o **domínio do servidor de mídia** e já configura o **certificado SSL (HTTPS)** automaticamente com Let's Encrypt. O SSL é necessário para o vídeo aparecer no sistema publicado (HTTPS).
+
+Para instalar sem perguntas, informe o domínio direto no comando:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/danielnwmt/nexus-seguranca/main/installer/install-mediamtx-ubuntu.sh | sudo MEDIA_DOMAIN=mtx.seudominio.com SSL_EMAIL=seu@email.com bash
+```
+
+> ⚠️ O domínio precisa estar com o DNS apontado para o IP do servidor e a porta 80 liberada antes da instalação. Deixe o domínio em branco para instalar sem SSL (somente HTTP).
+
+O instalador detecta o IP público, configura o WebRTC, libera as portas necessárias, ativa a renovação automática do certificado e mantém o MediaMTX ativo como serviço.
 
 Para verificar:
 
