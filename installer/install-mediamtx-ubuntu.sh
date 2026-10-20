@@ -141,10 +141,6 @@ tar -xzf "$TMP_DIR/mediamtx.tar.gz" -C "$TMP_DIR" mediamtx
 install -m 0755 "$TMP_DIR/mediamtx" "$MEDIAMTX_BIN"
 ok "MediaMTX instalado em $MEDIAMTX_BIN"
 
-if ! id "$MEDIAMTX_USER" >/dev/null 2>&1; then
-  useradd --system --no-create-home --shell /usr/sbin/nologin "$MEDIAMTX_USER"
-fi
-
 install -d -m 0755 "$(dirname "$MEDIAMTX_CONFIG")"
 if [[ -f "$MEDIAMTX_CONFIG" ]]; then
   cp "$MEDIAMTX_CONFIG" "${MEDIAMTX_CONFIG}.backup.$(date +%Y%m%d%H%M%S)"
