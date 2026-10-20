@@ -96,6 +96,10 @@ LOCAL_IP="${LOCAL_IP:-127.0.0.1}"
 PUBLIC_IP="$(curl -4fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)"
 WEBRTC_HOST="${MEDIA_DOMAIN:-${PUBLIC_IP:-$LOCAL_IP}}"
 
+if ! id "$MEDIAMTX_USER" >/dev/null 2>&1; then
+  useradd --system --no-create-home --shell /usr/sbin/nologin "$MEDIAMTX_USER"
+fi
+
 if [[ "$SSL_ENABLED" == "true" ]]; then
   info "Gerando certificado SSL para ${MEDIA_DOMAIN}..."
   warn "O domínio ${MEDIA_DOMAIN} precisa estar apontado para o IP ${PUBLIC_IP:-deste servidor}."
