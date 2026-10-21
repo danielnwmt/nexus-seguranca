@@ -1,5 +1,9 @@
 # Roadmap
 
+- [ ] Configurar cobrança por câmera e mostrar mensalidade por empresa no SaaS
+- [ ] Verificar isolamento de contas a pagar por empresa
+- [ ] Validar salvamento e cálculo da cobrança SaaS
+
 - [x] Separar menu da Gestão SaaS
 - [x] Adicionar cadastro de empresas
 - [x] Adicionar liberação de recursos por empresa

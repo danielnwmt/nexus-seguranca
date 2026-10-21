@@ -1,1 +1,3 @@
 - Camera card previews resolve their playback URL through `src/lib/mediaUrl.ts`, matching the publishing media server and its SSL domain rather than a recording storage server, to avoid blocked or misdirected streams.
+- SaaS rates live in an owner-only billing table and monthly fees are aggregated server-side using non-deleted company cameras; operational client fees must not feed owner revenue.
+- Cloud accounts payable use a database-default company key and restrictive tenant/module policies; scope query caches by signed-in user to prevent stale bills across sessions.

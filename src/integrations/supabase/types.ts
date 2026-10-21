@@ -346,6 +346,7 @@ export type Database = {
         Row: {
           amount: number
           category: string
+          company_id: string | null
           created_at: string
           description: string
           due_date: string | null
@@ -359,6 +360,7 @@ export type Database = {
         Insert: {
           amount?: number
           category?: string
+          company_id?: string | null
           created_at?: string
           description: string
           due_date?: string | null
@@ -372,6 +374,7 @@ export type Database = {
         Update: {
           amount?: number
           category?: string
+          company_id?: string | null
           created_at?: string
           description?: string
           due_date?: string | null
@@ -382,7 +385,15 @@ export type Database = {
           supplier?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "bills_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "saas_companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cameras: {
         Row: {
@@ -391,6 +402,7 @@ export type Database = {
           auto_record: boolean | null
           brand: string | null
           client_id: string | null
+          company_id: string | null
           created_at: string
           deleted_at: string | null
           id: string
@@ -416,6 +428,7 @@ export type Database = {
           auto_record?: boolean | null
           brand?: string | null
           client_id?: string | null
+          company_id?: string | null
           created_at?: string
           deleted_at?: string | null
           id?: string
@@ -441,6 +454,7 @@ export type Database = {
           auto_record?: boolean | null
           brand?: string | null
           client_id?: string | null
+          company_id?: string | null
           created_at?: string
           deleted_at?: string | null
           id?: string
@@ -466,6 +480,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cameras_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "saas_companies"
             referencedColumns: ["id"]
           },
         ]
@@ -1234,6 +1255,32 @@ export type Database = {
         }
         Relationships: []
       }
+      saas_company_billing: {
+        Row: {
+          company_id: string
+          price_per_camera: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          price_per_camera?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          price_per_camera?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saas_company_billing_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "saas_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saas_company_features: {
         Row: {
           company_id: string
@@ -1537,7 +1584,17 @@ export type Database = {
         Returns: Json
       }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
+      current_saas_company_id: { Args: never; Returns: string }
       get_owner_dashboard_stats: { Args: never; Returns: Json }
+      get_saas_company_billing: {
+        Args: never
+        Returns: {
+          cameras_count: number
+          company_id: string
+          monthly_fee: number
+          price_per_camera: number
+        }[]
+      }
       reset_rate_limit: { Args: { _identifier: string }; Returns: undefined }
     }
     Enums: {

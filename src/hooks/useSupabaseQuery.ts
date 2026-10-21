@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
+import { useAuth } from '@/contexts/AuthContext';
 
 type TableName = 'clients' | 'cameras' | 'guards' | 'alarms' | 'invoices' | 'storage_servers' | 'cloud_storages' | 'installers' | 'service_orders' | 'bills' | 'media_servers' | 'recordings' | 'analytics_events' | 'guard_clients' | 'alarm_panels' | 'alarm_zones';
 
@@ -78,9 +79,10 @@ export function useTableQuery<T = any>(table: TableName, orderBy = 'created_at',
   const ascending = typeof ascendingOrOptions === 'boolean' ? ascendingOrOptions : (ascendingOrOptions?.ascending ?? false);
   const enabled = typeof ascendingOrOptions === 'object' ? (ascendingOrOptions?.enabled ?? true) : true;
   const isLocal = isLocalInstallation();
+  const { user, companyId, companyAccessLoading } = useAuth();
 
   return useQuery({
-    queryKey: isLocal ? ['local', table] : [table],
+    queryKey: isLocal ? ['local', table] : [table, user?.id, companyId],
     queryFn: async () => {
       if (isLocal) {
         const softFilter = SOFT_DELETE_TABLES.has(table) ? '&deleted_at=is.null' : '';
@@ -112,7 +114,7 @@ export function useTableQuery<T = any>(table: TableName, orderBy = 'created_at',
       }
       return data as T[];
     },
-    enabled,
+    enabled: enabled && (isLocal || (!!user && !companyAccessLoading)),
     refetchInterval: 15000,
     refetchOnWindowFocus: true,
   });
@@ -132,11 +134,12 @@ export function usePaginatedQuery<T = any>(
 ) {
   const { orderBy = 'created_at', ascending = false, search, searchColumns, filters } = options || {};
   const isLocal = isLocalInstallation();
+  const { user, companyId, companyAccessLoading } = useAuth();
 
   return useQuery({
     queryKey: isLocal
       ? ['local', table, 'paginated', page, pageSize, search, filters]
-      : [table, 'paginated', page, pageSize, search, filters],
+      : [table, 'paginated', page, pageSize, search, filters, user?.id, companyId],
     queryFn: async () => {
       if (isLocal) {
         const from = page * pageSize;
@@ -207,6 +210,7 @@ export function usePaginatedQuery<T = any>(
       return { data: (data || []) as T[], count: count || 0, totalPages: Math.ceil((count || 0) / pageSize) };
     },
     placeholderData: (prev) => prev,
+    enabled: isLocal || (!!user && !companyAccessLoading),
     refetchInterval: 15000,
     refetchOnWindowFocus: true,
   });
