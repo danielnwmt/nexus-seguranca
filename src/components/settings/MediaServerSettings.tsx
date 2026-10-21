@@ -15,6 +15,7 @@ interface MediaServer {
   id: string;
   name: string;
   ip_address: string;
+  domain: string | null;
   instances: number;
   rtmp_base_port: number;
   hls_base_port: number;
@@ -26,6 +27,7 @@ interface MediaServer {
 const defaultForm = {
   name: 'Servidor MediaMTX',
   ip_address: '',
+  domain: '',
   instances: 1,
   rtmp_base_port: 1935,
   hls_base_port: 8888,
