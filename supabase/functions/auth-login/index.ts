@@ -165,7 +165,15 @@ Deno.serve(async (req) => {
         .eq("role", "owner")
         .maybeSingle();
 
-      if (!ownerRole) {
+      if (ownerRole) {
+        return new Response(JSON.stringify({
+          error: "invalid_company",
+          message: "Esta conta não pertence a este endereço.",
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } else {
         const { data: membership } = await adminClient
           .from("saas_company_users")
           .select("saas_companies!inner(subdomain, custom_domain, domain_type, status)")
