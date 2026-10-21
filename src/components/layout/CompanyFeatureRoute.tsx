@@ -13,7 +13,10 @@ const CompanyFeatureRoute = ({ module, children }: { module: string; children: R
   }
 
   if (companyId && !companyFeatures.includes(module)) {
-    return <Navigate to="/" replace />;
+    if (module !== 'dashboard' && companyFeatures.includes('dashboard')) {
+      return <Navigate to="/" replace />;
+    }
+    return <div className="py-16 text-center text-sm font-mono text-muted-foreground">Recurso não liberado para sua empresa.</div>;
   }
 
   return <>{children}</>;

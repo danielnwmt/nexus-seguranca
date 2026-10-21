@@ -124,6 +124,17 @@ export function useCompanySettings() {
           .eq('id', companyId)
           .single();
         if (error) throw error;
+        let mediaServerIp: string | null = null;
+        try {
+          const { data: ms } = await supabase
+            .from('media_servers')
+            .select('ip_address')
+            .limit(1)
+            .maybeSingle();
+          mediaServerIp = ms?.ip_address || null;
+        } catch {
+          mediaServerIp = null;
+        }
         return {
           id: data.id,
           name: data.name,
@@ -134,7 +145,7 @@ export function useCompanySettings() {
           phone: data.phone,
           email: data.email,
           logo_url: data.logo_url,
-          media_server_ip: null,
+          media_server_ip: mediaServerIp,
           login_bg_url: data.login_bg_url,
           recording_segment_minutes: data.recording_segment_minutes,
         } as CompanySettings;
