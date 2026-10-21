@@ -839,6 +839,7 @@ export type Database = {
       media_servers: {
         Row: {
           created_at: string
+          domain: string | null
           hls_base_port: number
           id: string
           instances: number
@@ -852,6 +853,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          domain?: string | null
           hls_base_port?: number
           id?: string
           instances?: number
@@ -865,6 +867,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          domain?: string | null
           hls_base_port?: number
           id?: string
           instances?: number

@@ -113,6 +113,8 @@ export function useTableQuery<T = any>(table: TableName, orderBy = 'created_at',
       return data as T[];
     },
     enabled,
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -205,6 +207,8 @@ export function usePaginatedQuery<T = any>(
       return { data: (data || []) as T[], count: count || 0, totalPages: Math.ceil((count || 0) / pageSize) };
     },
     placeholderData: (prev) => prev,
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
   });
 }
 
