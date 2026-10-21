@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { isLocalInstallation } from '@/hooks/useLocalApi';
+import { useTableQuery } from '@/hooks/useSupabaseQuery';
+import { buildPlayableUrl, buildHlsUrl as buildHlsUrlLib, pickMediaDomain } from '@/lib/mediaUrl';
 import { useToast } from '@/hooks/use-toast';
 import AnalyticsOverlay from '@/components/dashboard/AnalyticsOverlay';
 
