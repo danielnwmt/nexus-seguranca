@@ -15,6 +15,7 @@ interface MediaServer {
   id: string;
   name: string;
   ip_address: string;
+  domain: string | null;
   instances: number;
   rtmp_base_port: number;
   hls_base_port: number;
@@ -26,6 +27,7 @@ interface MediaServer {
 const defaultForm = {
   name: 'Servidor MediaMTX',
   ip_address: '',
+  domain: '',
   instances: 1,
   rtmp_base_port: 1935,
   hls_base_port: 8888,
@@ -113,6 +115,7 @@ const MediaServerSettings = () => {
     setForm({
       name: s.name,
       ip_address: s.ip_address,
+      domain: s.domain || '',
       instances: s.instances,
       rtmp_base_port: s.rtmp_base_port,
       hls_base_port: s.hls_base_port,
@@ -442,6 +445,17 @@ const MediaServerSettings = () => {
             <div>
               <Label className="text-xs">Endereço IP</Label>
               <Input value={form.ip_address} onChange={e => setForm(f => ({ ...f, ip_address: e.target.value }))} placeholder="192.168.1.100" />
+            </div>
+            <div>
+              <Label className="text-xs">Domínio com SSL (para o sistema na nuvem)</Label>
+              <Input
+                value={form.domain}
+                onChange={e => setForm(f => ({ ...f, domain: e.target.value.toLowerCase().replace(/^https?:\/\//, '').replace(/[^a-z0-9.-]/g, '') }))}
+                placeholder="ex: bilheteiapro.com"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Obrigatório quando o sistema está publicado (HTTPS). Sem ele o vídeo é bloqueado pelo navegador.
+              </p>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>

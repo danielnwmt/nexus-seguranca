@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { isLocalInstallation } from '@/hooks/useLocalApi';
+import { useTableQuery } from '@/hooks/useSupabaseQuery';
+import { buildPlayableUrl, buildHlsUrl as buildHlsUrlLib, pickMediaDomain } from '@/lib/mediaUrl';
 import { useToast } from '@/hooks/use-toast';
 import AnalyticsOverlay from '@/components/dashboard/AnalyticsOverlay';
 
@@ -54,6 +56,8 @@ const CameraPlayer = ({
   showAnalytics = true,
 }: CameraPlayerProps) => {
   const { toast } = useToast();
+  const { data: mediaServersList = [] } = useTableQuery('media_servers');
+  const mediaDomain = pickMediaDomain(mediaServersList as any[]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -92,8 +96,8 @@ const CameraPlayer = ({
     }
 
     const host = mediaServerIp || window.location.hostname;
-    return `http://${host}:${webrtcPort}/${key}/`;
-  }, [extractStreamKey, mediaServerIp, webrtcPort]);
+    return buildPlayableUrl('http', host, webrtcPort, key, mediaDomain);
+  }, [extractStreamKey, mediaServerIp, webrtcPort, mediaDomain]);
 
   // Build HLS fallback URL
   const buildHlsUrl = useCallback((): string => {
@@ -105,8 +109,8 @@ const CameraPlayer = ({
     }
 
     const host = mediaServerIp || window.location.hostname;
-    return `http://${host}:${hlsPort}/${key}/index.m3u8`;
-  }, [extractStreamKey, mediaServerIp, hlsPort]);
+    return buildHlsUrlLib('http', host, hlsPort, key, mediaDomain);
+  }, [extractStreamKey, mediaServerIp, hlsPort, mediaDomain]);
 
   const webrtcUrl = buildWebRtcUrl();
   const hlsUrl = buildHlsUrl();
