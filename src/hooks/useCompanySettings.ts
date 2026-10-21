@@ -128,10 +128,11 @@ export function useCompanySettings() {
         try {
           const { data: ms } = await supabase
             .from('media_servers')
-            .select('ip_address')
+            .select('ip_address, domain')
             .limit(1)
             .maybeSingle();
-          mediaServerIp = ms?.ip_address || null;
+          // Prefer the SSL domain so HTTPS pages can play the stream
+          mediaServerIp = (ms as any)?.domain || ms?.ip_address || null;
         } catch {
           mediaServerIp = null;
         }
