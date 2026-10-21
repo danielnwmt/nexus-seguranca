@@ -1,3 +1,5 @@
+import { useTableQuery } from '@/hooks/useSupabaseQuery';
+import { buildPlayableUrl, pickMediaDomain } from '@/lib/mediaUrl';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera as CameraType, ANALYTIC_LABELS } from '@/types/monitoring';
 import { Video, VideoOff, Circle, Pencil, Trash2, Play, Square, Eye, Brain, Film, ScanEye, Loader2, Link2 } from 'lucide-react';
@@ -119,6 +121,7 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
     }
   }, [isRecording, camera, toast]);
 
+  const { data: mediaServersList = [] } = useTableQuery('media_servers');
   // Converte stream URL para endpoint WebRTC reproduzível
   const getWebRtcUrl = (): string => {
     const url = camera.streamUrl;
@@ -166,7 +169,7 @@ const CameraFeed = ({ camera, compact, onEdit, onDelete }: CameraFeedProps) => {
     }
 
     const host = streamHost || window.location.hostname;
-    return `${scheme}://${host}:${streamPort}/${streamKey}/`;
+    return buildPlayableUrl(scheme, host, streamPort, streamKey, pickMediaDomain(mediaServersList as any[]));
   };
 
   const webRtcUrl = getWebRtcUrl();
