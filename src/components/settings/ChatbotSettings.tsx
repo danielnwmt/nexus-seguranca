@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import WhatsAppConnect from './WhatsAppConnect';
 
 interface BotAction {
   id: string;
@@ -133,6 +134,7 @@ const ChatbotSettings = () => {
 
   return (
     <div className="space-y-4">
+      <WhatsAppConnect />
       {/* Webhook n8n */}
       <Card className="bg-card border-border">
         <CardHeader>
