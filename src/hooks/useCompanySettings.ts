@@ -132,7 +132,8 @@ export function useCompanySettings() {
             .limit(1)
             .maybeSingle();
           // Prefer the SSL domain so HTTPS pages can play the stream
-          mediaServerIp = (ms as any)?.domain || ms?.ip_address || null;
+          const row = ms as any;
+          mediaServerIp = row?.domain || row?.ip_address || null;
         } catch {
           mediaServerIp = null;
         }
