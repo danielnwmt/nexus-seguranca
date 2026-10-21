@@ -75,7 +75,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
              : tenantAddress.customDomain
                ? tenantCompany?.domain_type !== 'custom' || tenantCompany?.custom_domain !== tenantAddress.customDomain
                : false;
-           if (!roles.includes('owner') && (!tenantCompany || tenantCompany.status !== 'active' || addressMismatch)) {
+           const onTenantAddress = !!(tenantAddress.subdomain || tenantAddress.customDomain);
+           const ownerOnTenant = roles.includes('owner') && onTenantAddress;
+           if (ownerOnTenant || (!roles.includes('owner') && (!tenantCompany || tenantCompany.status !== 'active' || addressMismatch))) {
              await supabase.auth.signOut();
              setUser(null);
              setSession(null);
