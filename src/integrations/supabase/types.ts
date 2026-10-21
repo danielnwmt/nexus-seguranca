@@ -1460,6 +1460,42 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_configs: {
+        Row: {
+          bot_enabled: boolean
+          company_id: string | null
+          created_at: string
+          gs_api_key: string | null
+          gs_app: string | null
+          gs_number: string | null
+          id: string
+          owner_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          bot_enabled?: boolean
+          company_id?: string | null
+          created_at?: string
+          gs_api_key?: string | null
+          gs_app?: string | null
+          gs_number?: string | null
+          id?: string
+          owner_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          bot_enabled?: boolean
+          company_id?: string | null
+          created_at?: string
+          gs_api_key?: string | null
+          gs_app?: string | null
+          gs_number?: string | null
+          id?: string
+          owner_user_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       company_branding_public: {

@@ -6,24 +6,49 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 const KEY = 'nexus_whatsapp_config';
-const GUPSHUP_WEBHOOK = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/chatbot-webhook?provider=gupshup`;
+const WEBHOOK_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chatbot-webhook?provider=gupshup`;
 
 type Cfg = { mode: 'qrcode' | 'gupshup'; evoUrl: string; evoKey: string; evoInstance: string; gsApiKey: string; gsApp: string; gsNumber: string };
 const blank: Cfg = { mode: 'qrcode', evoUrl: '', evoKey: '', evoInstance: 'nexus', gsApiKey: '', gsApp: '', gsNumber: '' };
 
 const WhatsAppConnect = () => {
   const { toast } = useToast();
+  const { user, companyId } = useAuth();
   const [cfg, setCfg] = useState<Cfg>(() => { try { return { ...blank, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { return blank; } });
   const [qr, setQr] = useState('');
   const [state, setState] = useState('');
   const [loading, setLoading] = useState(false);
+  const [cfgId, setCfgId] = useState<string | null>(null);
   const set = (k: keyof Cfg, v: string) => setCfg(p => ({ ...p, [k]: v }));
   const base = cfg.evoUrl.replace(/\/$/, '');
   const headers = { apikey: cfg.evoKey, 'Content-Type': 'application/json' };
+  const GUPSHUP_WEBHOOK = cfgId ? `${WEBHOOK_BASE}&cfg=${cfgId}` : 'Salve a Gupshup para gerar o endereço';
 
-  const save = () => { localStorage.setItem(KEY, JSON.stringify(cfg)); toast({ title: 'WhatsApp salvo' }); };
+  useEffect(() => {
+    if (!user) return;
+    const q = supabase.from('whatsapp_configs').select('id, gs_api_key, gs_app, gs_number');
+    (companyId ? q.eq('company_id', companyId) : q.eq('owner_user_id', user.id).is('company_id', null)).maybeSingle().then(({ data }) => {
+      if (data) { setCfgId(data.id); setCfg(p => ({ ...p, gsApiKey: data.gs_api_key || '', gsApp: data.gs_app || '', gsNumber: data.gs_number || '' })); }
+    });
+  }, [user, companyId]);
+
+  const save = async () => {
+    const { gsApiKey, ...rest } = cfg;
+    localStorage.setItem(KEY, JSON.stringify(rest));
+    if (cfg.mode === 'gupshup' && user) {
+      const row = { company_id: companyId, owner_user_id: user.id, gs_api_key: cfg.gsApiKey, gs_app: cfg.gsApp, gs_number: cfg.gsNumber, updated_at: new Date().toISOString() };
+      const res = cfgId
+        ? await supabase.from('whatsapp_configs').update(row).eq('id', cfgId).select('id').single()
+        : await supabase.from('whatsapp_configs').insert(row).select('id').single();
+      if (res.error) return toast({ title: 'Erro ao salvar', description: res.error.message, variant: 'destructive' });
+      setCfgId(res.data.id);
+    }
+    toast({ title: 'WhatsApp salvo' });
+  };
 
   const checkState = async () => {
     try {
