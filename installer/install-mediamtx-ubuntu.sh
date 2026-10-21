@@ -5,7 +5,7 @@
 
 set -Eeuo pipefail
 
-MEDIAMTX_VERSION="${MEDIAMTX_VERSION:-v1.9.3}"
+MEDIAMTX_VERSION="${MEDIAMTX_VERSION:-v1.12.3}"
 MEDIAMTX_BIN="${MEDIAMTX_BIN:-/usr/local/bin/mediamtx}"
 MEDIAMTX_CONFIG="${MEDIAMTX_CONFIG:-/usr/local/etc/mediamtx.yml}"
 MEDIAMTX_USER="${MEDIAMTX_USER:-mediamtx}"
@@ -124,7 +124,7 @@ if [[ "$SSL_ENABLED" == "true" ]]; then
 set -e
 install -m 0640 -o root -g ${MEDIAMTX_USER} /etc/letsencrypt/live/${MEDIA_DOMAIN}/privkey.pem ${CERT_DIR}/privkey.pem
 install -m 0640 -o root -g ${MEDIAMTX_USER} /etc/letsencrypt/live/${MEDIA_DOMAIN}/fullchain.pem ${CERT_DIR}/fullchain.pem
-systemctl restart mediamtx
+systemctl is-enabled mediamtx >/dev/null 2>&1 && systemctl restart mediamtx || true
 EOF
   chmod 0755 /etc/letsencrypt/renewal-hooks/deploy/mediamtx.sh
   bash /etc/letsencrypt/renewal-hooks/deploy/mediamtx.sh
