@@ -32,7 +32,7 @@ const ClientCameraViewer = ({ open, onOpenChange, client, cameras, allClients }:
   const mapCamera = (c: any) => {
     const cl = allClients.find((cl: any) => cl.id === c.client_id);
     const streamUrl = mediaServerIp && c.stream_key
-      ? `http://${mediaServerIp}:8889/${c.stream_key}/`
+      ? buildPlayableUrl('http', mediaServerIp, 8889, c.stream_key, pickMediaDomain([{ ip_address: mediaServerIp }]))
       : c.stream_url || '';
     return {
       id: c.id,

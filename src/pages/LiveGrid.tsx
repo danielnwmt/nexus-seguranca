@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useTableQuery } from '@/hooks/useSupabaseQuery';
 import { isLocalInstallation } from '@/hooks/useLocalApi';
 import LazyVideoCell from '@/components/dashboard/LazyVideoCell';
+import { buildPlayableUrl, pickMediaDomain } from '@/lib/mediaUrl';
 
 type GridLayout = '2x2' | '3x3' | '4x4';
 
@@ -108,7 +109,7 @@ const LiveGrid = () => {
     }
 
     const host = streamHost || (mediaServers as any[])[0]?.ip_address || window.location.hostname;
-    return `${scheme}://${host}:${streamPort}/${streamKey}/`;
+    return buildPlayableUrl(scheme, host, streamPort, streamKey, pickMediaDomain(mediaServers as any[]));
   };
 
   return (
