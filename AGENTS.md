@@ -1,0 +1,1 @@
+- Camera card previews resolve their playback URL through `src/lib/mediaUrl.ts`, matching the publishing media server and its SSL domain rather than a recording storage server, to avoid blocked or misdirected streams.

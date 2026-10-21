@@ -1,5 +1,21 @@
 const isIp = (h: string) => /^\d{1,3}(\.\d{1,3}){3}$/.test(h);
 
+/** Resolve previews against the publishing media server, never the recording storage server. */
+export const buildCameraPreviewUrl = (
+  camera: { stream_key?: string | null; stream_url?: string | null },
+  servers: { ip_address?: string; domain?: string | null; webrtc_base_port?: number }[],
+): string => {
+  let source: URL | undefined;
+  try {
+    if (camera.stream_url) source = new URL(camera.stream_url);
+  } catch { /* Fall back to the saved stream key and configured media server. */ }
+  const key = camera.stream_key || source?.pathname.replace(/^\/+|\/+$/g, '') || '';
+  const server = servers.find(s => s.ip_address === source?.hostname || s.domain === source?.hostname) || servers[0];
+  const host = server?.domain?.trim() || source?.hostname || server?.ip_address || '';
+  if (!host || !key) return '';
+  return buildPlayableUrl('http', host, server?.webrtc_base_port || 8889, key, pickMediaDomain(server ? [server] : []));
+};
+
 /** Pick a domain-type media server host (needed for HTTPS/SSL). */
 export const pickMediaDomain = (servers: any[] = []): string => {
   const clean = (v: string) => v.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
