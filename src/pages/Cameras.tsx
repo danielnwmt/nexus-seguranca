@@ -16,6 +16,7 @@ import { useTableQuery, usePaginatedQuery, useInsertMutation, useUpdateMutation,
 import LineCrossingEditor, { type LineCrossingLine } from '@/components/cameras/LineCrossingEditor';
 import RecordingsViewer from '@/components/cameras/RecordingsViewer';
 import DvrDiscovery from '@/components/cameras/DvrDiscovery';
+import { buildCameraPreviewUrl } from '@/lib/mediaUrl';
 
 // ── Options as specified ──
 const PROTOCOL_OPTIONS = ['RTSP', 'RTMP'] as const;
@@ -355,17 +356,19 @@ const Cameras = () => {
           const isRecording = camera.status === 'recording';
           const retDays = camera.retention_days ?? 30;
           const clientName = getClientName(camera.client_id);
+          const previewUrl = buildCameraPreviewUrl(camera, serverList);
 
           return (
             <Card key={camera.id} className="group overflow-hidden border-border bg-card hover:border-primary/30 transition-all">
               {/* Thumbnail area */}
               <div className="relative bg-black aspect-video flex items-center justify-center overflow-hidden">
-                {isOnline && defaultMediaServerIp ? (
+                {isOnline && previewUrl ? (
                   <iframe
-                    src={`http://${getServerIpForClient(camera.client_id)}:${webrtcPort}/${camera.stream_key || camera.id}/`}
+                    src={previewUrl}
                     className="absolute inset-0 w-full h-full border-0"
-                    allow="autoplay; muted"
-                    loading="lazy"
+                    allow="autoplay; encrypted-media; fullscreen"
+                    title={`Imagem ao vivo — ${camera.name}`}
+                    loading="eager"
                   />
                 ) : camera.snapshot_url ? (
                   <img
