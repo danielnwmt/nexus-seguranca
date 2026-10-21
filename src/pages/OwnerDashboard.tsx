@@ -14,6 +14,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { getCompanyAccessUrl, getCompanyUrl, normalizeDomain, normalizeSubdomain } from '@/lib/tenantDomain';
+import { calculateCompanyMonthlyFee, totalActiveCompanyFees, type CompanyBilling } from '@/lib/saasBilling';
+
+const currency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 interface OwnerStats {
   clients_total: number;
@@ -80,6 +83,31 @@ const OwnerDashboard = () => {
   const [temporaryAccess, setTemporaryAccess] = useState<{ email: string; password: string } | null>(null);
   const [passwordCopied, setPasswordCopied] = useState(false);
   const [enabledModules, setEnabledModules] = useState<string[]>([]);
+  const [billingCompany, setBillingCompany] = useState<Company | null>(null);
+  const [cameraPrice, setCameraPrice] = useState('0');
+  const { data: billing = [], isLoading: billingLoading, error: billingError } = useQuery({
+    queryKey: ['saas-company-billing'],
+    queryFn: async () => {
+      const { data: rows, error: queryError } = await supabase.rpc('get_saas_company_billing');
+      if (queryError) throw queryError;
+      return (rows || []).map((row) => ({ ...row, price_per_camera: Number(row.price_per_camera), cameras_count: Number(row.cameras_count), monthly_fee: Number(row.monthly_fee) })) as CompanyBilling[];
+    },
+    refetchInterval: 15000,
+  });
+  const saveBilling = useMutation({
+    mutationFn: async () => {
+      const price = Number(cameraPrice);
+      if (!billingCompany || cameraPrice.trim() === '' || !Number.isFinite(price) || price < 0) throw new Error('Informe um valor por câmera válido.');
+      const { error: saveError } = await supabase.from('saas_company_billing').upsert({ company_id: billingCompany.id, price_per_camera: price, updated_at: new Date().toISOString() });
+      if (saveError) throw saveError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['saas-company-billing'] });
+      setBillingCompany(null);
+      toast({ title: 'Cobrança atualizada' });
+    },
+    onError: (saveError: Error) => toast({ title: 'Não foi possível salvar a cobrança', description: saveError.message, variant: 'destructive' }),
+  });
   const { data = emptyStats, isLoading, error } = useQuery({
     queryKey: ['owner-dashboard-stats'],
     queryFn: async () => {
@@ -145,6 +173,7 @@ const OwnerDashboard = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['saas-companies'] });
+      queryClient.invalidateQueries({ queryKey: ['saas-company-billing'] });
       setCompanyDialog(false);
       toast({ title: editingCompany ? 'Empresa atualizada' : 'Empresa adicionada' });
     },
@@ -255,7 +284,7 @@ const OwnerDashboard = () => {
             <StatsCard title="Usuários" value={isLoading ? '—' : data.users_total} icon={ShieldCheck} />
             <StatsCard title="Câmeras" value={isLoading ? '—' : data.cameras_total} icon={Camera} trend={`${data.cameras_online} online`} variant={onlineRate < 80 ? 'warning' : 'success'} />
             <StatsCard title="Alarmes abertos" value={isLoading ? '—' : data.alarms_open} icon={Bell} variant={data.alarms_open > 0 ? 'warning' : 'default'} />
-            <StatsCard title="Mensalidades" value={isLoading ? '—' : data.monthly_revenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} icon={DollarSign} variant="success" />
+            <StatsCard title="Mensalidades SaaS" value={companiesLoading || billingLoading || billingError ? '—' : currency(totalActiveCompanyFees(companies, billing))} icon={DollarSign} variant="success" />
           </section>
 
           <section className="grid gap-4 lg:grid-cols-3">
@@ -296,21 +325,25 @@ const OwnerDashboard = () => {
               <Button onClick={openNewCompany}><Plus /> Adicionar empresa</Button>
             </div>
 
+            {billingError && <p className="text-sm text-destructive">Não foi possível carregar as cobranças das empresas.</p>}
             <div className="overflow-hidden rounded-md border border-border">
               <Table>
-                <TableHeader><TableRow><TableHead>Empresa</TableHead><TableHead>Contato</TableHead><TableHead>Plano</TableHead><TableHead>Situação</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Empresa</TableHead><TableHead>Contato</TableHead><TableHead>Plano</TableHead><TableHead>Câmeras</TableHead><TableHead>Valor / câmera</TableHead><TableHead>Mensalidade SaaS</TableHead><TableHead>Situação</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {companiesLoading ? (
-                    <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">Carregando empresas...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="py-10 text-center text-muted-foreground">Carregando empresas...</TableCell></TableRow>
                   ) : companies.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">Nenhuma empresa cadastrada.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="py-10 text-center text-muted-foreground">Nenhuma empresa cadastrada.</TableCell></TableRow>
                   ) : companies.map((company) => (
                     <TableRow key={company.id}>
                       <TableCell><strong>{company.name}</strong><div className="text-xs text-muted-foreground">{company.document || 'Documento não informado'}</div><div className="mt-1 flex items-center gap-1 font-mono text-xs text-primary"><ExternalLink className="h-3 w-3" />{getCompanyAccessUrl(company)}</div></TableCell>
                       <TableCell><div>{company.email || '—'}</div><div className="text-xs text-muted-foreground">{company.phone || '—'}</div></TableCell>
                       <TableCell>{company.plan_name}</TableCell>
+                      <TableCell className="font-mono">{billingLoading || billingError ? '—' : billing.find((row) => row.company_id === company.id)?.cameras_count ?? 0}</TableCell>
+                      <TableCell className="whitespace-nowrap font-mono">{billingLoading || billingError ? '—' : currency(billing.find((row) => row.company_id === company.id)?.price_per_camera ?? 0)}</TableCell>
+                      <TableCell className="whitespace-nowrap font-mono">{billingLoading || billingError ? '—' : currency(billing.find((row) => row.company_id === company.id)?.monthly_fee ?? 0)}</TableCell>
                       <TableCell><Badge variant={company.status === 'active' ? 'default' : 'secondary'}>{company.status === 'active' ? 'Ativa' : 'Inativa'}</Badge></TableCell>
-                      <TableCell><div className="flex justify-end gap-2"><Button variant="outline" size="sm" onClick={() => openFeatures(company)}><Settings2 /> Recursos</Button><Button variant="ghost" size="icon" title="Editar empresa" onClick={() => openEditCompany(company)}><Pencil /></Button></div></TableCell>
+                      <TableCell><div className="flex justify-end gap-2"><Button variant="outline" size="icon" title="Configurar cobrança" aria-label={`Configurar cobrança de ${company.name}`} disabled={billingLoading || !!billingError} onClick={() => { setBillingCompany(company); setCameraPrice(String(billing.find((row) => row.company_id === company.id)?.price_per_camera ?? 0)); }}><DollarSign /></Button><Button variant="outline" size="sm" onClick={() => openFeatures(company)}><Settings2 /> Recursos</Button><Button variant="ghost" size="icon" title="Editar empresa" onClick={() => openEditCompany(company)}><Pencil /></Button></div></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -319,6 +352,20 @@ const OwnerDashboard = () => {
           </section>
         </>
       )}
+
+      <Dialog open={!!billingCompany} onOpenChange={(open) => { if (!open) setBillingCompany(null); }}>
+        <DialogContent className="max-w-md">
+          <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); saveBilling.mutate(); }}>
+            <DialogHeader><DialogTitle>Cobrança SaaS — {billingCompany?.name}</DialogTitle></DialogHeader>
+            <div><Label htmlFor="camera-price">Valor mensal por câmera (R$)</Label><Input id="camera-price" type="number" min="0" step="0.01" required value={cameraPrice} onChange={(event) => setCameraPrice(event.target.value)} /></div>
+            <dl className="space-y-3 border-y border-border py-4">
+              <div className="flex justify-between"><dt className="text-muted-foreground">Câmeras cadastradas</dt><dd className="font-mono">{billing.find((row) => row.company_id === billingCompany?.id)?.cameras_count ?? 0}</dd></div>
+              <div className="flex justify-between"><dt>Mensalidade da empresa</dt><dd className="font-mono text-primary">{currency(calculateCompanyMonthlyFee(Math.max(0, Number(cameraPrice) || 0), billing.find((row) => row.company_id === billingCompany?.id)?.cameras_count ?? 0))}</dd></div>
+            </dl>
+            <DialogFooter><Button type="button" variant="outline" onClick={() => setBillingCompany(null)}>Cancelar</Button><Button type="submit" disabled={saveBilling.isPending}>{saveBilling.isPending ? 'Salvando...' : 'Salvar cobrança'}</Button></DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={companyDialog} onOpenChange={setCompanyDialog}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { isLocalInstallation, getLocalApiBase } from '@/hooks/useLocalApi';
+import { useAuth } from '@/contexts/AuthContext';
 
 type TableName = 'clients' | 'cameras' | 'guards' | 'alarms' | 'invoices' | 'storage_servers' | 'cloud_storages' | 'installers' | 'service_orders' | 'bills' | 'media_servers' | 'recordings' | 'analytics_events' | 'guard_clients' | 'alarm_panels' | 'alarm_zones';
 
@@ -80,7 +81,7 @@ export function useTableQuery<T = any>(table: TableName, orderBy = 'created_at',
   const isLocal = isLocalInstallation();
 
   return useQuery({
-    queryKey: isLocal ? ['local', table] : [table],
+    queryKey: isLocal ? ['local', table] : [table, user?.id, companyId],
     queryFn: async () => {
       if (isLocal) {
         const softFilter = SOFT_DELETE_TABLES.has(table) ? '&deleted_at=is.null' : '';
