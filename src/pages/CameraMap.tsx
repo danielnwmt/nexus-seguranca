@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { MapPin, Camera, Wifi, WifiOff, Users } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapContainer, TileLayer, Marker, Popup, LayersControl, LayerGroup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, LayersControl } from 'react-leaflet';
 import L from 'leaflet';
 import { useCameras } from '@/hooks/useCameras';
 import { useTableQuery } from '@/hooks/useSupabaseQuery';
