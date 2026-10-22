@@ -1,8 +1,9 @@
 # Roadmap
 
-- [ ] Configurar cobrança por câmera e mostrar mensalidade por empresa no SaaS
-- [ ] Verificar isolamento de contas a pagar por empresa
-- [ ] Validar salvamento e cálculo da cobrança SaaS
+- [x] Configurar cobrança por câmera e mostrar mensalidade por empresa no SaaS
+- [x] Aplicar isolamento de contas a pagar por empresa no banco
+- [x] Testar cálculo da cobrança SaaS
+- [ ] Validar salvamento na tela e contas a pagar com sessão ativa — bloqueado: autorização de acesso para teste recusada
 
 - [x] Separar menu da Gestão SaaS
 - [x] Adicionar cadastro de empresas
