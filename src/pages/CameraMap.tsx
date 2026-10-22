@@ -72,10 +72,20 @@ const CameraMap = () => {
       ) : (
         <div className="rounded-lg overflow-hidden border border-border" style={{ height: 'calc(100vh - 200px)' }}>
           <MapContainer center={defaultCenter} zoom={12} style={{ height: '100%', width: '100%' }}>
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
+            <LayersControl position="topright">
+              <LayersControl.BaseLayer checked name="Padrão">
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+              </LayersControl.BaseLayer>
+              <LayersControl.BaseLayer name="Satélite">
+                <TileLayer
+                  attribution='Imagens &copy; <a href="https://www.esri.com/">Esri</a>'
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                />
+              </LayersControl.BaseLayer>
+            </LayersControl>
             {clientsWithLocation.map((client) => {
               const cameras = clientCamerasMap[client.id] || [];
               const onlineCount = cameras.filter(c => c.status === 'online').length;
