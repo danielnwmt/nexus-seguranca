@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Badge } from '@/components/ui/badge';
 import { isLocalInstallation } from '@/hooks/useLocalApi';
 import { useTableQuery } from '@/hooks/useSupabaseQuery';
-import { buildPlayableUrl, buildHlsUrl as buildHlsUrlLib, pickMediaDomain } from '@/lib/mediaUrl';
+import { buildPlayableUrl, buildHlsUrl as buildHlsUrlLib, pickMediaDomain, buildCameraPreviewUrl } from '@/lib/mediaUrl';
 import { useToast } from '@/hooks/use-toast';
 import AnalyticsOverlay from '@/components/dashboard/AnalyticsOverlay';
 
@@ -95,9 +95,13 @@ const CameraPlayer = ({
       return `${window.location.origin}/webrtc/${key}`;
     }
 
+    if (!mediaServerIp) {
+      const url = buildCameraPreviewUrl({ stream_key: key, stream_url: streamUrl }, mediaServersList as any[]);
+      if (url) return url;
+    }
     const host = mediaServerIp || window.location.hostname;
     return buildPlayableUrl('http', host, webrtcPort, key, mediaDomain);
-  }, [extractStreamKey, mediaServerIp, webrtcPort, mediaDomain]);
+  }, [extractStreamKey, mediaServerIp, webrtcPort, mediaDomain, streamUrl, mediaServersList]);
 
   // Build HLS fallback URL
   const buildHlsUrl = useCallback((): string => {
